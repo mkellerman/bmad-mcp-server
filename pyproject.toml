@@ -1,6 +1,6 @@
 [project]
 name = "bmad-mcp-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server providing BMad Master orchestration with embedded agent personas, workflows, and task execution capabilities"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -51,7 +51,7 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
-minversion = "0.1.0"
+minversion = "0.1.1"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
