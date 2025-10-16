@@ -1,0 +1,177 @@
+name: Release to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      pre_release_tag:
+        description: 'Pre-release tag to promote (e.g., v1.0.0-alpha.3)'
+        required: false
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+    
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e ".[dev]"
+        uv pip install --system build twine
+    
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Validate version format
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ Error: Version must be in format X.Y.Z (e.g., 1.0.0)"
+          exit 1
+        fi
+        echo "✅ Version format is valid: $VERSION"
+    
+    - name: Check if tag already exists
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        TAG="v${VERSION}"
+        if git rev-parse "$TAG" >/dev/null 2>&1; then
+          echo "❌ Error: Tag $TAG already exists"
+          exit 1
+        fi
+        echo "✅ Tag $TAG does not exist, proceeding..."
+    
+    - name: Update version in pyproject.toml
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        sed -i 's/version = ".*"/version = "'$VERSION'"/' pyproject.toml
+        echo "✅ Updated pyproject.toml to version $VERSION"
+        cat pyproject.toml | grep "^version"
+    
+    - name: Run full test suite
+      run: |
+        pytest --cov=src/bmad_mcp --cov-report=term-missing --cov-fail-under=60 -v
+        echo "✅ All tests passed"
+    
+    - name: Build package
+      run: |
+        python -m build
+        echo "📦 Package built successfully"
+        ls -lh dist/
+    
+    - name: Verify package contents
+      run: |
+        python -m twine check dist/*
+        echo "✅ Package verification passed"
+    
+    - name: Commit version bump
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        git add pyproject.toml
+        git commit -m "chore: release version $VERSION [skip ci]"
+        git push origin main
+        echo "✅ Committed version bump to main"
+    
+    - name: Create and push release tag
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        TAG="v${VERSION}"
+        git tag -a "$TAG" -m "Release $VERSION"
+        git push origin "$TAG"
+        echo "✅ Created and pushed tag $TAG"
+    
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        python -m twine upload dist/*
+        VERSION="${{ github.event.inputs.version }}"
+        echo "✅ Published to PyPI: https://pypi.org/project/bmad-mcp-server/$VERSION/"
+    
+    - name: Generate changelog
+      id: changelog
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        PRE_RELEASE_TAG="${{ github.event.inputs.pre_release_tag }}"
+        
+        if [ -n "$PRE_RELEASE_TAG" ]; then
+          # Generate changelog from pre-release tag to now
+          CHANGELOG=$(git log ${PRE_RELEASE_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+        else
+          # Generate changelog from last release tag
+          LAST_TAG=$(git tag -l "v*.*.*" --sort=-v:refname | grep -v alpha | grep -v beta | head -n 2 | tail -n 1)
+          if [ -n "$LAST_TAG" ]; then
+            CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+          else
+            CHANGELOG="Initial release"
+          fi
+        fi
+        
+        # Save to file for GitHub release
+        echo "$CHANGELOG" > CHANGELOG.txt
+        echo "✅ Generated changelog"
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.event.inputs.version }}
+        release_name: "Release v${{ github.event.inputs.version }}"
+        body: |
+          ## 🚀 Release v${{ github.event.inputs.version }}
+          
+          ### 📦 Installation
+          ```bash
+          pip install bmad-mcp-server==${{ github.event.inputs.version }}
+          ```
+          
+          ### 📝 Changes
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ### 🔗 Links
+          - [PyPI Package](https://pypi.org/project/bmad-mcp-server/${{ github.event.inputs.version }}/)
+          - [Documentation](https://github.com/mkellerman/bmad-mcp-server#readme)
+          
+          ---
+          
+          **Full Changelog**: https://github.com/mkellerman/bmad-mcp-server/compare/${{ github.event.inputs.pre_release_tag || 'main' }}...v${{ github.event.inputs.version }}
+        draft: false
+        prerelease: false
+    
+    - name: Bump to next dev version
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+        NEXT_MINOR=$((MINOR + 1))
+        NEXT_VERSION="${MAJOR}.${NEXT_MINOR}.0"
+        
+        sed -i 's/version = ".*"/version = "'$NEXT_VERSION'"/' pyproject.toml
+        
+        git add pyproject.toml
+        git commit -m "chore: bump version to $NEXT_VERSION-dev [skip ci]"
+        git push origin main
+        
+        echo "✅ Bumped version to $NEXT_VERSION for next development cycle"

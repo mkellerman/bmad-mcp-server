@@ -1,0 +1,131 @@
+name: Pre-release (TestPyPI)
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+      - '!.github/workflows/pre-release.yml'
+
+jobs:
+  pre-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+    
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e ".[dev]"
+        uv pip install --system build twine
+    
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Get current version and calculate next pre-release
+      id: version
+      run: |
+        # Get current version from pyproject.toml
+        CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # Get latest pre-release tag for current version
+        BASE_VERSION="${CURRENT_VERSION%-*}"
+        LATEST_TAG=$(git tag -l "v${BASE_VERSION}-alpha.*" | sort -V | tail -n 1)
+        
+        if [ -z "$LATEST_TAG" ]; then
+          # No pre-release tags yet, start with alpha.1
+          PRE_NUMBER=1
+        else
+          # Extract pre-release number and increment
+          PRE_NUMBER=$(echo $LATEST_TAG | sed 's/.*alpha\.\([0-9]*\)/\1/')
+          PRE_NUMBER=$((PRE_NUMBER + 1))
+        fi
+        
+        NEW_VERSION="${BASE_VERSION}-alpha.${PRE_NUMBER}"
+        NEW_TAG="v${NEW_VERSION}"
+        
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+        echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+        
+        echo "📦 Current version: $CURRENT_VERSION"
+        echo "🚀 New pre-release version: $NEW_VERSION"
+        echo "🏷️  New tag: $NEW_TAG"
+    
+    - name: Update version in pyproject.toml
+      run: |
+        sed -i 's/version = ".*"/version = "${{ steps.version.outputs.new_version }}"/' pyproject.toml
+        echo "✅ Updated pyproject.toml to version ${{ steps.version.outputs.new_version }}"
+    
+    - name: Run tests
+      run: |
+        pytest --cov=src/bmad_mcp --cov-report=term-missing --cov-fail-under=60
+    
+    - name: Build package
+      run: |
+        python -m build
+        echo "📦 Package built successfully"
+        ls -lh dist/
+    
+    - name: Commit version bump
+      run: |
+        git add pyproject.toml
+        git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]" || echo "No changes to commit"
+        git push origin main || echo "Nothing to push"
+    
+    - name: Create and push tag
+      run: |
+        git tag -a "${{ steps.version.outputs.new_tag }}" -m "Pre-release ${{ steps.version.outputs.new_version }}"
+        git push origin "${{ steps.version.outputs.new_tag }}"
+        echo "✅ Created and pushed tag ${{ steps.version.outputs.new_tag }}"
+    
+    - name: Publish to TestPyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      run: |
+        python -m twine upload --repository testpypi dist/*
+        echo "✅ Published to TestPyPI: https://test.pypi.org/project/bmad-mcp-server/${{ steps.version.outputs.new_version }}/"
+    
+    - name: Create GitHub Pre-release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.new_tag }}
+        release_name: "Pre-release ${{ steps.version.outputs.new_version }}"
+        body: |
+          ## 🧪 Pre-release ${{ steps.version.outputs.new_version }}
+          
+          This is an automated pre-release for testing purposes.
+          
+          ### 📦 Installation from TestPyPI
+          ```bash
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bmad-mcp-server==${{ steps.version.outputs.new_version }}
+          ```
+          
+          ### ⚠️ Testing Only
+          This pre-release is published to TestPyPI for validation. Do not use in production.
+          
+          To promote this release to production PyPI, use the "Release to PyPI" workflow.
+        draft: false
+        prerelease: true

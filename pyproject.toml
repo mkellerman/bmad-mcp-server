@@ -1,0 +1,88 @@
+[project]
+name = "bmad-mcp-server"
+version = "0.1.0"
+description = "MCP server providing BMad Master orchestration with embedded agent personas, workflows, and task execution capabilities"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Marc R Kellerman", email = "mkellerman@outlook.com"}
+]
+keywords = ["mcp", "server", "agent", "orchestration", "workflow", "bmad", "personas", "claude"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "pyyaml>=6.0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/mkellerman/bmad-mcp-server"
+Repository = "https://github.com/mkellerman/bmad-mcp-server"
+Documentation = "https://github.com/mkellerman/bmad-mcp-server#readme"
+Issues = "https://github.com/mkellerman/bmad-mcp-server/issues"
+
+[project.scripts]
+bmad-mcp-server = "bmad_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bmad_mcp"]
+
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "-v",
+]
+markers = [
+    "unit: Unit tests for isolated components",
+    "integration: Integration tests for MCP tools and server",
+    "slow: Tests that take significant time to run",
+]
+
+# Coverage settings (applied when --cov flag is used)
+[tool.coverage.run]
+source = ["bmad_mcp"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+fail_under = 60

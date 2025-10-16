@@ -1,0 +1,25 @@
+# Codecov configuration for bmad-mcp-server
+
+codecov:
+  require_ci_to_pass: yes
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto         # Let Codecov set an appropriate target
+        threshold: 1%        # Allow small fluctuations
+        base: auto
+    patch:
+      default:
+        target: 60%          # Match pytest --cov-fail-under
+        threshold: 1%
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+
+ignore:
+  - "tests/**"
+  - "docs/**"
+
