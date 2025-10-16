@@ -27,11 +27,12 @@ jobs:
     
     - name: Install dependencies
       run: |
-        uv pip install --system -e ".[dev]"
+        uv sync --all-extras --dev
+        uv pip install pytest
     
     - name: Run tests with coverage
       run: |
-        pytest --cov=src/bmad_mcp --cov-report=xml --cov-report=term-missing --cov-fail-under=60
+        uv run pytest --cov=src/bmad_mcp --cov-report=xml --cov-report=term-missing --cov-fail-under=60
     
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -56,15 +57,15 @@ jobs:
     
     - name: Install dependencies
       run: |
-        uv pip install --system -e ".[dev]"
-        uv pip install --system ruff mypy
+        uv sync --all-extras --dev
+        uv pip install ruff mypy
     
     - name: Run ruff
       run: |
-        ruff check src/
+        uv run ruff check src/
       continue-on-error: true
     
     - name: Run type checking
       run: |
-        mypy src/bmad_mcp --ignore-missing-imports
+        uv run mypy src/bmad_mcp --ignore-missing-imports
       continue-on-error: true
