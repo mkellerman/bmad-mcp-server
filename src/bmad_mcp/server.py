@@ -1,6 +1,9 @@
 """BMAD MCP Server - Main entry point."""
 
 import asyncio
+import argparse
+import sys
+import inspect
 from mcp.server.fastmcp import FastMCP
 from .resources import load_embedded_file, load_config, get_embedded_path, list_embedded_files
 import re
@@ -12,6 +15,99 @@ import io
 
 # Initialize FastMCP server
 mcp = FastMCP("BMAD Agent Personas")
+
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="BMAD MCP Server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  bmad-mcp-server                  Start the MCP server
+  bmad-mcp-server --list-tools     List all available tools
+  bmad-mcp-server <tool_name>      Show help for a specific tool
+        """
+    )
+    parser.add_argument(
+        "tool", 
+        nargs="?",
+        help="Tool name to show details for"
+    )
+    parser.add_argument(
+        "--list-tools", 
+        action="store_true", 
+        help="List all available MCP tools and exit"
+    )
+    return parser.parse_args()
+
+
+async def list_mcp_tools():
+    """List all available MCP tools (names only)."""
+    # Get all tools from the FastMCP server using its list_tools method
+    tools_list = await mcp.list_tools()
+    
+    if not tools_list:
+        print("No tools registered.")
+        return 0
+    
+    # Sort tools alphabetically by name
+    sorted_tools = sorted(tools_list, key=lambda t: t.name)
+    
+    print("Available tools:")
+    for tool in sorted_tools:
+        print(f"  {tool.name}")
+    
+    print(f"\nUse 'bmad-mcp-server <tool_name>' for details on a specific tool.")
+    return len(tools_list)
+
+
+async def show_tool_help(tool_name: str):
+    """Show detailed help for a specific tool."""
+    # Get all tools from the FastMCP server
+    tools_list = await mcp.list_tools()
+    
+    # Find the requested tool
+    tool = None
+    for t in tools_list:
+        if t.name == tool_name:
+            tool = t
+            break
+    
+    if not tool:
+        print(f"Error: Tool '{tool_name}' not found.")
+        print(f"\nUse 'bmad-mcp-server --list-tools' to see available tools.")
+        return 1
+    
+    # Display tool information
+    print(f"Tool: {tool.name}")
+    print("=" * 50)
+    
+    if tool.description:
+        print(f"\n{tool.description}")
+    
+    if hasattr(tool, 'inputSchema') and tool.inputSchema:
+        schema = tool.inputSchema
+        if 'properties' in schema:
+            print("\nParameters:")
+            props = schema['properties']
+            required = schema.get('required', [])
+            
+            for param_name, param_info in props.items():
+                param_type = param_info.get('type', 'any')
+                param_desc = param_info.get('description', '')
+                is_required = param_name in required
+                
+                required_marker = " [required]" if is_required else " [optional]"
+                print(f"  • {param_name}: {param_type}{required_marker}")
+                if param_desc:
+                    # Indent description lines
+                    for line in param_desc.split('\n'):
+                        print(f"    {line}")
+    else:
+        print("\nParameters: None")
+    
+    return 0
 
 
 def _build_agent_list() -> str:
@@ -66,6 +162,19 @@ def _build_workflow_list() -> str:
 
 def main():
     """Entry point for the MCP server."""
+    # Parse command line arguments
+    args = parse_args()
+    
+    # Handle --list-tools flag
+    if args.list_tools:
+        asyncio.run(list_mcp_tools())
+        sys.exit(0)
+    
+    # Handle tool-specific help (e.g., bmad-mcp-server bmad_agent --help)
+    if args.tool:
+        exit_code = asyncio.run(show_tool_help(args.tool))
+        sys.exit(exit_code)
+    
     # Run the server with stdio transport (default)
     mcp.run()
 
