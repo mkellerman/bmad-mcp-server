@@ -14,6 +14,56 @@ import io
 mcp = FastMCP("BMAD Agent Personas")
 
 
+def _build_agent_list() -> str:
+    """Build dynamic list of available agents from manifest."""
+    try:
+        manifest_content = load_embedded_file("_cfg/agent-manifest.csv")
+        reader = csv.DictReader(io.StringIO(manifest_content))
+        agents = []
+        
+        for row in reader:
+            name = row.get("name", "").strip()
+            title = row.get("title", "").strip()
+            if name and title:
+                # Use display name if available, otherwise use name
+                display = row.get("displayName", name).strip()
+                agents.append(f"    - {name} ({title})")
+        
+        if agents:
+            return "\n    ".join(["Available agents:"] + sorted(agents))
+        return "Available agents: (See manifest for list)"
+    except:
+        return "Available agents: (Load manifest to see list)"
+
+
+def _build_workflow_list() -> str:
+    """Build dynamic list of available workflows from manifest."""
+    try:
+        manifest_content = load_embedded_file("_cfg/workflow-manifest.csv")
+        reader = csv.DictReader(io.StringIO(manifest_content))
+        workflows = []
+        
+        for row in reader:
+            name = row.get("name", "").strip()
+            desc = row.get("description", "").strip()
+            if name:
+                # Truncate description if too long
+                if desc and len(desc) > 60:
+                    desc = desc[:57] + "..."
+                workflows.append(f"    - {name}: {desc}" if desc else f"    - {name}")
+        
+        if workflows:
+            # Show first 10 workflows, indicate more exist
+            shown = sorted(workflows)[:10]
+            result = "\n    ".join(["Common workflows:"] + shown)
+            if len(workflows) > 10:
+                result += f"\n    ... and {len(workflows) - 10} more (call without parameters to list all)"
+            return result
+        return "Workflows: (See manifest for list)"
+    except:
+        return "Workflows: (Load manifest to see list)"
+
+
 def main():
     """Entry point for the MCP server."""
     # Run the server with stdio transport (default)
@@ -144,6 +194,11 @@ def bmad_manifest(type: str = "agent") -> str:
         return f"ERROR: Failed to load {type} manifest: {e}"
 
 
+# Build dynamic docstrings at module load time
+_AGENT_LIST = _build_agent_list()
+_WORKFLOW_LIST = _build_workflow_list()
+
+
 @mcp.tool()
 def bmad_agent(name: str | None = None, user_name: str = "User", language: str = "English") -> str:
     """
@@ -152,15 +207,7 @@ def bmad_agent(name: str | None = None, user_name: str = "User", language: str =
     If no name provided, lists all available agents from the manifest.
     Otherwise loads the specified agent with injected user preferences.
     
-    Available agents (when manifest is loaded):
-    - master / bmad-master (Master orchestrator)
-    - analyst (Business Analyst)
-    - architect (System Architect)
-    - dev (Developer)
-    - pm (Product Manager)
-    - sm (Scrum Master)
-    - tea (Test Architect)
-    - ux-expert (UX Expert)
+    AGENT_LIST_PLACEHOLDER
     
     Args:
         name: Agent name from manifest (or None to list all)
@@ -234,6 +281,10 @@ def bmad_agent(name: str | None = None, user_name: str = "User", language: str =
         return f"ERROR: Failed to load agent: {e}"
 
 
+# Inject dynamic agent list into docstring
+bmad_agent.__doc__ = bmad_agent.__doc__.replace("AGENT_LIST_PLACEHOLDER", _AGENT_LIST)
+
+
 @mcp.tool()
 def bmad_workflow(name: str | None = None) -> str:
     """
@@ -242,10 +293,7 @@ def bmad_workflow(name: str | None = None) -> str:
     If no name provided, lists all available workflows from the manifest.
     Otherwise loads the specified workflow YAML configuration.
     
-    Common workflows:
-    - party-mode (Multi-agent group discussion)
-    - brainstorming (Brainstorming sessions)
-    - bmad-init (Initialize BMad in workspace)
+    WORKFLOW_LIST_PLACEHOLDER
     
     Args:
         name: Workflow name or path (or None to list all)
@@ -303,6 +351,10 @@ def bmad_workflow(name: str | None = None) -> str:
         return f"Workflow not found: {name}\n\nUse bmad_workflow() without parameters to list available workflows."
     except Exception as e:
         return f"ERROR: Failed to load workflow: {e}"
+
+
+# Inject dynamic workflow list into docstring
+bmad_workflow.__doc__ = bmad_workflow.__doc__.replace("WORKFLOW_LIST_PLACEHOLDER", _WORKFLOW_LIST)
 
 
 @mcp.tool()
