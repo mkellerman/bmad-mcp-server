@@ -1,253 +1,180 @@
-# BMad MCP Server
+# BMAD MCP Server
 
-[![CI - Tests](https://github.com/mkellerman/bmad-mcp-server/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/mkellerman/bmad-mcp-server/actions/workflows/test.yml)
-[![PyPI - Version](https://img.shields.io/pypi/v/bmad-mcp-server.svg)](https://pypi.org/project/bmad-mcp-server/)
-[![codecov](https://codecov.io/gh/mkellerman/bmad-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/mkellerman/bmad-mcp-server)
+Model Context Protocol (MCP) server implementation for the BMAD (Business Methodology for Agile Development) framework.
 
-**AI-powered MCP Server for [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD) agent orchestration and workflow management.**
+## Overview
 
-BMad MCP Server brings a team of specialized AI agent personas directly into your Claude conversations. Get instant access to Business Analysts, Architects, Developers, Product Managers, Scrum Masters, Test Architects, and UX Experts—all working together through structured workflows.
+The BMAD MCP Server exposes BMAD methodology to any MCP-compatible host (Claude Desktop, Cursor, etc.) by serving raw BMAD files on-demand. The server acts as a **file proxy** - it doesn't parse or transform files, instead serving them as-is for the LLM to process according to BMAD methodology.
 
-## 🌟 Features
+## Features
 
-- **11 Specialized Agent Personas**: Each with unique expertise, communication styles, and decision-making principles
-- **Multi-Agent Collaboration**: Party Mode enables group discussions with multiple agents responding to your questions
-- **Embedded Workflows**: Pre-built workflows for product briefs, architecture design, story creation, and more
-- **Task Execution**: Systematic task management with the BMad Master orchestrator
-- **Zero Configuration**: Agents and workflows are embedded—just install and go
+- **Agent Prompts**: Access 11 BMAD specialist agents via `/bmad-{name}` prompts
+- **Workflow Discovery**: List and execute BMAD workflows dynamically
+- **Task Execution**: Invoke BMAD tasks for structured guidance
+- **Knowledge Base**: Access domain-specific knowledge (test architecture, patterns, etc.)
+- **Format-Agnostic**: Server remains functional even if BMAD changes file formats
 
-## 📦 Installation
+## Architecture
 
-### Option 1: Install with pip
+- **File Proxy Pattern**: Server serves raw files without parsing
+- **Lazy Loading**: Resources loaded just-in-time through conversational discovery
+- **Security**: Path validation ensures files stay within BMAD root directory
+- **Zero Maintenance**: Updates via `git pull` in `/bmad` folder work seamlessly
+
+## Installation
+
+### Prerequisites
+
+- Python 3.11 or higher
+- BMAD v6-alpha installation
+
+### Setup
+
+1. **Clone repository:**
+```bash
+git clone https://github.com/mkellerman/bmad-mcp-server.git
+cd bmad-mcp-server
+```
+
+2. **Install BMAD (if not already installed):**
+```bash
+npx git+https://github.com/bmad-code-org/BMAD-METHOD.git#v6-alpha install
+```
+
+3. **Install dependencies:**
+```bash
+pip install -e ".[dev]"
+```
+
+4. **Verify installation:**
+```bash
+python src/mcp_server.py
+```
+
+The server should start without errors (though it won't do much yet - Phase 1 in progress!).
+
+## Usage
+
+### Running the Server
 
 ```bash
-pip install bmad-mcp-server
+python src/mcp_server.py
 ```
 
-### Option 2: Run instantly with uvx (recommended)
+### Configuration
 
-```bash
-uvx bmad-mcp-server
-```
+#### Claude Desktop
 
-## ⚙️ Configuration
-
-### Claude Desktop Setup
-
-Add this to your Claude Desktop configuration file:
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`  
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "bmad": {
-      "command": "uvx",
-      "args": ["bmad-mcp-server"]
-    }
-  }
-}
-```
-
-**Alternative (if installed with pip):**
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
   "mcpServers": {
     "bmad": {
       "command": "python",
-      "args": ["-m", "bmad_mcp.server"]
+      "args": ["/path/to/bmad-mcp-server/src/mcp_server.py"]
     }
   }
 }
 ```
 
-After updating the config, restart Claude Desktop.
+#### Cursor
 
-## 🚀 Quick Start
+Add to Cursor's MCP settings:
 
-Once configured, you can interact with BMad agents directly in Claude:
-
-### 1. Activate the BMad Master
-
-```
-#bmad
-```
-
-The BMad Master will greet you and present a menu of options including tasks, workflows, and party mode.
-
-### 2. Access Specific Agents Directly
-
-Jump straight to any agent by name:
-
-```
-#bmad analyst        → Mary (Business Analyst)
-#bmad architect      → Winston (System Architect)  
-#bmad dev            → Amelia (Developer)
-#bmad pm             → John (Product Manager)
-#bmad sm             → Bob (Scrum Master)
-#bmad tea            → Murat (Test Architect)
-#bmad ux-expert      → Sally (UX Expert)
+```json
+{
+  "bmad": {
+    "command": "python",
+    "args": ["/path/to/bmad-mcp-server/src/mcp_server.py"]
+  }
+}
 ```
 
-Each agent has their own specialized menu and workflows tailored to their expertise.
+### Using BMAD Agents
 
-### 3. Start Party Mode (Multi-Agent Chat)
+Once configured, invoke agents in your MCP host:
 
 ```
-#bmad *party-mode
+/bmad-analyst    - Load Mary (Business Analyst)
+/bmad-architect  - Load Winston (Solution Architect)
+/bmad-dev        - Load Dev (Developer)
+/bmad-pm         - Load John (Product Manager)
+... and 7 more agents
 ```
 
-This activates all agent personas for a group discussion. Ask any question and watch multiple experts respond with their unique perspectives!
+## Development Status
 
-**Example conversation:**
+**Current Phase: Phase 1 - Foundation (MVP)**
+
+- [x] Story 1.1: Setup Project Structure & MCP Server Skeleton ✅ (IN PROGRESS)
+- [ ] Story 1.2: Implement Manifest Loader
+- [ ] Story 1.3: Implement File Reader
+- [ ] Story 1.4: Implement Prompt Builder for Agent Prompts
+- [ ] Story 1.5: Wire Prompt System to MCP Server
+
+See [docs/user-stories.md](docs/user-stories.md) for full development roadmap.
+
+## Project Structure
+
 ```
-You: "We're building a task management app. What should we consider?"
-
-📋 John (PM): [Strategic product perspective]
-🏗️ Winston (Architect): [Technical architecture insights]
-🎨 Sally (UX Expert): [User experience considerations]
-💻 Amelia (Developer): [Implementation approach]
+bmad-mcp-server/
+├── src/
+│   ├── mcp_server.py           # Main MCP server entry point ✅
+│   ├── loaders/
+│   │   ├── manifest_loader.py  # CSV manifest parsing (TODO)
+│   │   └── file_reader.py      # Raw file reading (TODO)
+│   ├── builders/
+│   │   ├── prompt_builder.py   # Wrap raw files with BMAD instructions (TODO)
+│   │   ├── tool_builder.py     # MCP tool definitions (TODO)
+│   │   └── resource_builder.py # MCP resource definitions (TODO)
+│   └── utils/
+│       └── path_validator.py   # Security validation (TODO)
+├── bmad/                       # BMAD v6-alpha installation ✅
+├── docs/
+│   ├── prd.md                  # Product Requirements ✅
+│   ├── architecture.md         # Architecture Specification ✅
+│   └── user-stories.md         # User Stories ✅
+├── tests/
+│   └── (test files TODO)
+├── pyproject.toml              # Python project configuration ✅
+└── README.md                   # This file ✅
 ```
 
-### 4. Explore Available Options
+## Testing
 
-- `*help` - Show the main menu
-- `*list-agents` - View all available agent personas with commands
-- `*list-tasks` - View available tasks
-- `*list-workflows` - Browse workflow library
-- `*exit` - Exit party mode or current workflow
-
-## 👥 Available Agent Personas
-
-| Icon | Name | Role |
-|------|------|------|
-| 🧙 | **BMad Master** | Master orchestrator and workflow executor |
-| 📊 | **Mary** | Business Analyst - Requirements & research expert |
-| 🏗️ | **Winston** | Architect - System design & technical leadership |
-| 💻 | **Amelia** | Developer - Implementation specialist |
-| 📋 | **John** | Product Manager - Strategy & prioritization |
-| 🏃 | **Bob** | Scrum Master - Agile & story preparation |
-| 🧪 | **Murat** | Test Architect - Quality & testing strategy |
-| 🎨 | **Sally** | UX Expert - User experience & design |
-
-## 🔧 Advanced Usage
-
-### Using with Other MCP Clients
-
-BMad MCP Server works with any MCP-compatible client. The server communicates via stdio and implements the standard MCP protocol.
-
-### Running Standalone
+Run tests with pytest:
 
 ```bash
-# Run the server directly
-bmad-mcp-server
-
-# Or with Python module syntax
-python -m bmad_mcp.server
-```
-
-The server will start in stdio mode, waiting for MCP protocol messages.
-
-## 🧪 Development & Testing
-
-### Setup Development Environment
-
-```bash
-# Activate virtual environment first
-source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate   # Windows
-
-# Or use uv to run commands directly
-uv run pytest
-```
-
-### Running Tests
-
-```bash
-# Run all tests
 pytest
-
-# Run with coverage report
-pytest --cov=bmad_mcp
-
-# Run specific test categories
-pytest tests/unit/
-pytest tests/integration/
 ```
 
-### Test Structure
+Run with coverage:
 
-```
-tests/
-├── unit/          # Fast, isolated component tests
-├── integration/   # MCP protocol and tool integration tests
-└── fixtures/      # Shared test data and helpers
+```bash
+pytest --cov=src --cov-report=html
 ```
 
-See [tests/README.md](tests/README.md) for detailed testing guidelines.
+## Documentation
 
-## 📚 Workflows
+- [Product Requirements Document](docs/prd.md)
+- [Architecture Specification](docs/architecture.md)
+- [User Stories](docs/user-stories.md)
 
-BMad includes embedded workflows for common development activities:
+## Contributing
 
-- **Analysis**: Product briefs, research, brainstorming
-- **Planning**: Requirements, technical specs, architecture
-- **Solutioning**: Architecture decisions, tech selection
-- **Implementation**: Story creation, development, retrospectives
+This is a structured development project following BMAD methodology. See user stories for current work items.
 
-Access workflows through the BMad Master menu or by triggering them directly.
+## License
 
-## 🛠️ Development Status
+TBD
 
-**Current Version**: 0.1.0 (Alpha)
+## Acknowledgments
 
-This is an early-stage release. While fully functional, expect ongoing improvements and potential breaking changes in future versions.
-
-### Release Channels
-
-- **Pre-releases (TestPyPI)**: Automatic on every push to `main` - for testing and validation
-- **Stable releases (PyPI)**: Manual releases after validation - for production use
-
-See [Release Documentation](.github/RELEASE.md) for details on our automated release pipeline.
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) file for details
-
-## 🤝 Contributing
-
-Contributions are welcome! We'd love your help making BMad MCP Server even better.
-
-### Quick Start for Contributors
-
-1. Fork and clone the repository
-2. Install development dependencies: `uv pip install -e ".[dev]"`
-3. Make your changes and add tests
-4. Run tests: `pytest`
-5. Submit a Pull Request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
-- Development setup
-- Testing requirements (60% minimum coverage)
-- Code style guidelines
-- Pull request process
-
-Check the [issues](https://github.com/mkellerman/bmad-mcp-server/issues) page for good first issues and areas where you can help!
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/mkellerman/bmad-mcp-server/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/mkellerman/bmad-mcp-server/discussions)
-
-## 🙏 Acknowledgments
-
-[BMAD-METHOD™](https://github.com/bmad-code-org/BMAD-METHOD): Universal AI Agent Framework
-
-Built on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) by Anthropic.
-
+Built using:
+- [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+- [BMAD Methodology](https://github.com/bmad-code-org/BMAD-METHOD)
 
 ---
 
-**Ready to get started?** Install BMad MCP Server and activate your AI agent team today! 🚀
+**Status:** 🚧 Phase 1 Development - Story 1.1 Complete ✅
