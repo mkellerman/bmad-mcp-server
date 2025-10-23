@@ -12,14 +12,20 @@ dependencies = [
 bmad-mcp-server = "src.mcp_server:run"
 
 [project.optional-dependencies]
+# All test & development dependencies (unified)
+# Equivalent to: pip install -r tests/requirements.txt
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
-]
-copilot-test = [
+    "pytest-mock>=3.12.0",
     "litellm>=1.78.0",
     "jsonschema>=4.20.0",
+    "faker>=22.0.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "flake8>=7.0.0",
+    "mypy>=1.8.0",
 ]
 
 [build-system]
@@ -37,8 +43,10 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
     "manual: Manual/interactive tests with verbose output (deselect with '-m \"not manual\"')",
+    "integration: Integration tests (may be slower, test component interactions)",
+    "e2e: End-to-end tests (requires litellm, tests full workflows with Copilot)",
 ]
-# Exclude manual tests by default
+# Exclude manual tests by default (run with: pytest -m manual)
 addopts = "-m 'not manual'"
 
 [tool.coverage.run]

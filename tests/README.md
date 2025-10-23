@@ -5,6 +5,9 @@ Comprehensive test suite for the BMAD MCP Server, including unit tests, integrat
 ## Quick Start
 
 ```bash
+# Install test dependencies (if not already installed)
+pip install -e ".[dev]"
+
 # Run all tests (excludes manual tests by default)
 pytest
 
@@ -48,6 +51,25 @@ tests/
     ├── __init__.py
     └── copilot_tester.py        # ⭐ GitHub Copilot MCP testing utility
 ```
+
+---
+
+## Installation
+
+Before running tests, install dependencies:
+
+```bash
+# From project root
+pip install -e ".[dev]"
+```
+
+This installs all testing dependencies including:
+- **Testing**: pytest, pytest-asyncio, pytest-cov, pytest-mock
+- **E2E Testing**: litellm (for Copilot integration), jsonschema
+- **Test Utilities**: faker
+- **Code Quality**: black, isort, flake8, mypy
+
+See `pyproject.toml` `[project.optional-dependencies]` section for the complete list.
 
 ---
 
@@ -287,7 +309,7 @@ interpretation = await tester.interpret_result(
 
 1. **Install dependencies:**
    ```bash
-   pip install -e ".[copilot-test]"
+   pip install -e ".[dev]"
    ```
 
 2. **Run a test that uses Copilot:**
@@ -460,7 +482,7 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: |
-          pip install -e ".[dev,copilot-test]"
+          pip install -e ".[dev]"
       - name: Run tests
         run: |
           # Run all non-manual tests with coverage
@@ -479,8 +501,8 @@ If you see import errors, ensure you're in the project root with venv active:
 
 ```bash
 cd /path/to/bmad-mcp-server
-source venv/bin/activate
-pip install -e ".[dev,copilot-test]"
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
 ### "litellm not installed"
@@ -488,7 +510,7 @@ pip install -e ".[dev,copilot-test]"
 Tests are automatically skipped if litellm is missing. To run them:
 
 ```bash
-pip install -e ".[copilot-test]"
+pip install -e ".[dev]"
 ```
 
 ### Copilot Authentication Issues

@@ -41,12 +41,24 @@ cd bmad-mcp-server
 npx git+https://github.com/bmad-code-org/BMAD-METHOD.git#v6-alpha install
 ```
 
-3. **Install dependencies:**
+3. **Create virtual environment (recommended):**
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate  # macOS/Linux
+# or
+.venv\Scripts\activate     # Windows
+```
+
+4. **Install dependencies:**
+```bash
+# Production (MCP server only)
+pip install -e .
+
+# Development (includes all test dependencies, code quality tools, etc.)
 pip install -e ".[dev]"
 ```
 
-4. **Verify installation:**
+5. **Verify installation:**
 ```bash
 python src/mcp_server.py
 ```
@@ -143,17 +155,26 @@ bmad-mcp-server/
 
 ## Testing
 
-Run tests with pytest:
+Install test dependencies:
 
 ```bash
-pytest
+pip install -e ".[dev]"
 ```
 
-Run with coverage:
+Run tests:
 
 ```bash
+# All tests (unit + integration, excluding manual by default)
+pytest
+
+# Unit tests only (fast)
+pytest tests/unit/
+
+# With coverage report
 pytest --cov=src --cov-report=html
 ```
+
+See [tests/README.md](tests/README.md) for comprehensive testing documentation.
 
 ## Documentation
 
