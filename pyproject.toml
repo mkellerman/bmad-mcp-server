@@ -17,6 +17,10 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
 ]
+copilot-test = [
+    "litellm>=1.78.0",
+    "jsonschema>=4.20.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -28,9 +32,14 @@ packages = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "copilot_mcp.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "manual: Manual/interactive tests with verbose output (deselect with '-m \"not manual\"')",
+]
+# Exclude manual tests by default
+addopts = "-m 'not manual'"
 
 [tool.coverage.run]
 source = ["src"]
