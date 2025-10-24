@@ -27,7 +27,7 @@ class TestMultiAgentWorkflows:
     @pytest.fixture
     def project_root(self):
         """Path to project root."""
-        return Path(__file__).parent.parent.parent
+        return Path(__file__).parent.parent.parent / "src"
     
     @pytest.fixture
     def mcp_server(self, project_root):

@@ -23,8 +23,8 @@ class TestCopilotAgentActivation:
     
     @pytest.fixture
     def real_bmad_root(self):
-        """Path to project root (manifest paths include 'bmad/' prefix)."""
-        return Path(__file__).parent.parent.parent
+        """Path to src directory (manifest paths include 'bmad/' prefix under src)."""
+        return Path(__file__).parent.parent.parent / "src"
     
     @pytest.fixture
     def agent_manifest(self, real_bmad_root):

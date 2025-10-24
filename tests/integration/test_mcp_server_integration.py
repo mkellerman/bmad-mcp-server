@@ -17,9 +17,9 @@ class TestMCPServerWithRealBMAD:
     
     @pytest.fixture
     def real_bmad_root(self):
-        """Path to actual BMAD installation for integration tests."""
-        # Use the actual BMAD directory in the repo
-        return Path(__file__).parent.parent.parent / "bmad"
+        """Path to actual BMAD installation for integration tests (src/bmad)."""
+        # Use the actual BMAD directory in the repo under src
+        return Path(__file__).parent.parent.parent / "src" / "bmad"
     
     @pytest.fixture
     def mcp_server(self, real_bmad_root):

@@ -16,7 +16,7 @@ from tests.utils.e2e_framework import (
     E2ETest,
     E2EScenario,
     quick_test,
-    test_sequence,
+    test_sequence as run_sequence,
     agent_loaded
 )
 
@@ -309,7 +309,7 @@ class TestAgentActivationDeclarative:
     @pytest.mark.asyncio
     async def test_simple_command_sequence(self, mcp_server):
         """Just verify commands execute successfully."""
-        result = await test_sequence(mcp_server, [
+        result = await run_sequence(mcp_server, [
             "analyst",
             "*workflow-status",
             "pm"

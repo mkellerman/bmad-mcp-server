@@ -20,8 +20,8 @@ class TestAgentPromptLoading:
     
     @pytest.fixture
     def real_bmad_root(self):
-        """Path to actual BMAD installation."""
-        return Path(__file__).parent.parent.parent / "bmad"
+        """Path to actual BMAD installation (src/bmad)."""
+        return Path(__file__).parent.parent.parent / "src" / "bmad"
     
     @pytest.fixture
     def mcp_server(self, real_bmad_root):

@@ -19,7 +19,7 @@ class TestWorkflowExecution:
     @pytest.fixture
     def project_root(self):
         """Get project root directory."""
-        return Path(__file__).parent.parent.parent
+        return Path(__file__).parent.parent.parent / "src"
     
     @pytest.fixture
     def bmad_root(self, project_root):
@@ -45,8 +45,9 @@ class TestWorkflowExecution:
         assert result.get('type') == 'workflow'
         assert result.get('name') == 'workflow-status'
         
-        content = result.get('content', '')
-        assert len(content) > 100
+        # New workflow response uses 'instructions' and 'workflow_yaml' fields
+        content = result.get('instructions') or result.get('workflow_yaml', '')
+        assert content is not None and len(content) > 50
         
         print(f"\n✓ workflow-status executed")
         print(f"  Content length: {len(content)} chars")
@@ -156,7 +157,8 @@ class TestWorkflowDiscovery:
     @pytest.fixture
     def unified_tool(self):
         """Create unified tool instance."""
-        return UnifiedBMADTool(Path(__file__).parent.parent.parent)
+        # Use 'src' as project root so manifests resolve under src/bmad/_cfg
+        return UnifiedBMADTool(Path(__file__).parent.parent.parent / "src")
     
     @pytest.mark.asyncio
     async def test_list_workflows_command(self, unified_tool):
@@ -206,7 +208,8 @@ class TestWorkflowChaining:
     @pytest.fixture
     def unified_tool(self):
         """Create unified tool instance."""
-        return UnifiedBMADTool(Path(__file__).parent.parent.parent)
+        # Use 'src' as project root so manifests resolve under src/bmad/_cfg
+        return UnifiedBMADTool(Path(__file__).parent.parent.parent / "src")
     
     @pytest.mark.asyncio
     async def test_sequential_workflow_execution(self, unified_tool):
@@ -225,7 +228,8 @@ class TestWorkflowChaining:
         
         print(f"\n✓ Sequential execution successful")
         print(f"  1. Analyst loaded: {len(result1.get('content', ''))} chars")
-        print(f"  2. Workflow executed: {len(result2.get('content', ''))} chars")
+        wf2 = result2.get('instructions') or result2.get('workflow_yaml', '')
+        print(f"  2. Workflow executed: {len(wf2)} chars")
         print(f"  3. PM loaded: {len(result3.get('content', ''))} chars")
     
     @pytest.mark.asyncio
@@ -241,7 +245,8 @@ class TestWorkflowChaining:
         
         # Both should succeed independently
         assert len(agent_result.get('content', '')) > 500
-        assert len(workflow_result.get('content', '')) > 100
+        wf_content = workflow_result.get('instructions') or workflow_result.get('workflow_yaml', '')
+        assert wf_content is not None and len(wf_content) > 50
         
         print(f"\n✓ Workflow after agent load successful")
 

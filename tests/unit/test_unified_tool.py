@@ -12,7 +12,8 @@ from src.unified_tool import UnifiedBMADTool, ValidationResult
 @pytest.fixture
 def bmad_root():
     """Get BMAD root directory."""
-    return Path(__file__).parent.parent.parent
+    # Project root is the 'src' directory where 'bmad/_cfg' lives
+    return Path(__file__).parent.parent.parent / "src"
 
 
 @pytest.fixture

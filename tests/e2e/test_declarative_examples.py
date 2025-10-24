@@ -12,7 +12,7 @@ from tests.utils.e2e_framework import (
     E2ETest,
     E2EScenario,
     quick_test,
-    test_sequence,
+    test_sequence as run_sequence,
     agent_loaded,
     workflow_executed
 )
@@ -25,7 +25,7 @@ class TestDeclarativeExamples:
     @pytest.fixture
     def mcp_server(self):
         """Create MCP server instance."""
-        project_root = Path(__file__).parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent / "src"
         return BMADMCPServer(project_root)
     
     # ==================================================================
@@ -114,7 +114,7 @@ class TestDeclarativeExamples:
         
         Just validate that commands execute successfully.
         """
-        result = await test_sequence(mcp_server, [
+        result = await run_sequence(mcp_server, [
             "analyst",
             "*workflow-status",
             "pm"

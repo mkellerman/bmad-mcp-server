@@ -20,7 +20,7 @@ class TestPerformance:
     @pytest.fixture
     def project_root(self):
         """Get project root directory."""
-        return Path(__file__).parent.parent.parent
+        return Path(__file__).parent.parent.parent / "src"
     
     @pytest.fixture
     def mcp_server(self, project_root):
@@ -127,7 +127,7 @@ class TestResourceUsage:
     @pytest.fixture
     def unified_tool(self):
         """Create unified tool instance."""
-        return UnifiedBMADTool(Path(__file__).parent.parent.parent)
+        return UnifiedBMADTool(Path(__file__).parent.parent.parent / "src")
     
     @pytest.mark.asyncio
     async def test_large_content_handling(self, unified_tool):
@@ -177,7 +177,7 @@ class TestStressTesting:
     @pytest.fixture
     def unified_tool(self):
         """Create unified tool instance."""
-        return UnifiedBMADTool(Path(__file__).parent.parent.parent)
+        return UnifiedBMADTool(Path(__file__).parent.parent.parent / "src")
     
     @pytest.mark.asyncio
     async def test_rapid_agent_switching(self, unified_tool):
@@ -252,7 +252,7 @@ class TestScalability:
     @pytest.fixture
     def unified_tool(self):
         """Create unified tool instance."""
-        return UnifiedBMADTool(Path(__file__).parent.parent.parent)
+        return UnifiedBMADTool(Path(__file__).parent.parent.parent / "src")
     
     @pytest.mark.asyncio
     async def test_many_sequential_operations(self, unified_tool):

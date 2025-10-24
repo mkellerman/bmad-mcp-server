@@ -39,7 +39,7 @@ from mcp_server import BMADMCPServer
 from tests.utils.copilot_tester import CopilotMCPTester, skip_if_no_litellm
 
 # ---- Initialize BMAD MCP Server
-BMAD_ROOT = Path(__file__).parent.parent.parent / "bmad"
+BMAD_ROOT = Path(__file__).parent.parent.parent / "src" / "bmad"
 mcp_server = BMADMCPServer(BMAD_ROOT)
 
 # ---- Initialize Copilot Tester

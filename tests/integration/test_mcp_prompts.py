@@ -24,8 +24,8 @@ class TestMCPPromptsWithCopilot:
     
     @pytest.fixture
     def bmad_root(self):
-        """Path to BMAD installation."""
-        return Path(__file__).parent.parent.parent / "bmad"
+        """Path to BMAD installation (src/bmad)."""
+        return Path(__file__).parent.parent.parent / "src" / "bmad"
     
     @pytest.fixture
     async def mcp_server(self, bmad_root):
