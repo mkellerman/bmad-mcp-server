@@ -67,19 +67,24 @@ class BMADMCPServer:
         if not self.bmad_root.exists():
             raise ValueError(f"BMAD root does not exist: {self.bmad_root}")
 
-        # Check if bmad_root is the project root (contains bmad/ subdirectory)
-        # or if it's the BMAD directory itself (contains _cfg/)
+        # Check if bmad_root is the project root (contains bmad/ subdirectory),
+        # src root (contains src/bmad/ subdirectory), or the BMAD directory itself (contains _cfg/)
         manifest_dir = self.bmad_root / "bmad" / "_cfg"
         if manifest_dir.exists():
             # Project root - bmad_root points to project, manifests in bmad/_cfg
             self.project_root = self.bmad_root
+        elif (self.bmad_root / "src" / "bmad" / "_cfg").exists():
+            # Repository root - manifests are under src/bmad/_cfg
+            manifest_dir = self.bmad_root / "src" / "bmad" / "_cfg"
+            self.project_root = self.bmad_root / "src"
         else:
             # BMAD directory - bmad_root points to bmad, manifests in _cfg
             manifest_dir = self.bmad_root / "_cfg"
             if not manifest_dir.exists():
                 raise ValueError(
                     f"BMAD manifest directory not found. "
-                    f"Expected either {self.bmad_root / 'bmad' / '_cfg'} or "
+                    f"Expected one of: {self.bmad_root / 'bmad' / '_cfg'}, "
+                    f"{self.bmad_root / 'src' / 'bmad' / '_cfg'}, or "
                     f"{self.bmad_root / '_cfg'}"
                 )
             # bmad_root is the BMAD directory, so project root is parent
@@ -466,8 +471,8 @@ Begin workflow execution now.""")
 
 async def main():
     """Main entry point for BMAD MCP Server."""
-    # Determine BMAD root - use project root since manifest paths include 'bmad/' prefix
-    bmad_root = Path(__file__).parent.parent
+    # Determine BMAD root - use src directory since manifests live under src/bmad/_cfg
+    bmad_root = Path(__file__).parent
 
     logger.info(f"Starting BMAD MCP Server...")
     logger.info(f"BMAD root: {bmad_root}")
