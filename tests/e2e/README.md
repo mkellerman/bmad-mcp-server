@@ -4,78 +4,102 @@ End-to-end tests that validate complete workflows using real GitHub Copilot LLM 
 
 ## Overview
 
-These tests validate the complete user experience:
+These tests validate the complete user experience with **GitHub Copilot API only**:
 1. **Agent Activation**: Copilot discovers, selects, and loads BMAD agents
 2. **Workflow Execution**: Copilot discovers, selects, and executes BMAD workflows
 3. **Real LLM Integration**: Tests use actual GitHub Copilot API calls via litellm
 
 ## Test Files
 
-### test_copilot_agent_activation.py (9 tests)
-Tests complete agent activation flow with Copilot:
-- ✅ `test_copilot_discovers_analyst_prompt` - Copilot selects list_prompts tool
-- ✅ `test_all_manifest_agents_are_available` - All 11 agents from manifest are available
-- ✅ `test_copilot_lists_and_identifies_agents` - Copilot identifies analyst agent
-- ✅ `test_copilot_loads_analyst_agent_prompt` - Agent content loads correctly
-- ⚠️ `test_copilot_responds_as_analyst_agent` - JSON parsing issue with LLM response
-- ✅ `test_copilot_agent_discovers_workflows` - Agent discovers workflow tools
-- ⚠️ `test_full_agent_activation_workflow` - Complete E2E flow (JSON parsing)
-- ✅ `test_agent_can_filter_workflows_by_module` - Workflow filtering works
+### test_copilot_agent_activation.py (9 tests - All Passing ✅)
 
-### test_copilot_workflow_execution.py (8 tests)
-Tests complete workflow execution flow:
-- ✅ `test_copilot_discovers_workflow_tool` - Copilot selects workflow tools
-- ✅ `test_copilot_lists_and_selects_workflow` - Workflow selection works
-- ⚠️ `test_copilot_gets_workflow_details` - Workflow path handling issue
-- ⚠️ `test_copilot_executes_workflow` - Workflow path handling issue
-- ⚠️ `test_copilot_interprets_workflow_instructions` - JSON parsing issue
-- ⚠️ `test_full_workflow_execution_flow` - Complete E2E flow (path handling)
-- ✅ `test_copilot_handles_workflow_not_found` - Error handling works
-- ✅ `test_workflow_filtering_by_category` - Category filtering works
-- ✅ `test_agent_executes_workflow` - Agent can execute workflows
+Tests complete agent activation and workflow execution using GitHub Copilot API:
+
+| Test | Status | Description |
+|------|--------|-------------|
+| `test_copilot_discovers_analyst_prompt` | ✅ | Copilot selects correct tool for agent discovery |
+| `test_all_manifest_agents_are_available` | ✅ | All 11 agents from manifest available via MCP prompts |
+| `test_copilot_lists_and_identifies_agents` | ✅ | Copilot correctly identifies analyst agent from list |
+| `test_copilot_loads_analyst_agent_prompt` | ✅ | Agent content loads with correct persona/metadata |
+| `test_copilot_responds_as_analyst_agent` | ✅ | Copilot can interpret and respond as loaded agent |
+| `test_copilot_agent_discovers_workflows` | ✅ | Agent discovers bmad tool for workflow execution |
+| `test_full_agent_activation_workflow` | ✅ | Complete E2E: discover → load agent → verify workflows |
+| `test_agent_loads_correctly_via_bmad_tool` | ✅ | Unified bmad tool loads agents correctly |
+| `test_bmad_master_and_workflow_execution` | ✅ | Load bmad-master and execute workflow via bmad tool |
+
+**Test Coverage:**
+- ✅ Agent discovery via MCP prompts
+- ✅ Agent loading via unified bmad tool
+- ✅ Manifest validation (all agents available)
+- ✅ Copilot LLM tool selection
+- ✅ Workflow execution via bmad tool
+- ✅ Multi-step agent activation workflows
 
 ## Running E2E Tests
 
 ### Prerequisites
 ```bash
-# Install litellm for Copilot integration
-pip install litellm
+# Install required dependencies (in virtual environment)
+source .venv/bin/activate
+pip install mcp>=1.19.0 litellm jsonschema
 
-# Set up GitHub Copilot API access (if needed)
+# Ensure GitHub Copilot API access is configured
 # E2E tests use the GitHub Copilot model via litellm
 ```
 
 ### Run All E2E Tests
 ```bash
+# Activate virtual environment first
+source .venv/bin/activate
+
 # Run all E2E tests
 pytest tests/e2e/ -v
 
 # Run specific test file
 pytest tests/e2e/test_copilot_agent_activation.py -v
 
-# Run with output
+# Run with output to see LLM interactions
 pytest tests/e2e/ -v -s
 
 # Skip E2E tests (if litellm not available)
 pytest tests/ -m "not e2e"
 ```
 
-## Test Results
+### Run Individual Tests
+```bash
+# Test agent discovery
+pytest tests/e2e/test_copilot_agent_activation.py::TestCopilotAgentActivation::test_copilot_discovers_analyst_prompt -v -s
 
-**Current Status:** 11/17 tests passing (65%)
+# Test manifest compliance
+pytest tests/e2e/test_copilot_agent_activation.py::TestCopilotAgentActivation::test_all_manifest_agents_are_available -v -s
+```
 
-**Passing Tests (11):**
-- Agent discovery and selection ✅
-- Manifest validation ✅  
-- Agent content loading ✅
-- Workflow tool discovery ✅
-- Workflow filtering ✅
-- Error handling ✅
+## Test Architecture
 
-**Known Issues (6):**
-- Some tests fail due to JSON parsing when LLM returns prose instead of JSON
-- Workflow path handling needs refinement in some edge cases
-- These are minor issues in test expectations, not core functionality
+### Why Copilot API Tests?
+
+These tests validate the **real user experience** by:
+1. Making actual API calls to GitHub Copilot
+2. Testing how the LLM interacts with MCP tools and prompts
+3. Validating prompt quality and LLM response handling
+4. Ensuring agents and workflows are discoverable and usable
+
+### Unified Tool Architecture
+
+The tests use the **single unified `bmad` tool** that accepts commands:
+- `""` (empty) → Load bmad-master agent
+- `"agent-name"` → Load specific agent (e.g., "analyst", "dev")
+- `"*workflow-name"` → Execute workflow (asterisk required)
+
+This reflects the actual MCP server architecture where one tool handles all routing.
+
+### No Subprocess/STDIO Tests
+
+Previous tests that spawned the MCP server as a subprocess and communicated via stdio caused hanging issues and were difficult to debug. The Copilot API-based approach is:
+- More reliable (no process management)
+- Faster (direct Python API calls)
+- More realistic (tests actual LLM interactions)
+- Easier to debug (full Python stack traces)
 
 ## Test Architecture
 

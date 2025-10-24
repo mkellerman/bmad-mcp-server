@@ -1,201 +1,136 @@
 # BMAD MCP Server
 
-Model Context Protocol (MCP) server implementation for the BMAD (Business Methodology for Agile Development) framework.
+Access the complete BMAD methodology through any AI assistant via the Model Context Protocol.
 
-## Overview
+## What is BMAD?
 
-The BMAD MCP Server exposes BMAD methodology to any MCP-compatible host (Claude Desktop, Cursor, etc.) by serving raw BMAD files on-demand. The server acts as a **file proxy** - it doesn't parse or transform files, instead serving them as-is for the LLM to process according to BMAD methodology.
-
-## Features
-
-- **Agent Prompts**: Access 11 BMAD specialist agents via `/bmad-{name}` prompts
-- **Workflow Discovery**: List and execute BMAD workflows dynamically
-- **Task Execution**: Invoke BMAD tasks for structured guidance
-- **Knowledge Base**: Access domain-specific knowledge (test architecture, patterns, etc.)
-- **Format-Agnostic**: Server remains functional even if BMAD changes file formats
-
-## Architecture
-
-- **File Proxy Pattern**: Server serves raw files without parsing
-- **Lazy Loading**: Resources loaded just-in-time through conversational discovery
-- **Security**: Path validation ensures files stay within BMAD root directory
-- **Zero Maintenance**: Updates via `git pull` in `/bmad` folder work seamlessly
+BMAD (Business Methodology for Agile Development) provides 11 specialist AI agents and 36+ automated workflows to accelerate software development, from requirements analysis to deployment.
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.11 or higher
-- BMAD v6-alpha installation
-
-### Setup
-
-1. **Clone repository:**
 ```bash
 git clone https://github.com/mkellerman/bmad-mcp-server.git
 cd bmad-mcp-server
-```
-
-2. **Install BMAD (if not already installed):**
-```bash
-npx git+https://github.com/bmad-code-org/BMAD-METHOD.git#v6-alpha install
-```
-
-3. **Create virtual environment (recommended):**
-```bash
 python3 -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# or
-.venv\Scripts\activate     # Windows
-```
-
-4. **Install dependencies:**
-```bash
-# Production (MCP server only)
+source .venv/bin/activate
 pip install -e .
-
-# Development (includes all test dependencies, code quality tools, etc.)
-pip install -e ".[dev]"
 ```
 
-5. **Verify installation:**
-```bash
-python src/mcp_server.py
-```
+## Configuration
 
-The server should start without errors (though it won't do much yet - Phase 1 in progress!).
+### GitHub Copilot (VS Code)
 
-## Usage
+Auto-discovered when repository is open. Ensure MCP is enabled in Copilot settings.
 
-### Running the Server
+### Claude Desktop
 
-```bash
-python src/mcp_server.py
-```
-
-### Configuration
-
-#### Claude Desktop
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "bmad": {
       "command": "python",
-      "args": ["/path/to/bmad-mcp-server/src/mcp_server.py"]
+      "args": ["/absolute/path/to/bmad-mcp-server/src/mcp_server.py"]
     }
   }
 }
 ```
 
-#### Cursor
+### Cursor
 
-Add to Cursor's MCP settings:
+Add to Cursor's MCP settings with same configuration as Claude Desktop.
 
-```json
-{
-  "bmad": {
-    "command": "python",
-    "args": ["/path/to/bmad-mcp-server/src/mcp_server.py"]
-  }
-}
-```
-
-### Using BMAD Agents
-
-Once configured, invoke agents in your MCP host:
-
-```
-/bmad-analyst    - Load Mary (Business Analyst)
-/bmad-architect  - Load Winston (Solution Architect)
-/bmad-dev        - Load Dev (Developer)
-/bmad-pm         - Load John (Product Manager)
-... and 7 more agents
-```
-
-## Development Status
-
-**Current Phase: Phase 1 - Foundation (MVP)**
-
-- [x] Story 1.1: Setup Project Structure & MCP Server Skeleton ✅ (IN PROGRESS)
-- [ ] Story 1.2: Implement Manifest Loader
-- [ ] Story 1.3: Implement File Reader
-- [ ] Story 1.4: Implement Prompt Builder for Agent Prompts
-- [ ] Story 1.5: Wire Prompt System to MCP Server
-
-See [docs/user-stories.md](docs/user-stories.md) for full development roadmap.
-
-## Project Structure
-
-```
-bmad-mcp-server/
-├── src/
-│   ├── mcp_server.py           # Main MCP server entry point ✅
-│   ├── loaders/
-│   │   ├── manifest_loader.py  # CSV manifest parsing (TODO)
-│   │   └── file_reader.py      # Raw file reading (TODO)
-│   ├── builders/
-│   │   ├── prompt_builder.py   # Wrap raw files with BMAD instructions (TODO)
-│   │   ├── tool_builder.py     # MCP tool definitions (TODO)
-│   │   └── resource_builder.py # MCP resource definitions (TODO)
-│   └── utils/
-│       └── path_validator.py   # Security validation (TODO)
-├── bmad/                       # BMAD v6-alpha installation ✅
-├── docs/
-│   ├── prd.md                  # Product Requirements ✅
-│   ├── architecture.md         # Architecture Specification ✅
-│   └── user-stories.md         # User Stories ✅
-├── tests/
-│   └── (test files TODO)
-├── pyproject.toml              # Python project configuration ✅
-└── README.md                   # This file ✅
-```
-
-## Testing
-
-Install test dependencies:
+## Quick Start
 
 ```bash
-pip install -e ".[dev]"
+# Get help
+bmad *help
+
+# See what's available
+bmad *list-agents
+bmad *list-workflows
+
+# Load an agent
+bmad analyst      # Business Analyst
+bmad dev          # Senior Developer
+bmad tea          # Test Architect
+
+# Run a workflow
+bmad *party-mode      # Multi-agent discussion
+bmad *brainstorming   # Creative ideation
 ```
 
-Run tests:
+## Commands
 
-```bash
-# All tests (unit + integration, excluding manual by default)
-pytest
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `bmad` | Load bmad-master (default) | `bmad` |
+| `bmad <agent>` | Load specialist agent | `bmad analyst` |
+| `bmad *<workflow>` | Execute workflow | `bmad *party-mode` |
+| `bmad *list-agents` | Show all agents | - |
+| `bmad *list-workflows` | Show all workflows | - |
+| `bmad *help` | Show command reference | - |
 
-# Unit tests only (fast)
-pytest tests/unit/
+## Available Agents
 
-# With coverage report
-pytest --cov=src --cov-report=html
-```
+- **bmad-master** - Orchestrator and methodology expert
+- **analyst** (Mary) - Strategic Business Analyst
+- **architect** (Winston) - Solution Architect
+- **dev** (Olivia) - Senior Developer
+- **tea** (Murat) - Master Test Architect
+- **pm** (John) - Product Manager
+- **sm** (Sarah) - Scrum Master
+- **ux-expert** (Alex) - UX/UI Specialist
+- Plus 3 more specialized agents
 
-See [tests/README.md](tests/README.md) for comprehensive testing documentation.
+## Popular Workflows
 
-## Documentation
+- `*party-mode` - Multi-agent group discussions
+- `*brainstorming` - Facilitated creative ideation
+- `*framework` - Initialize test framework
+- `*atdd` - Generate E2E tests before implementation
+- `*workflow-status` - Check workflow status
+- Plus 31 more workflows
 
-- [Product Requirements Document](docs/prd.md)
-- [Architecture Specification](docs/architecture.md)
+## Troubleshooting
+
+**Server not found?**
+- Restart your AI host after configuration
+- Use absolute path in config
+- Verify Python 3.11+
+
+**Commands not working?**
+- Use `*` prefix for workflows: `bmad *party-mode`
+- No `*` for agents: `bmad analyst`
+- Run `bmad *help` for reference
+
+**Need help?**
+- Run `bmad *help` in your AI assistant
+- Check `bmad *list-agents` and `bmad *list-workflows`
+
+## Requirements
+
+- Python 3.11 or higher
+- MCP-compatible AI host (GitHub Copilot, Claude Desktop, Cursor, etc.)
+
+## Development
+
+Developer documentation is in `docs/`:
+- [Architecture](docs/architecture.md)
+- [Product Requirements](docs/prd.md)
 - [User Stories](docs/user-stories.md)
 
-## Contributing
-
-This is a structured development project following BMAD methodology. See user stories for current work items.
+Run tests:
+```bash
+pip install -e ".[dev]"
+pytest
+```
 
 ## License
 
 TBD
 
-## Acknowledgments
-
-Built using:
-- [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-- [BMAD Methodology](https://github.com/bmad-code-org/BMAD-METHOD)
-
 ---
 
-**Status:** 🚧 Phase 1 Development - Story 1.1 Complete ✅
+**Status:** Production Ready ✅ | **Version:** 2.0 | **MCP SDK:** 1.19.0

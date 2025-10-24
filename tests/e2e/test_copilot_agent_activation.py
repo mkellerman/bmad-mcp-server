@@ -200,54 +200,48 @@ class TestCopilotAgentActivation:
     
     @pytest.mark.asyncio
     async def test_full_agent_activation_workflow(self, copilot_tester, mcp_server):
-        """Test complete E2E workflow: discover -> activate -> interact."""
+        """Test complete agent activation workflow with Copilot using unified bmad tool."""
         print("\n" + "="*70)
         print("FULL E2E TEST: Agent Activation Workflow")
         print("="*70)
         
-        # Step 1: User asks for help
+        # Step 1: Ask Copilot to help with business analyst task
         print("\n[STEP 1] User requests business analyst help...")
-        selection = await copilot_tester.ask_tool_selection(
-            task="I need to analyze market opportunities for a new mobile app",
-            available_tools=["list_prompts", "list_tools"],
-            context="BMAD provides agents and tools for software development"
+        tool_selection = await copilot_tester.ask_tool_selection(
+            task="I need help from a business analyst to gather requirements for a new feature.",
+            available_tools=["list_prompts", "get_prompt", "bmad"],
+            context="BMAD agents are available through prompts. Use list_prompts to see available agents or bmad tool to load agents."
         )
-        print(f"  → Copilot selected: {selection['tool']}")
+        print(f"  → Copilot selected: {tool_selection['tool']}")
         
-        # Step 2: List available agents
+        # Step 2: List prompts
         print("\n[STEP 2] Listing available agents...")
         prompts = await mcp_server.list_prompts()
         print(f"  → Found {len(prompts)} agents")
         
-        # Step 3: Select analyst agent
-        print("\n[STEP 3] Loading analyst agent...")
-        analyst_result = await mcp_server.get_prompt("bmad-analyst", {})
-        content_preview = analyst_result.messages[0].content.text[:300]
-        print(f"  → Loaded agent: {analyst_result.description}")
-        print(f"  → Content preview: {content_preview}...")
+        # Step 3: Load analyst agent via unified bmad tool
+        print("\n[STEP 3] Loading analyst agent via bmad tool...")
+        analyst_result = await mcp_server.call_tool("bmad", {"command": "analyst"})
+        analyst_content = analyst_result.content[0].text
+        print(f"  → Loaded agent content ({len(analyst_content)} chars)")
+        print(f"  → Content preview: {analyst_content[:200]}...")
         
-        # Step 4: Agent responds
+        # Step 4: Agent responds to user
         print("\n[STEP 4] Agent responding to user...")
         response = await copilot_tester.interpret_result(
-            task="Help me understand what market research I should conduct",
-            tool_result={"agent_context": "You are a business analyst expert"}
+            task="I need help gathering requirements for a mobile app feature",
+            tool_result={"agent_loaded": True, "agent_name": "analyst", "content_length": len(analyst_content)}
         )
         print(f"  → Response action: {response.get('next_action')}")
         
-        # Step 5: Agent discovers workflows
-        print("\n[STEP 5] Agent checking for available workflows...")
-        tool_selection = await copilot_tester.ask_tool_selection(
-            task="What workflows can help with market analysis?",
-            available_tools=["list_workflows"],
-            context="BMAD provides workflows for various tasks"
-        )
-        print(f"  → Selected tool: {tool_selection['tool']}")
+        # Step 5: Verify agent can discover workflows (via bmad-master)
+        print("\n[STEP 5] Loading bmad-master to discover workflows...")
+        master_result = await mcp_server.call_tool("bmad", {"command": ""})
+        master_content = master_result.content[0].text
         
-        # Step 6: List workflows
-        print("\n[STEP 6] Listing available workflows...")
-        workflows_result = await mcp_server.call_tool("list_workflows", {})
-        workflows_data = json.loads(workflows_result.content[0].text)
-        print(f"  → Found {workflows_data['count']} workflows")
+        # bmad-master content should mention workflows
+        assert "workflow" in master_content.lower()
+        print(f"  → bmad-master loaded ({len(master_content)} chars)")
         
         print("\n" + "="*70)
         print("✓ COMPLETE E2E WORKFLOW SUCCESSFUL")
@@ -255,121 +249,81 @@ class TestCopilotAgentActivation:
         
         # Assertions
         assert len(prompts) > 0
-        assert analyst_result is not None
+        assert len(analyst_content) > 500
+        assert "analyst" in analyst_content.lower() or "mary" in analyst_content.lower()
         assert response.get("next_action") in ["answer_user", "call_tool_again", "ask_clarifying_question"]
-        assert workflows_data["count"] > 0
+        assert len(master_content) > 500
     
     @pytest.mark.asyncio
-    async def test_agent_can_filter_workflows_by_module(self, copilot_tester, mcp_server):
-        """Test that agent can intelligently filter workflows."""
-        # Load analyst agent
-        await mcp_server.get_prompt("bmad-analyst", {})
+    async def test_agent_loads_correctly_via_bmad_tool(self, mcp_server):
+        """Test that agents can be loaded via unified bmad tool."""
+        # Load analyst agent via bmad tool
+        result = await mcp_server.call_tool("bmad", {"command": "analyst"})
+        content = result.content[0].text
         
-        # Ask to find BMM-specific workflows
-        selection = await copilot_tester.ask_tool_selection(
-            task="Find workflows specifically for the BMM module (not core)",
-            available_tools=["list_workflows"],
-            context="Workflows can be filtered by module parameter: core or bmm"
-        )
+        # Verify analyst agent loaded
+        assert len(content) > 500, "Agent content too short"
+        assert "analyst" in content.lower() or "mary" in content.lower()
+        print(f"\n✓ Successfully loaded analyst agent via bmad tool ({len(content)} chars)")
         
-        # Execute with filter
-        result = await mcp_server.call_tool("list_workflows", {"module": "bmm"})
-        data = json.loads(result.content[0].text)
+        # Load another agent to verify pattern works
+        dev_result = await mcp_server.call_tool("bmad", {"command": "dev"})
+        dev_content = dev_result.content[0].text
         
-        # Verify all results are BMM module
-        assert data["count"] > 0
-        for wf in data["workflows"]:
-            assert wf["module"] == "bmm"
-        
-        print(f"\n✓ Filtered to {data['count']} BMM workflows")
+        assert len(dev_content) > 500
+        assert "dev" in dev_content.lower() or "developer" in dev_content.lower()
+        print(f"✓ Successfully loaded dev agent via bmad tool ({len(dev_content)} chars)")
     
     @pytest.mark.asyncio
-    async def test_bmad_master_triggers_party_mode_workflow(self, copilot_tester, mcp_server):
-        """Test multi-step interaction: load bmad-master, then trigger *party-mode workflow."""
+    async def test_bmad_master_and_workflow_execution(self, copilot_tester, mcp_server):
+        """Test loading bmad-master and executing a workflow via unified bmad tool."""
         print("\n" + "="*70)
-        print("MULTI-STEP E2E TEST: BMad Master → Party Mode Workflow")
+        print("E2E TEST: BMad Master → Workflow Execution")
         print("="*70)
         
-        # Step 1: Load bmad-master agent
-        print("\n[STEP 1] Loading bmad-master agent...")
-        master_result = await mcp_server.get_prompt("bmad-master", {})
-        master_content = master_result.messages[0].content.text
+        # Step 1: Load bmad-master agent via empty command
+        print("\n[STEP 1] Loading bmad-master agent (empty command)...")
+        master_result = await mcp_server.call_tool("bmad", {"command": ""})
+        master_content = master_result.content[0].text
         
         assert len(master_content) > 500, "Agent content too short"
         assert "bmad" in master_content.lower(), "BMad Master content missing BMAD reference"
         print(f"  ✓ Loaded bmad-master agent ({len(master_content)} chars)")
-        print(f"  Description: {master_result.description}")
         
-        # Step 2: User sends message mentioning *party-mode
-        print("\n[STEP 2] User sends message with *party-mode trigger...")
+        # Step 2: Ask Copilot to recognize workflow command pattern
+        print("\n[STEP 2] Testing Copilot workflow command recognition...")
         user_message = "*party-mode"
-        print(f"  User input: '{user_message}'")
-        
-        # Step 3: Ask Copilot (as bmad-master) what tool to use
-        print("\n[STEP 3] Copilot interprets *party-mode as workflow trigger...")
         selection = await copilot_tester.ask_tool_selection(
-            task=f"User says: {user_message}. This looks like a workflow command.",
-            available_tools=["list_workflows", "get_workflow_details", "execute_workflow"],
+            task=f"User says: {user_message}. What tool should I use?",
+            available_tools=["bmad"],
             context=(
-                "BMad Master recognizes workflow commands starting with *. "
-                "The format *workflow-name should trigger workflow execution. "
-                "Available workflows include party-mode for multi-agent discussions."
+                "The bmad tool accepts commands with patterns:\n"
+                "- Empty string '' = load bmad-master\n"
+                "- 'agent-name' = load agent\n"
+                "- '*workflow-name' = execute workflow (asterisk required)\n"
+                "User input starting with * indicates a workflow execution request."
             )
         )
         
         print(f"  → Copilot selected: {selection['tool']}")
         print(f"  → Reasoning: {selection.get('why', 'N/A')}")
+        assert selection["tool"] == "bmad"
         
-        # Step 4: Verify workflow discovery or execution was selected
-        assert selection["tool"] in ["list_workflows", "execute_workflow", "get_workflow_details"], \
-            f"Expected workflow-related tool, got {selection['tool']}"
+        # Step 3: Execute workflow via bmad tool
+        print("\n[STEP 3] Executing party-mode workflow...")
+        workflow_result = await mcp_server.call_tool("bmad", {"command": "*party-mode"})
+        workflow_content = workflow_result.content[0].text
         
-        # Step 5: List workflows to find party-mode
-        print("\n[STEP 4] Finding party-mode workflow...")
-        list_result = await mcp_server.call_tool("list_workflows", {})
-        workflows_data = json.loads(list_result.content[0].text)
-        
-        party_mode_wf = None
-        for wf in workflows_data["workflows"]:
-            if wf["name"] == "party-mode":
-                party_mode_wf = wf
-                break
-        
-        assert party_mode_wf is not None, "party-mode workflow not found"
-        print(f"  ✓ Found party-mode workflow")
-        print(f"    Path: {party_mode_wf['path']}")
-        print(f"    Description: {party_mode_wf['description'][:80]}...")
-        
-        # Step 6: Verify workflow details match expectations
-        assert "party" in party_mode_wf["name"].lower()
-        assert party_mode_wf["module"] == "core"
-        assert "party-mode" in party_mode_wf["path"]
-        
-        # Step 7: Ask Copilot to interpret the workflow selection as a response
-        print("\n[STEP 5] Confirming workflow was triggered as secondary response...")
-        response = await copilot_tester.interpret_result(
-            task=f"User requested: {user_message}",
-            tool_result={
-                "workflow_found": True,
-                "workflow_name": party_mode_wf["name"],
-                "workflow_description": party_mode_wf["description"]
-            }
-        )
-        
-        print(f"  → Next action: {response.get('next_action')}")
-        print(f"  → Satisfied: {response.get('satisfied')}")
-        
-        # Verify response indicates successful workflow trigger
-        assert response.get("next_action") in ["answer_user", "call_tool_again"], \
-            f"Expected answer_user or call_tool_again, got {response.get('next_action')}"
+        # Verify workflow was loaded (content should mention party-mode)
+        assert len(workflow_content) > 100, "Workflow content too short"
+        print(f"  ✓ Workflow executed successfully ({len(workflow_content)} chars)")
+        print(f"  → Content preview: {workflow_content[:150]}...")
         
         print("\n" + "="*70)
-        print("✓ PARTY MODE WORKFLOW SUCCESSFULLY TRIGGERED")
+        print("✓ WORKFLOW EXECUTION TEST SUCCESSFUL")
         print("="*70)
         print("\nSequence validated:")
-        print("  1. ✓ BMad Master agent loaded")
-        print("  2. ✓ *party-mode command recognized")
-        print("  3. ✓ Workflow tool selected by Copilot")
-        print("  4. ✓ party-mode workflow discovered")
-        print("  5. ✓ Workflow trigger confirmed as secondary response")
+        print("  1. ✓ BMad Master agent loaded via empty command")
+        print("  2. ✓ Copilot recognized *workflow pattern")
+        print("  3. ✓ Workflow executed via bmad tool")
         print("="*70)

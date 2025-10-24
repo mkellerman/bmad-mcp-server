@@ -5,7 +5,7 @@ description = "Model Context Protocol server for BMAD methodology"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=0.9.0",
+    "mcp>=1.19.0",
 ]
 
 [project.scripts]
@@ -47,8 +47,8 @@ markers = [
     "integration: Integration tests (may be slower, test component interactions)",
     "e2e: End-to-end tests (requires litellm, tests full workflows with Copilot)",
 ]
-# Exclude manual tests by default (run with: pytest -m manual)
-addopts = "-m 'not manual'"
+# Exclude manual tests and archived tests by default
+addopts = "-m 'not manual' --ignore=tests/archived_legacy_tests"
 
 [tool.coverage.run]
 source = ["src"]
