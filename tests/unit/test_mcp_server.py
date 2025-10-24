@@ -8,6 +8,9 @@ Story T1.1 + T1.2 from user-stories-testing.md
 import pytest
 from pathlib import Path
 
+# Skip all tests in this file if mcp library not installed
+pytest.importorskip("mcp")
+
 from src.mcp_server import BMADMCPServer
 
 
