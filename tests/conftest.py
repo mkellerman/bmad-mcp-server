@@ -34,13 +34,13 @@ def pytest_configure(config):
 
 @pytest.fixture(scope="session")
 def project_root():
-    """Get project root directory."""
-    return Path(__file__).parent.parent
+    """Get project root directory (src directory where 'bmad/' lives)."""
+    return Path(__file__).parent.parent / "src"
 
 
 @pytest.fixture(scope="session")
 def bmad_root(project_root):
-    """Get BMAD root directory."""
+    """Get BMAD root directory (src/bmad)."""
     return project_root / "bmad"
 
 

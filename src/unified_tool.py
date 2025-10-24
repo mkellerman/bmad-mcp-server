@@ -298,9 +298,48 @@ class UnifiedBMADTool:
 
         return ValidationResult(valid=True)
 
+    def _resolve_agent_alias(self, name: str) -> str:
+        """
+        Resolve agent name aliases to canonical names.
+        
+        Common aliases:
+        - "master" → "bmad-master"
+        - Module-specific shortcuts in game context
+        
+        Args:
+            name: User-provided agent name
+            
+        Returns:
+            Canonical agent name if alias found, otherwise original name
+        """
+        # Define common aliases
+        aliases = {
+            "master": "bmad-master",
+        }
+        
+        # Check if it's a known alias
+        canonical = aliases.get(name)
+        if canonical:
+            logger.debug(f"Resolved alias '{name}' to '{canonical}'")
+            return canonical
+        
+        # Check if adding module prefix resolves to valid agent
+        # For example: "architect" in game module could map to "game-architect"
+        for agent in self.agents:
+            agent_name = agent.get('name', '')
+            module = agent.get('module', '')
+            
+            # Check if the name is the suffix of an agent with module prefix
+            if agent_name.endswith(f"-{name}") and agent_name.startswith(f"{module}-"):
+                logger.debug(f"Resolved module alias '{name}' to '{agent_name}' (module: {module})")
+                return agent_name
+        
+        return name
+
     def _is_agent_name(self, name: str) -> bool:
-        """Check if name exists in agent manifest."""
-        return any(a.get('name') == name for a in self.agents)
+        """Check if name exists in agent manifest (after alias resolution)."""
+        canonical_name = self._resolve_agent_alias(name)
+        return any(a.get('name') == canonical_name for a in self.agents)
 
     def _is_workflow_name(self, name: str) -> bool:
         """Check if name exists in workflow manifest."""
@@ -355,21 +394,25 @@ class UnifiedBMADTool:
         Load agent prompt content.
 
         Args:
-            agent_name: Name of agent to load
+            agent_name: Name of agent to load (can be alias like "master")
 
         Returns:
             Dict with agent prompt content
         """
-        logger.info(f"Loading agent: {agent_name}")
+        # Resolve aliases (e.g., "master" → "bmad-master")
+        canonical_name = self._resolve_agent_alias(agent_name)
+        
+        logger.info(f"Loading agent: {canonical_name}" + 
+                   (f" (from alias: {agent_name})" if canonical_name != agent_name else ""))
 
-        # Find agent in manifest
-        agent = next((a for a in self.agents if a.get('name') == agent_name), None)
+        # Find agent in manifest using canonical name
+        agent = next((a for a in self.agents if a.get('name') == canonical_name), None)
 
         if not agent:
             # This shouldn't happen after validation, but handle gracefully
             return {
                 "success": False,
-                "error": f"Agent '{agent_name}' not found in manifest",
+                "error": f"Agent '{canonical_name}' not found in manifest",
                 "exit_code": 2
             }
 
@@ -421,7 +464,7 @@ class UnifiedBMADTool:
         return {
             "success": True,
             "type": "agent",
-            "agent_name": agent_name,
+            "agent_name": canonical_name,  # Return canonical name
             "display_name": display_name,
             "content": "\n".join(content_parts),
             "exit_code": 0
@@ -510,9 +553,9 @@ class UnifiedBMADTool:
             Dict with formatted task list
         """
         content_parts = ["# Available BMAD Tasks\n"]
-        
+
         # Load task manifest
-        task_manifest_path = self.bmad_root / "_cfg" / "task-manifest.csv"
+        task_manifest_path = self.bmad_root / "bmad" / "_cfg" / "task-manifest.csv"
         tasks = []
         
         if task_manifest_path.exists():
