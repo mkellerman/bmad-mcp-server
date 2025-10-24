@@ -1,4 +1,4 @@
-# BMAD MCP Server
+# BMAD MCP Server (Node.js)
 
 Access the complete BMAD methodology through any AI assistant via the Model Context Protocol.
 
@@ -6,14 +6,17 @@ Access the complete BMAD methodology through any AI assistant via the Model Cont
 
 BMAD (Business Methodology for Agile Development) provides 11 specialist AI agents and 36+ automated workflows to accelerate software development, from requirements analysis to deployment.
 
+## Prerequisites
+
+- Node.js 18 or higher
+- npm or yarn
+
 ## Installation
 
 ```bash
-git clone https://github.com/mkellerman/bmad-mcp-server.git
 cd bmad-mcp-server
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
+npm install
+npm run build
 ```
 
 ## Configuration
@@ -30,8 +33,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "bmad": {
-      "command": "python",
-      "args": ["/absolute/path/to/bmad-mcp-server/src/mcp_server.py"]
+      "command": "node",
+      "args": ["/absolute/path/to/bmad-mcp-server/bmad-mcp-server/build/index.js"]
     }
   }
 }
@@ -40,6 +43,28 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ### Cursor
 
 Add to Cursor's MCP settings with same configuration as Claude Desktop.
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run in development mode (with tsx)
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
+
+# Format code
+npm run format
+```
 
 ## Quick Start
 
@@ -93,44 +118,57 @@ bmad *brainstorming   # Creative ideation
 - `*workflow-status` - Check workflow status
 - Plus 31 more workflows
 
+## Project Structure
+
+```
+bmad-mcp-server/
+├── bmad/                     # BMAD methodology files (agents, workflows)
+│   ├── _cfg/                 # Configuration and manifests
+│   │   ├── agent-manifest.csv
+│   │   ├── workflow-manifest.csv
+│   │   ├── task-manifest.csv
+│   │   └── agents/           # Agent customization files
+│   ├── core/                 # Core BMAD agents and workflows
+│   ├── bmm/                  # BMM module agents and workflows
+│   └── docs/                 # BMAD documentation
+├── src/
+│   ├── index.ts              # Entry point
+│   ├── server.ts             # MCP server implementation
+│   ├── types/
+│   │   └── index.ts          # TypeScript type definitions
+│   ├── tools/
+│   │   ├── index.ts          # Tools module exports
+│   │   └── unified-tool.ts   # Unified BMAD tool implementation
+│   ├── utils/
+│   │   ├── manifest-loader.ts # CSV manifest parser
+│   │   └── file-reader.ts     # Secure file reader
+│   └── prompts/
+│       └── index.ts          # Prompt definitions (placeholder)
+├── build/                    # Compiled JavaScript (generated)
+├── tests/                    # Test files
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
 ## Troubleshooting
 
 **Server not found?**
 - Restart your AI host after configuration
 - Use absolute path in config
-- Verify Python 3.11+
+- Ensure Node.js 18+ is installed
+- Check that build/ directory exists (run `npm run build`)
 
-**Commands not working?**
-- Use `*` prefix for workflows: `bmad *party-mode`
-- No `*` for agents: `bmad analyst`
-- Run `bmad *help` for reference
+**Build errors?**
+- Run `npm install` to ensure all dependencies are installed
+- Check Node.js version with `node --version`
+- Try deleting `node_modules` and `build` folders, then run `npm install && npm run build`
 
-**Need help?**
-- Run `bmad *help` in your AI assistant
-- Check `bmad *list-agents` and `bmad *list-workflows`
-
-## Requirements
-
-- Python 3.11 or higher
-- MCP-compatible AI host (GitHub Copilot, Claude Desktop, Cursor, etc.)
-
-## Development
-
-Developer documentation is in `docs/`:
-- [Architecture](docs/architecture.md)
-- [Product Requirements](docs/prd.md)
-- [User Stories](docs/user-stories.md)
-
-Run tests:
-```bash
-pip install -e ".[dev]"
-pytest
-```
+**Import errors?**
+- Ensure `type: "module"` is in package.json
+- Check that all imports use `.js` extensions
+- Verify tsconfig.json has `"module": "ESNext"`
 
 ## License
 
-TBD
-
----
-
-**Status:** Production Ready ✅ | **Version:** 2.0 | **MCP SDK:** 1.19.0
+ISC
