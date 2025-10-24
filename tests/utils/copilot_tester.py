@@ -104,11 +104,13 @@ class CopilotMCPTester:
         system_rules = (
             f"You are an MCP-style agent helping test the BMAD MCP Server.\n"
             f"Available tools: {tools_list}\n"
-            f"{context or ''}\n"
-            "When you decide to call a tool, output ONE line starting with 'DEBUG_JSON:' "
-            'followed by compact JSON: {"action":{"tool":"TOOL_NAME","args":{}},'
-            '"why":"...","confidence":0.0-1.0}. No extra text inside this JSON. '
-            "Do not reveal chain-of-thought; include only these fields."
+            f"{context or ''}\n\n"
+            "CRITICAL: You MUST respond with EXACTLY this format:\n"
+            "DEBUG_JSON:{\"action\":{\"tool\":\"TOOL_NAME\",\"args\":{}},"
+            "\"why\":\"...\",\"confidence\":0.9}\n\n"
+            "Example: DEBUG_JSON:{\"action\":{\"tool\":\"list_prompts\",\"args\":{}},"
+            "\"why\":\"Need to see available agents\",\"confidence\":0.9}\n\n"
+            "No other text. No explanations. Just the DEBUG_JSON line."
         )
         
         response = completion(
@@ -175,6 +177,23 @@ class CopilotMCPTester:
         )
         
         final_txt = response["choices"][0]["message"]["content"].strip()
+        
+        # Try to extract JSON from markdown code blocks
+        if final_txt.startswith("```"):
+            # Extract content between ```json and ```
+            lines = final_txt.split("\n")
+            json_lines = []
+            in_code_block = False
+            for line in lines:
+                if line.strip().startswith("```"):
+                    if in_code_block:
+                        break
+                    in_code_block = True
+                    continue
+                if in_code_block:
+                    json_lines.append(line)
+            final_txt = "\n".join(json_lines).strip()
+        
         return json.loads(final_txt)
     
     def validate_tool_args(

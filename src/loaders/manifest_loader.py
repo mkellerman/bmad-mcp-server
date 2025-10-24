@@ -28,14 +28,14 @@ class ManifestLoader:
         Initialize manifest loader.
         
         Args:
-            bmad_root: Path to BMAD installation directory
+            bmad_root: Path to project root (manifest paths include 'bmad/' prefix)
         """
         self.bmad_root = Path(bmad_root).resolve()
-        self.manifest_dir = self.bmad_root / "_cfg"
+        self.manifest_dir = self.bmad_root / "bmad" / "_cfg"
         
         # Validate manifest directory exists
         if not self.manifest_dir.exists():
-            logger.warning(f"Manifest directory not found: {self.manifest_dir}")
+            raise ValueError(f"BMAD manifest directory not found: {self.manifest_dir}")
     
     def load_agent_manifest(self) -> list[dict]:
         """
