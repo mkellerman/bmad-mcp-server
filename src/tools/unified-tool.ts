@@ -134,7 +134,7 @@ export class UnifiedBMADTool {
     this.agents = this.manifestLoader.loadAgentManifest();
     this.workflows = this.manifestLoader.loadWorkflowManifest();
 
-    console.log(
+    console.error(
       `UnifiedBMADTool initialized with ${this.agents.length} agents ` +
         `and ${this.workflows.length} workflows`,
     );
@@ -152,28 +152,28 @@ export class UnifiedBMADTool {
 
     // Empty command → load bmad-master (default)
     if (!normalized) {
-      console.log('Empty command, loading bmad-master (default)');
+      console.error('Empty command, loading bmad-master (default)');
       return this.loadAgent('bmad-master');
     }
 
     // Check for built-in discovery commands first (before parsing)
     if (normalized === '*list-agents') {
-      console.log('Discovery command: list-agents');
+      console.error('Discovery command: list-agents');
       return this.listAgents();
     } else if (normalized === '*list-workflows') {
-      console.log('Discovery command: list-workflows');
+      console.error('Discovery command: list-workflows');
       return this.listWorkflows();
     } else if (normalized === '*list-tasks') {
-      console.log('Discovery command: list-tasks');
+      console.error('Discovery command: list-tasks');
       return this.listTasks();
     } else if (normalized === '*discover') {
-      console.log('Discovery command: discover');
+      console.error('Discovery command: discover');
       return this.discover();
     } else if (normalized.startsWith('*init')) {
-      console.log('Initialization command received');
+      console.error('Initialization command received');
       return this.init(normalized);
     } else if (normalized === '*help') {
-      console.log('Discovery command: help');
+      console.error('Discovery command: help');
       return this.help();
     }
 
@@ -403,7 +403,7 @@ export class UnifiedBMADTool {
     // Check if it's a known alias
     const canonical = aliases[name];
     if (canonical) {
-      console.log(`Resolved alias '${name}' to '${canonical}'`);
+      console.error(`Resolved alias '${name}' to '${canonical}'`);
       return canonical;
     }
 
@@ -417,7 +417,7 @@ export class UnifiedBMADTool {
         agentName.endsWith(`-${name}`) &&
         agentName.startsWith(`${module}-`)
       ) {
-        console.log(
+        console.error(
           `Resolved module alias '${name}' to '${agentName}' (module: ${module})`,
         );
         return agentName;
@@ -503,7 +503,7 @@ export class UnifiedBMADTool {
     // Resolve aliases (e.g., "master" → "bmad-master")
     const canonicalName = this.resolveAgentAlias(agentName);
 
-    console.log(
+    console.error(
       `Loading agent: ${canonicalName}${canonicalName !== agentName ? ` (from alias: ${agentName})` : ''}`,
     );
 
@@ -1087,7 +1087,7 @@ export class UnifiedBMADTool {
    * Execute workflow by loading its configuration and instructions.
    */
   private executeWorkflow(workflowName: string): BMADToolResult {
-    console.log(`Executing workflow: ${workflowName}`);
+    console.error(`Executing workflow: ${workflowName}`);
 
     // Find workflow in manifest
     const workflow = this.workflows.find((w) => w.name === workflowName);

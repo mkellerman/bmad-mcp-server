@@ -109,7 +109,7 @@ export class ManifestLoader {
         ),
       );
 
-      console.log(`Loaded ${filtered.length} entries from ${filename}`);
+      console.error(`Loaded ${filtered.length} entries from ${filename}`);
       return filtered;
     } catch (error) {
       const errorMessage =

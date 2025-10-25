@@ -197,6 +197,10 @@ This project uses [Husky](https://typicode.github.io/husky/) to automatically ru
 
 The pre-commit hook runs `npm run precommit`, which executes `lint:fix` and `format`.
 
+## Contributor Guide
+
+See `AGENTS.md` for coding style, testing practices, PR requirements, and a concise Architecture Overview of the MCP server and unified tool.
+
 ## Versioning & Release Process
 
 This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH):

@@ -116,7 +116,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should load manifests on initialization', () => {
       const consoleSpy = jest
-        .spyOn(console, 'log')
+        .spyOn(console, 'error')
         .mockImplementation(() => {});
       createUnifiedTool(fixture.tmpDir);
 

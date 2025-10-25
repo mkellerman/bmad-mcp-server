@@ -74,7 +74,7 @@ export class FileReader {
         this.validatePath(root, resolvedPath);
 
         const content = fs.readFileSync(resolvedPath, 'utf-8');
-        console.log(`Read ${content.length} bytes from ${resolvedPath}`);
+        console.error(`Read ${content.length} bytes from ${resolvedPath}`);
         return content;
       } catch (error) {
         if (error instanceof PathTraversalError) {

@@ -65,7 +65,7 @@ export class BMADMCPServer {
   constructor(bmadRoot: string, discovery: BmadPathResolution) {
     this.discovery = discovery;
     this.bmadRoot = path.resolve(bmadRoot);
-    console.log(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
+    console.error(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
 
     const manifestDir = discovery.activeLocation.manifestDir;
     if (!manifestDir) {
@@ -73,8 +73,8 @@ export class BMADMCPServer {
     }
 
     this.projectRoot = this.bmadRoot;
-    console.log(`Project root: ${this.projectRoot}`);
-    console.log(`Manifest directory: ${manifestDir}`);
+    console.error(`Project root: ${this.projectRoot}`);
+    console.error(`Manifest directory: ${manifestDir}`);
 
     // Initialize components
     this.manifestLoader = new ManifestLoader(this.projectRoot);
@@ -86,8 +86,8 @@ export class BMADMCPServer {
     // Load manifests for prompts
     this.agents = this.manifestLoader.loadAgentManifest();
 
-    console.log(`Loaded ${this.agents.length} agents from manifest`);
-    console.log('BMAD MCP Server initialized successfully');
+    console.error(`Loaded ${this.agents.length} agents from manifest`);
+    console.error('BMAD MCP Server initialized successfully');
 
     // Create MCP server
     this.server = new Server(
@@ -112,7 +112,7 @@ export class BMADMCPServer {
   private setupHandlers(): void {
     // List available prompts (BMAD agents)
     this.server.setRequestHandler(ListPromptsRequestSchema, () => {
-      console.log(
+      console.error(
         `list_prompts called - returning ${this.agents.length} agents`,
       );
 
@@ -140,7 +140,7 @@ export class BMADMCPServer {
     // Get a specific prompt (BMAD agent)
     this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
       const name = request.params.name;
-      console.log(`get_prompt called for: ${name}`);
+      console.error(`get_prompt called for: ${name}`);
 
       // Normalize agent name (handle both "analyst" and "bmad-analyst")
       const agentNameStripped = name.replace('bmad-', '');
@@ -209,7 +209,7 @@ export class BMADMCPServer {
 
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, () => {
-      console.log('list_tools called - returning unified bmad tool');
+      console.error('list_tools called - returning unified bmad tool');
 
       const tools: Tool[] = [
         {
@@ -285,7 +285,7 @@ The tool provides helpful suggestions if you:
     // Call a tool
     this.server.setRequestHandler(CallToolRequestSchema, (request) => {
       const { name, arguments: args } = request.params;
-      console.log(`call_tool called: ${name} with args:`, args);
+      console.error(`call_tool called: ${name} with args:`, args);
 
       if (name !== 'bmad') {
         return {
@@ -300,7 +300,7 @@ The tool provides helpful suggestions if you:
       }
 
       const command = (args?.command as string) ?? '';
-      console.log(`Executing bmad tool with command: '${command}'`);
+      console.error(`Executing bmad tool with command: '${command}'`);
 
       // Execute through unified tool
       const result = this.unifiedTool.execute(command);

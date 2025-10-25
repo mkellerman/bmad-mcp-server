@@ -111,7 +111,7 @@ describe('FileReader', () => {
 
     it('should log successful reads', () => {
       const consoleSpy = jest
-        .spyOn(console, 'log')
+        .spyOn(console, 'error')
         .mockImplementation(() => {});
       const testFile = path.join(fixture.tmpDir, 'src', 'bmad', 'test.txt');
       fs.writeFileSync(testFile, 'Test', 'utf-8');

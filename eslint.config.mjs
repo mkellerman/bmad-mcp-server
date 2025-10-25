@@ -28,7 +28,7 @@ export default tseslint.config(
       },
     },
     rules: {
-      'no-console': 'warn',
+      'no-console': ['warn', { allow: ['error', 'warn'] }],
       quotes: ['error', 'single'],
       semi: ['error', 'always'],
     },
@@ -51,7 +51,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
-      'no-console': 'warn',
+      'no-console': ['warn', { allow: ['error', 'warn'] }],
       quotes: ['error', 'single'],
       semi: ['error', 'always'],
     },

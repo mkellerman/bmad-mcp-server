@@ -133,7 +133,7 @@ another,Another,Another Agent,,another,,,,bmm,another.md`;
 
     it('should log number of loaded entries', () => {
       const consoleSpy = jest
-        .spyOn(console, 'log')
+        .spyOn(console, 'error')
         .mockImplementation(() => {});
       loader.loadAgentManifest();
 
