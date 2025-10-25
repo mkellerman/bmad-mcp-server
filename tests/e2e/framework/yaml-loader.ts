@@ -6,7 +6,13 @@ import * as yaml from 'js-yaml';
  * Test case expectation types
  */
 export interface Expectation {
-  type: 'contains' | 'not_contains' | 'regex' | 'response_length' | 'response_time' | 'llm_judge';
+  type:
+    | 'contains'
+    | 'not_contains'
+    | 'regex'
+    | 'response_length'
+    | 'response_time'
+    | 'llm_judge';
   value?: string;
   pattern?: string;
   min?: number;
@@ -87,13 +93,13 @@ export class YAMLTestLoader {
    */
   static loadTestDirectory(dirPath: string): TestSuite[] {
     const testSuites: TestSuite[] = [];
-    
+
     if (!fs.existsSync(dirPath)) {
       return testSuites;
     }
 
     const files = fs.readdirSync(dirPath);
-    
+
     for (const file of files) {
       if (file.endsWith('.yaml') || file.endsWith('.yml')) {
         const filePath = path.join(dirPath, file);

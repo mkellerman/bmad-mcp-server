@@ -16,7 +16,7 @@ export interface TestFixture {
  */
 export function createTestFixture(): TestFixture {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bmad-test-'));
-  
+
   const cleanup = () => {
     if (fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -51,12 +51,18 @@ export function createBMADStructure(baseDir: string): void {
  * Create a sample agent manifest CSV
  */
 export function createAgentManifest(baseDir: string): void {
-  const manifestPath = path.join(baseDir, 'src', 'bmad', '_cfg', 'agent-manifest.csv');
+  const manifestPath = path.join(
+    baseDir,
+    'src',
+    'bmad',
+    '_cfg',
+    'agent-manifest.csv',
+  );
   const content = `name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
 bmad-master,BMAD Master,AI Agent Orchestrator,🎯,orchestrator,You are the BMAD Master,Direct,Agile,core,core/agents/bmad-master.md
 analyst,Business Analyst,Requirements Analyst,📊,analyst,You are a business analyst,Professional,User-focused,bmm,bmm/agents/analyst.md
 dev,Developer,Full-Stack Developer,👨‍💻,developer,You are a developer,Technical,Clean code,bmm,bmm/agents/dev.md`;
-  
+
   fs.writeFileSync(manifestPath, content, 'utf-8');
 }
 
@@ -64,11 +70,17 @@ dev,Developer,Full-Stack Developer,👨‍💻,developer,You are a developer,Tec
  * Create a sample workflow manifest CSV
  */
 export function createWorkflowManifest(baseDir: string): void {
-  const manifestPath = path.join(baseDir, 'src', 'bmad', '_cfg', 'workflow-manifest.csv');
+  const manifestPath = path.join(
+    baseDir,
+    'src',
+    'bmad',
+    '_cfg',
+    'workflow-manifest.csv',
+  );
   const content = `name,description,trigger,module,path
 party-mode,Brainstorming party mode,*party-mode,core,core/workflows/party-mode/party-mode.xml
 analysis,Requirements analysis workflow,*analysis,bmm,bmm/workflows/1-analysis/analysis.xml`;
-  
+
   fs.writeFileSync(manifestPath, content, 'utf-8');
 }
 
@@ -76,39 +88,53 @@ analysis,Requirements analysis workflow,*analysis,bmm,bmm/workflows/1-analysis/a
  * Create a sample task manifest CSV
  */
 export function createTaskManifest(baseDir: string): void {
-  const manifestPath = path.join(baseDir, 'src', 'bmad', '_cfg', 'task-manifest.csv');
+  const manifestPath = path.join(
+    baseDir,
+    'src',
+    'bmad',
+    '_cfg',
+    'task-manifest.csv',
+  );
   const content = `name,description,module,path
 daily-standup,Daily standup meeting,bmm,bmm/tasks/daily-standup.xml
 retrospective,Sprint retrospective,bmm,bmm/tasks/retrospective.xml`;
-  
+
   fs.writeFileSync(manifestPath, content, 'utf-8');
 }
 
 /**
  * Create a sample agent file
  */
-export function createAgentFile(baseDir: string, agentPath: string, content: string): void {
+export function createAgentFile(
+  baseDir: string,
+  agentPath: string,
+  content: string,
+): void {
   const fullPath = path.join(baseDir, 'src', 'bmad', agentPath);
   const dir = path.dirname(fullPath);
-  
+
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  
+
   fs.writeFileSync(fullPath, content, 'utf-8');
 }
 
 /**
  * Create a sample workflow file
  */
-export function createWorkflowFile(baseDir: string, workflowPath: string, content: string): void {
+export function createWorkflowFile(
+  baseDir: string,
+  workflowPath: string,
+  content: string,
+): void {
   const fullPath = path.join(baseDir, 'src', 'bmad', workflowPath);
   const dir = path.dirname(fullPath);
-  
+
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  
+
   fs.writeFileSync(fullPath, content, 'utf-8');
 }
 

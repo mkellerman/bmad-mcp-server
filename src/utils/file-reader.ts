@@ -41,7 +41,7 @@ export class FileReader {
 
   constructor(bmadRoot: string | string[]) {
     if (Array.isArray(bmadRoot)) {
-      const resolved = bmadRoot.map(root => path.resolve(root));
+      const resolved = bmadRoot.map((root) => path.resolve(root));
       this.primaryRoot = resolved[0];
       this.roots = resolved;
     } else {
@@ -66,7 +66,7 @@ export class FileReader {
    * @throws FileReadError if file doesn't exist or can't be read
    */
   readFile(filePath: string): string {
-    const lastErrors: Error[] = [];
+    const lastErrors: unknown[] = [];
 
     for (const root of this.roots) {
       try {
@@ -76,7 +76,7 @@ export class FileReader {
         const content = fs.readFileSync(resolvedPath, 'utf-8');
         console.log(`Read ${content.length} bytes from ${resolvedPath}`);
         return content;
-      } catch (error: any) {
+      } catch (error) {
         if (error instanceof PathTraversalError) {
           throw error;
         }
@@ -87,7 +87,10 @@ export class FileReader {
     const errorMsg = `File not found across BMAD roots: ${filePath}`;
     console.error(errorMsg);
     if (lastErrors.length > 0) {
-      lastErrors.forEach(err => console.error('  Cause:', err.message ?? err));
+      lastErrors.forEach((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('  Cause:', message);
+      });
     }
     throw new FileReadError(errorMsg);
   }
@@ -142,8 +145,7 @@ export class FileReader {
 
     // If relative path starts with '..' or is absolute, it's outside root
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-      const errorMsg =
-        `Path traversal detected: ${resolvedPath} is outside BMAD root ${root}`;
+      const errorMsg = `Path traversal detected: ${resolvedPath} is outside BMAD root ${root}`;
       console.error(errorMsg);
       throw new PathTraversalError(errorMsg);
     }

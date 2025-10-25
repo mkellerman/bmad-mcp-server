@@ -268,7 +268,9 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
        await page.click('[data-testid="login-button"]');
 
        // THEN: Error message is displayed
-       await expect(page.locator('[data-testid="error-message"]')).toHaveText('Invalid email or password');
+       await expect(page.locator('[data-testid="error-message"]')).toHaveText(
+         'Invalid email or password',
+       );
      });
    });
    ```
@@ -297,7 +299,9 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
      // NOW navigate
      await page.goto('/dashboard');
 
-     await expect(page.locator('[data-testid="user-name"]')).toHaveText('Test User');
+     await expect(page.locator('[data-testid="user-name"]')).toHaveText(
+       'Test User',
+     );
    });
    ```
 
@@ -385,7 +389,8 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
      ...overrides,
    });
 
-   export const createUsers = (count: number) => Array.from({ length: count }, () => createUser());
+   export const createUsers = (count: number) =>
+     Array.from({ length: count }, () => createUser());
    ```
 
    **Factory principles:**
@@ -670,7 +675,9 @@ test('should display user name', async ({ page }) => {
 // ❌ WRONG: Multiple assertions (not atomic)
 test('should display user info', async ({ page }) => {
   await expect(page.locator('[data-testid="user-name"]')).toHaveText('John');
-  await expect(page.locator('[data-testid="user-email"]')).toHaveText('john@example.com');
+  await expect(page.locator('[data-testid="user-email"]')).toHaveText(
+    'john@example.com',
+  );
 });
 ```
 

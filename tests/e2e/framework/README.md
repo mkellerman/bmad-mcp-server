@@ -31,6 +31,7 @@ npm run e2e:logs
 ## Configuration
 
 The LiteLLM proxy is configured to support multiple AI providers:
+
 - OpenAI
 - Anthropic
 - Groq

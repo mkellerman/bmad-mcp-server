@@ -2,8 +2,19 @@
  * Unit tests for FileReader
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { FileReader, FileReadError, PathTraversalError } from '../../src/utils/file-reader.js';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  jest,
+} from '@jest/globals';
+import {
+  FileReader,
+  FileReadError,
+  PathTraversalError,
+} from '../../src/utils/file-reader.js';
 import {
   createTestFixture,
   createBMADStructure,
@@ -39,12 +50,14 @@ describe('FileReader', () => {
     });
 
     it('should warn if BMAD root does not exist', () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
       const nonExistentPath = path.join(fixture.tmpDir, 'nonexistent');
       new FileReader(nonExistentPath);
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('BMAD root directory not found')
+        expect.stringContaining('BMAD root directory not found'),
       );
       consoleSpy.mockRestore();
     });
@@ -97,20 +110,27 @@ describe('FileReader', () => {
     });
 
     it('should log successful reads', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
       const testFile = path.join(fixture.tmpDir, 'src', 'bmad', 'test.txt');
       fs.writeFileSync(testFile, 'Test', 'utf-8');
 
       reader.readFile(testFile);
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Read 4 bytes from')
+        expect.stringContaining('Read 4 bytes from'),
       );
       consoleSpy.mockRestore();
     });
 
     it('should handle permission errors', () => {
-      const testFile = path.join(fixture.tmpDir, 'src', 'bmad', 'restricted.txt');
+      const testFile = path.join(
+        fixture.tmpDir,
+        'src',
+        'bmad',
+        'restricted.txt',
+      );
       fs.writeFileSync(testFile, 'Secret', 'utf-8');
       fs.chmodSync(testFile, 0o000);
 
@@ -153,7 +173,14 @@ describe('FileReader', () => {
 
   describe('path validation', () => {
     it('should allow files in BMAD subdirectories', () => {
-      const testFile = path.join(fixture.tmpDir, 'src', 'bmad', 'deep', 'nested', 'file.txt');
+      const testFile = path.join(
+        fixture.tmpDir,
+        'src',
+        'bmad',
+        'deep',
+        'nested',
+        'file.txt',
+      );
       fs.mkdirSync(path.dirname(testFile), { recursive: true });
       fs.writeFileSync(testFile, 'Deep file', 'utf-8');
 

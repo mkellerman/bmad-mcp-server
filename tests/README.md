@@ -1,10 +1,6 @@
 # BMAD MCP Server - Test Suite# BMAD MCP Server - Test Suite
 
-
-
 Comprehensive test suite with unit tests (Jest) and E2E tests (Playwright + LLM).## Overview
-
-
 
 ## Quick StartComprehensive test suite for the BMAD MCP Server featuring:
 
@@ -12,7 +8,7 @@ Comprehensive test suite with unit tests (Jest) and E2E tests (Playwright + LLM)
 
 ### Unit Tests- **E2E Tests (Playwright + LLM):** YAML-based LLM-powered integration tests
 
-```bash
+````bash
 
 npm test                    # Run all unit tests## Test Coverage
 
@@ -92,43 +88,43 @@ Current status: **90.33% coverage** (91/91 tests passing)└── integration/
 
 npm test
 
-```
+````
 
 tests/# Run with coverage
 
-├── unit/                       # Jest unit testsnpm test -- --coverage
+├── unit/ # Jest unit testsnpm test -- --coverage
 
-│   ├── file-reader.test.ts    # 19 tests ✓
+│ ├── file-reader.test.ts # 19 tests ✓
 
-│   ├── manifest-loader.test.ts # 18 tests ✓# Run specific test file
+│ ├── manifest-loader.test.ts # 18 tests ✓# Run specific test file
 
-│   └── unified-tool.test.ts    # 29 tests ✓npm test -- tests/unit/file-reader.test.ts
+│ └── unified-tool.test.ts # 29 tests ✓npm test -- tests/unit/file-reader.test.ts
 
-├── e2e/                        # Playwright E2E tests
+├── e2e/ # Playwright E2E tests
 
-│   ├── framework/              # Test engine# Run in watch mode
+│ ├── framework/ # Test engine# Run in watch mode
 
-│   │   ├── llm-client.ts      # LiteLLM clientnpm test -- --watch
+│ │ ├── llm-client.ts # LiteLLM clientnpm test -- --watch
 
-│   │   ├── yaml-loader.ts     # Test parser```
+│ │ ├── yaml-loader.ts # Test parser```
 
-│   │   ├── validators.ts      # Validation logic
+│ │ ├── validators.ts # Validation logic
 
-│   │   └── runner.spec.ts     # Test runner### E2E Tests (Playwright + LLM)
+│ │ └── runner.spec.ts # Test runner### E2E Tests (Playwright + LLM)
 
-│   └── test-cases/             # YAML test definitions
+│ └── test-cases/ # YAML test definitions
 
-│       ├── agent-loading.yaml**Prerequisites:** LiteLLM proxy must be running
+│ ├── agent-loading.yaml**Prerequisites:** LiteLLM proxy must be running
 
-│       ├── discovery-commands.yaml
+│ ├── discovery-commands.yaml
 
-│       └── error-handling.yaml```bash
+│ └── error-handling.yaml```bash
 
 └── support/# 1. Start LiteLLM proxy (separate terminal)
 
     └── litellm-config.yaml     # LiteLLM config (gpt-4.1)npm run litellm:start
 
-```
+````
 
 # 2. Run E2E tests
 
@@ -170,7 +166,7 @@ tests:1. **QA writes tests in YAML** (no coding required)
 
       User request: "Load analyst agent"### Writing E2E Tests
 
-    
+
 
     expectations:Create YAML files in `tests/e2e/test-cases/`:
 
@@ -210,7 +206,7 @@ tests:1. **QA writes tests in YAML** (no coding required)
 
       User: "Load the analyst agent"
 
-> **Note**: LLM Judge validator is experimental (see `LLM-JUDGE-WIP.md`)    
+> **Note**: LLM Judge validator is experimental (see `LLM-JUDGE-WIP.md`)
 
     expectations:
 
@@ -218,7 +214,7 @@ tests:1. **QA writes tests in YAML** (no coding required)
 
         value: "Mary"
 
-```bash      
+```bash
 
 # Start proxy      - type: "llm_judge"
 
@@ -268,13 +264,13 @@ docker logs litellm-proxy       # View logs- Threshold-based validation (default
 
 docker-compose restart          # Restart container- Perfect for qualitative checks (tone, clarity, completeness)
 
-```
+````
 
 ### Setup E2E Tests
 
 **Port 4000 in use:**
 
-```bash### Quick Start (Docker - Recommended)
+````bash### Quick Start (Docker - Recommended)
 
 lsof -i :4000                   # Find process using port
 
@@ -384,7 +380,7 @@ createAgentManifest(fixture.tmpDir);
 // ... run tests ...
 
 fixture.cleanup(); // Automatic cleanup
-```
+````
 
 ## Test Configuration
 
@@ -408,26 +404,28 @@ fixture.cleanup(); // Automatic cleanup
 
 ### Utils (96.10%)
 
-| File | Statements | Branches | Functions | Lines |
-|------|-----------|----------|-----------|-------|
-| file-reader.ts | 92.85% | 88.88% | 100% | 92.85% |
-| manifest-loader.ts | 100% | 100% | 100% | 100% |
+| File               | Statements | Branches | Functions | Lines  |
+| ------------------ | ---------- | -------- | --------- | ------ |
+| file-reader.ts     | 92.85%     | 88.88%   | 100%      | 92.85% |
+| manifest-loader.ts | 100%       | 100%     | 100%      | 100%   |
 
 ### Tools (88.81%)
 
-| File | Statements | Branches | Functions | Lines |
-|------|-----------|----------|-----------|-------|
-| unified-tool.ts | 88.81% | 66.95% | 86.66% | 88.88% |
+| File            | Statements | Branches | Functions | Lines  |
+| --------------- | ---------- | -------- | --------- | ------ |
+| unified-tool.ts | 88.81%     | 66.95%   | 86.66%    | 88.88% |
 
 ## What's Tested
 
 ### Security Features
+
 - ✅ Path traversal prevention
 - ✅ Dangerous character detection
 - ✅ Input validation and sanitization
 - ✅ Permission error handling
 
 ### Core Functionality
+
 - ✅ Agent discovery and loading
 - ✅ Workflow discovery and execution
 - ✅ Manifest parsing (CSV)
@@ -435,6 +433,7 @@ fixture.cleanup(); // Automatic cleanup
 - ✅ Error messages and suggestions
 
 ### Edge Cases
+
 - ✅ Empty manifests
 - ✅ Missing files
 - ✅ Malformed CSV
@@ -464,7 +463,7 @@ Tests are designed to run in CI/CD environments:
 # Example GitHub Actions
 - name: Run Tests
   run: npm test
-  
+
 - name: Upload Coverage
   run: npm test -- --coverage
 ```

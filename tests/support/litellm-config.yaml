@@ -7,14 +7,14 @@ model_list:
     litellm_params:
       model: github_copilot/gpt-4.1
       headers:
-        Editor-Version: "vscode/1.95.0"
-        Editor-Plugin-Version: "copilot-chat/0.22.4"
-        Openai-Organization: "github-copilot"
-        Openai-Intent: "conversation-panel"
+        Editor-Version: 'vscode/1.95.0'
+        Editor-Plugin-Version: 'copilot-chat/0.22.4'
+        Openai-Organization: 'github-copilot'
+        Openai-Intent: 'conversation-panel'
 
 general_settings:
-  master_key: sk-test-bmad-1234  # API key for test framework authentication
-  
+  master_key: sk-test-bmad-1234 # API key for test framework authentication
+
 litellm_settings:
-  drop_params: true  # Drop unsupported params instead of failing
-  set_verbose: false  # Disable verbose logging in tests
+  drop_params: true # Drop unsupported params instead of failing
+  set_verbose: false # Disable verbose logging in tests

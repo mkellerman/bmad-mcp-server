@@ -106,25 +106,24 @@ export type ParsedCommand =
   | { type: 'workflow'; name: string }
   | { type: 'error'; validation: ValidationResult };
 
-
 export interface User {
-    id: string;
-    username: string;
-    email: string;
-    createdAt: Date;
-    updatedAt: Date;
+  id: string;
+  username: string;
+  email: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Prompt {
-    id: string;
-    contextId: string;
-    content: string;
-    createdAt: Date;
-    updatedAt: Date;
+  id: string;
+  contextId: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Response<T> {
-    success: boolean;
-    data?: T;
-    error?: string;
+  success: boolean;
+  data?: T;
+  error?: string;
 }

@@ -97,12 +97,18 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 
 test.describe('Checkout Flow with HAR Recording', () => {
-  test('should complete payment with full network capture', async ({ page, context }) => {
+  test('should complete payment with full network capture', async ({
+    page,
+    context,
+  }) => {
     // Start HAR recording BEFORE navigation
-    await context.routeFromHAR(path.join(__dirname, '../fixtures/checkout.har'), {
-      url: '**/api/**', // Only capture API calls
-      update: true, // Update HAR if file exists
-    });
+    await context.routeFromHAR(
+      path.join(__dirname, '../fixtures/checkout.har'),
+      {
+        url: '**/api/**', // Only capture API calls
+        update: true, // Update HAR if file exists
+      },
+    );
 
     await page.goto('/checkout');
 
@@ -180,7 +186,11 @@ type DebugFixture = {
 export const test = base.extend<DebugFixture>({
   captureDebugArtifacts: async ({ page }, use, testInfo) => {
     const consoleLogs: string[] = [];
-    const networkRequests: Array<{ url: string; status: number; method: string }> = [];
+    const networkRequests: Array<{
+      url: string;
+      status: number;
+      method: string;
+    }> = [];
 
     // Capture console messages
     page.on('console', (msg) => {
@@ -212,10 +222,18 @@ export const test = base.extend<DebugFixture>({
       fs.mkdirSync(artifactDir, { recursive: true });
 
       // Save console logs
-      fs.writeFileSync(path.join(artifactDir, 'console.log'), consoleLogs.join('\n'), 'utf-8');
+      fs.writeFileSync(
+        path.join(artifactDir, 'console.log'),
+        consoleLogs.join('\n'),
+        'utf-8',
+      );
 
       // Save network summary
-      fs.writeFileSync(path.join(artifactDir, 'network.json'), JSON.stringify(networkRequests, null, 2), 'utf-8');
+      fs.writeFileSync(
+        path.join(artifactDir, 'network.json'),
+        JSON.stringify(networkRequests, null, 2),
+        'utf-8',
+      );
 
       console.log(`Debug artifacts saved to: ${artifactDir}`);
     }
@@ -229,12 +247,17 @@ export const test = base.extend<DebugFixture>({
 // tests/e2e/payment-with-debug.spec.ts
 import { test, expect } from '../support/fixtures/debug-fixture';
 
-test('payment flow captures debug artifacts on failure', async ({ page, captureDebugArtifacts }) => {
+test('payment flow captures debug artifacts on failure', async ({
+  page,
+  captureDebugArtifacts,
+}) => {
   await page.goto('/checkout');
 
   // Test will automatically capture console + network on failure
   await page.getByTestId('submit-payment').click();
-  await expect(page.getByTestId('success-message')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId('success-message')).toBeVisible({
+    timeout: 5000,
+  });
 
   // If this fails, console.log and network.json saved automatically
 });
@@ -306,13 +329,19 @@ export const test = base.extend<A11yFixture>({
 
       // Attach results to test report (visible in trace viewer)
       if (results.violations.length > 0) {
-        console.log(`Found ${results.violations.length} accessibility violations:`);
+        console.log(
+          `Found ${results.violations.length} accessibility violations:`,
+        );
         results.violations.forEach((violation) => {
-          console.log(`- [${violation.impact}] ${violation.id}: ${violation.description}`);
+          console.log(
+            `- [${violation.impact}] ${violation.id}: ${violation.description}`,
+          );
           console.log(`  Help: ${violation.helpUrl}`);
         });
 
-        throw new Error(`Accessibility violations found: ${results.violations.length}`);
+        throw new Error(
+          `Accessibility violations found: ${results.violations.length}`,
+        );
       }
     });
   },
@@ -360,7 +389,10 @@ Cypress.Commands.add('checkA11y', (context = null, options = {}) => {
     if (violations.length) {
       cy.task('log', `Found ${violations.length} accessibility violations`);
       violations.forEach((violation) => {
-        cy.task('log', `- [${violation.impact}] ${violation.id}: ${violation.description}`);
+        cy.task(
+          'log',
+          `- [${violation.impact}] ${violation.id}: ${violation.description}`,
+        );
       });
     }
   });

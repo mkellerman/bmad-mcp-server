@@ -34,8 +34,20 @@ const AGENT_NAME_PATTERN = /^[a-z]+(-[a-z]+)*$/;
 const WORKFLOW_NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const MIN_NAME_LENGTH = 2;
 const MAX_NAME_LENGTH = 50;
-const DANGEROUS_CHARS = [';', '&', '|', '$', '`', '<', '>', '\n', '\r', '(', ')'];
-const FUZZY_MATCH_THRESHOLD = 0.70;
+const DANGEROUS_CHARS = [
+  ';',
+  '&',
+  '|',
+  '$',
+  '`',
+  '<',
+  '>',
+  '\n',
+  '\r',
+  '(',
+  ')',
+];
+const FUZZY_MATCH_THRESHOLD = 0.7;
 
 /**
  * Calculate similarity ratio between two strings (Levenshtein-based)
@@ -72,7 +84,7 @@ function levenshteinDistance(s1: string, s2: string): number {
         matrix[i][j] = Math.min(
           matrix[i - 1][j - 1] + 1,
           matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
+          matrix[i - 1][j] + 1,
         );
       }
     }
@@ -124,7 +136,7 @@ export class UnifiedBMADTool {
 
     console.log(
       `UnifiedBMADTool initialized with ${this.agents.length} agents ` +
-      `and ${this.workflows.length} workflows`
+        `and ${this.workflows.length} workflows`,
     );
   }
 
@@ -134,7 +146,7 @@ export class UnifiedBMADTool {
    * @param command Command string to parse and execute
    * @returns Result object with data or error information
    */
-  async execute(command: string): Promise<BMADToolResult> {
+  execute(command: string): BMADToolResult {
     // Normalize command (trim whitespace)
     const normalized = command.trim();
 
@@ -173,7 +185,10 @@ export class UnifiedBMADTool {
     }
 
     // Validate the name
-    const validation = this.validateName(parsedCommand.name, parsedCommand.type);
+    const validation = this.validateName(
+      parsedCommand.name,
+      parsedCommand.type,
+    );
     if (!validation.valid) {
       return this.formatErrorResponse(validation);
     }
@@ -271,7 +286,7 @@ export class UnifiedBMADTool {
    */
   private checkSecurity(command: string): ValidationResult {
     // Check dangerous characters
-    const foundDangerous = DANGEROUS_CHARS.filter(c => command.includes(c));
+    const foundDangerous = DANGEROUS_CHARS.filter((c) => command.includes(c));
     if (foundDangerous.length > 0) {
       return {
         valid: false,
@@ -283,7 +298,7 @@ export class UnifiedBMADTool {
 
     // Check non-ASCII
     if (!/^[\x00-\x7F]*$/.test(command)) {
-      const nonAscii = [...command].filter(c => c.charCodeAt(0) > 127);
+      const nonAscii = [...command].filter((c) => c.charCodeAt(0) > 127);
       return {
         valid: false,
         errorCode: 'NON_ASCII_CHARACTERS',
@@ -298,7 +313,10 @@ export class UnifiedBMADTool {
   /**
    * Validate agent or workflow name.
    */
-  private validateName(name: string, commandType: 'agent' | 'workflow'): ValidationResult {
+  private validateName(
+    name: string,
+    commandType: 'agent' | 'workflow',
+  ): ValidationResult {
     // Length validation
     if (name.length < MIN_NAME_LENGTH) {
       return {
@@ -319,7 +337,8 @@ export class UnifiedBMADTool {
     }
 
     // Pattern validation
-    const pattern = commandType === 'workflow' ? WORKFLOW_NAME_PATTERN : AGENT_NAME_PATTERN;
+    const pattern =
+      commandType === 'workflow' ? WORKFLOW_NAME_PATTERN : AGENT_NAME_PATTERN;
     if (!pattern.test(name)) {
       return {
         valid: false,
@@ -378,7 +397,7 @@ export class UnifiedBMADTool {
   private resolveAgentAlias(name: string): string {
     // Define common aliases
     const aliases: Record<string, string> = {
-      'master': 'bmad-master',
+      master: 'bmad-master',
     };
 
     // Check if it's a known alias
@@ -394,8 +413,13 @@ export class UnifiedBMADTool {
       const module = agent.module;
 
       // Check if the name is the suffix of an agent with module prefix
-      if (agentName.endsWith(`-${name}`) && agentName.startsWith(`${module}-`)) {
-        console.log(`Resolved module alias '${name}' to '${agentName}' (module: ${module})`);
+      if (
+        agentName.endsWith(`-${name}`) &&
+        agentName.startsWith(`${module}-`)
+      ) {
+        console.log(
+          `Resolved module alias '${name}' to '${agentName}' (module: ${module})`,
+        );
         return agentName;
       }
     }
@@ -408,34 +432,37 @@ export class UnifiedBMADTool {
    */
   private isAgentName(name: string): boolean {
     const canonicalName = this.resolveAgentAlias(name);
-    return this.agents.some(a => a.name === canonicalName);
+    return this.agents.some((a) => a.name === canonicalName);
   }
 
   /**
    * Check if name exists in workflow manifest.
    */
   private isWorkflowName(name: string): boolean {
-    return this.workflows.some(w => w.name === name);
+    return this.workflows.some((w) => w.name === name);
   }
 
   /**
    * Get list of all agent names.
    */
   private getAgentNames(): string[] {
-    return this.agents.map(a => a.name);
+    return this.agents.map((a) => a.name);
   }
 
   /**
    * Get list of all workflow names.
    */
   private getWorkflowNames(): string[] {
-    return this.workflows.map(w => w.name);
+    return this.workflows.map((w) => w.name);
   }
 
   /**
    * Check if name matches a valid name but with wrong case.
    */
-  private checkCaseMismatch(name: string, validNames: string[]): string | undefined {
+  private checkCaseMismatch(
+    name: string,
+    validNames: string[],
+  ): string | undefined {
     const lowercaseName = name.toLowerCase();
     for (const validName of validNames) {
       if (validName.toLowerCase() === lowercaseName && validName !== name) {
@@ -448,12 +475,18 @@ export class UnifiedBMADTool {
   /**
    * Find closest matching name using fuzzy matching.
    */
-  private findClosestMatch(inputName: string, validNames: string[]): string | undefined {
+  private findClosestMatch(
+    inputName: string,
+    validNames: string[],
+  ): string | undefined {
     let bestMatch: string | undefined = undefined;
     let bestScore = 0.0;
 
     for (const validName of validNames) {
-      const ratio = similarity(inputName.toLowerCase(), validName.toLowerCase());
+      const ratio = similarity(
+        inputName.toLowerCase(),
+        validName.toLowerCase(),
+      );
       if (ratio >= FUZZY_MATCH_THRESHOLD && ratio > bestScore) {
         bestScore = ratio;
         bestMatch = validName;
@@ -466,16 +499,16 @@ export class UnifiedBMADTool {
   /**
    * Load agent prompt content.
    */
-  private async loadAgent(agentName: string): Promise<BMADToolResult> {
+  private loadAgent(agentName: string): BMADToolResult {
     // Resolve aliases (e.g., "master" → "bmad-master")
     const canonicalName = this.resolveAgentAlias(agentName);
 
     console.log(
-      `Loading agent: ${canonicalName}${canonicalName !== agentName ? ` (from alias: ${agentName})` : ''}`
+      `Loading agent: ${canonicalName}${canonicalName !== agentName ? ` (from alias: ${agentName})` : ''}`,
     );
 
     // Find agent in manifest using canonical name
-    const agent = this.agents.find(a => a.name === canonicalName);
+    const agent = this.agents.find((a) => a.name === canonicalName);
 
     if (!agent) {
       // This shouldn't happen after validation, but handle gracefully
@@ -505,19 +538,22 @@ export class UnifiedBMADTool {
       try {
         const agentMdContentRaw = this.fileReader.readFile(agentPath);
         // Dynamically replace {project-root} with {mcp-resources}
-        const agentMdContent = this.resolveWorkflowPlaceholders(agentMdContentRaw);
+        const agentMdContent =
+          this.resolveWorkflowPlaceholders(agentMdContentRaw);
 
         contentParts.push('```markdown');
         contentParts.push(agentMdContent);
         contentParts.push('```\n');
-      } catch (error: any) {
-        contentParts.push(`[Error reading agent file: ${error.message}]\n`);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        contentParts.push(`[Error reading agent file: ${errorMessage}]\n`);
         console.error(`Error reading agent file ${agentPath}:`, error);
       }
     }
 
     // Customization YAML file
-    const module = agent.module || 'bmm';
+    const module = agent.module ?? 'bmm';
     const customizePath = `bmad/_cfg/agents/${module}-${agentName}.customize.yaml`;
 
     contentParts.push('## Agent Customization\n');
@@ -531,8 +567,12 @@ export class UnifiedBMADTool {
       contentParts.push('```yaml');
       contentParts.push(yamlContent);
       contentParts.push('```\n');
-    } catch (error: any) {
-      contentParts.push(`[Customization file not found or error: ${error.message}]\n`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      contentParts.push(
+        `[Customization file not found or error: ${errorMessage}]\n`,
+      );
     }
 
     // BMAD Processing Instructions
@@ -551,7 +591,7 @@ export class UnifiedBMADTool {
   /**
    * List all available agents from agent manifest.
    */
-  private async listAgents(): Promise<BMADToolResult> {
+  private listAgents(): BMADToolResult {
     const contentParts = ['# Available BMAD Agents\n'];
 
     if (this.agents.length === 0) {
@@ -575,7 +615,9 @@ export class UnifiedBMADTool {
 
     contentParts.push('\n**Usage:**');
     contentParts.push('- Load an agent: `bmad <agent-name>`');
-    contentParts.push('- Example: `bmad analyst` loads Mary, the Business Analyst\n');
+    contentParts.push(
+      '- Example: `bmad analyst` loads Mary, the Business Analyst\n',
+    );
 
     return {
       success: true,
@@ -590,7 +632,7 @@ export class UnifiedBMADTool {
   /**
    * List all available workflows from workflow manifest.
    */
-  private async listWorkflows(): Promise<BMADToolResult> {
+  private listWorkflows(): BMADToolResult {
     const contentParts = ['# Available BMAD Workflows\n'];
 
     if (this.workflows.length === 0) {
@@ -600,10 +642,10 @@ export class UnifiedBMADTool {
 
       for (let i = 0; i < this.workflows.length; i++) {
         const workflow = this.workflows[i];
-        const name = workflow.name || 'unknown';
-        const description = workflow.description || 'No description';
-        const trigger = workflow.trigger || name;
-        const module = workflow.module || 'core';
+        const name = workflow.name ?? 'unknown';
+        const description = workflow.description ?? 'No description';
+        const trigger = workflow.trigger ?? name;
+        const module = workflow.module ?? 'core';
 
         contentParts.push(`\n${i + 1}. **${trigger}** - ${description}`);
         contentParts.push(`   - Module: ${module}`);
@@ -613,7 +655,9 @@ export class UnifiedBMADTool {
 
     contentParts.push('\n**Usage:**');
     contentParts.push('- Execute a workflow: `bmad *<workflow-name>`');
-    contentParts.push('- Example: `bmad *party-mode` starts group discussion\n');
+    contentParts.push(
+      '- Example: `bmad *party-mode` starts group discussion\n',
+    );
 
     return {
       success: true,
@@ -628,7 +672,7 @@ export class UnifiedBMADTool {
   /**
    * List all available tasks from task manifest.
    */
-  private async listTasks(): Promise<BMADToolResult> {
+  private listTasks(): BMADToolResult {
     const contentParts = ['# Available BMAD Tasks\n'];
 
     const tasks = this.manifestLoader.loadTaskManifest();
@@ -650,7 +694,9 @@ export class UnifiedBMADTool {
       }
     }
 
-    contentParts.push('\n**Note:** Tasks are referenced within workflows and agent instructions.\n');
+    contentParts.push(
+      '\n**Note:** Tasks are referenced within workflows and agent instructions.\n',
+    );
 
     return {
       success: true,
@@ -677,7 +723,7 @@ export class UnifiedBMADTool {
     if (activeStats) {
       lines.push(
         `- Catalog: ${activeStats.agents} agents, ` +
-        `${activeStats.workflows} workflows, ${activeStats.tasks} tasks`
+          `${activeStats.workflows} workflows, ${activeStats.tasks} tasks`,
       );
     }
 
@@ -685,7 +731,7 @@ export class UnifiedBMADTool {
     lines.push('Locations (priority order):');
 
     const sorted = [...this.discovery.locations].sort(
-      (a, b) => a.priority - b.priority
+      (a, b) => a.priority - b.priority,
     );
 
     for (const location of sorted) {
@@ -705,7 +751,9 @@ export class UnifiedBMADTool {
     }
 
     lines.push('');
-    lines.push('To initialize a writable BMAD directory, run `bmad *init --help`.');
+    lines.push(
+      'To initialize a writable BMAD directory, run `bmad *init --help`.',
+    );
 
     return {
       success: true,
@@ -719,11 +767,15 @@ export class UnifiedBMADTool {
     };
   }
 
-  private async init(command: string): Promise<BMADToolResult> {
+  private init(command: string): BMADToolResult {
     const rawArgs = command.slice('*init'.length).trim();
     const normalizedArgs = rawArgs.toLowerCase();
 
-    if (!rawArgs || normalizedArgs === '--project' || normalizedArgs === 'project') {
+    if (
+      !rawArgs ||
+      normalizedArgs === '--project' ||
+      normalizedArgs === 'project'
+    ) {
       return this.performInitialization({ scope: 'project' });
     }
 
@@ -731,7 +783,11 @@ export class UnifiedBMADTool {
       return this.performInitialization({ scope: 'user' });
     }
 
-    if (normalizedArgs === '--help' || normalizedArgs === '-h' || normalizedArgs === 'help') {
+    if (
+      normalizedArgs === '--help' ||
+      normalizedArgs === '-h' ||
+      normalizedArgs === 'help'
+    ) {
       return this.initHelp();
     }
 
@@ -745,9 +801,9 @@ export class UnifiedBMADTool {
       'Create a writable BMAD directory populated with the default templates.',
       '',
       'Usage:',
-  '- `bmad *init --project` -> Copy into the current workspace (`./bmad`)',
-  '- `bmad *init --user` -> Copy into the user directory (`~/.bmad`)',
-  '- `bmad *init <path>` -> Copy into a custom path',
+      '- `bmad *init --project` -> Copy into the current workspace (`./bmad`)',
+      '- `bmad *init --user` -> Copy into the user directory (`~/.bmad`)',
+      '- `bmad *init <path>` -> Copy into a custom path',
       '',
       'Priority order for resolving BMAD content:',
       '1. Local project (`./bmad`)',
@@ -767,7 +823,10 @@ export class UnifiedBMADTool {
     };
   }
 
-  private performInitialization(options: { scope: 'project' | 'user' | 'custom'; customPath?: string }): BMADToolResult {
+  private performInitialization(options: {
+    scope: 'project' | 'user' | 'custom';
+    customPath?: string;
+  }): BMADToolResult {
     const source = this.packageBmadPath;
 
     if (!fs.existsSync(source)) {
@@ -820,11 +879,13 @@ export class UnifiedBMADTool {
 
     try {
       this.copyBmadTemplate(source, target);
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
         success: false,
         exitCode: 1,
-        error: `Failed to copy BMAD templates: ${error.message ?? error}`,
+        error: `Failed to copy BMAD templates: ${errorMessage}`,
       };
     }
 
@@ -838,7 +899,10 @@ export class UnifiedBMADTool {
     };
   }
 
-  private resolveInitTarget(options: { scope: 'project' | 'user' | 'custom'; customPath?: string }): string | undefined {
+  private resolveInitTarget(options: {
+    scope: 'project' | 'user' | 'custom';
+    customPath?: string;
+  }): string | undefined {
     if (options.scope === 'project') {
       return path.join(this.projectRoot, 'bmad');
     }
@@ -887,12 +951,19 @@ export class UnifiedBMADTool {
         fs.mkdirSync(destinationPath, { recursive: true });
         this.copyBmadTemplate(sourcePath, destinationPath);
       } else {
-        fs.copyFileSync(sourcePath, destinationPath, fs.constants.COPYFILE_EXCL);
+        fs.copyFileSync(
+          sourcePath,
+          destinationPath,
+          fs.constants.COPYFILE_EXCL,
+        );
       }
     }
   }
 
-  private buildInitSuccessMessage(scope: 'project' | 'user' | 'custom', target: string): string {
+  private buildInitSuccessMessage(
+    scope: 'project' | 'user' | 'custom',
+    target: string,
+  ): string {
     const lines: string[] = [];
     lines.push('# BMAD Templates Copied');
     lines.push('');
@@ -902,24 +973,36 @@ export class UnifiedBMADTool {
     lines.push('Customize agents, workflows, and tasks in this directory.');
     lines.push('');
     if (scope === 'project') {
-      lines.push('This project BMAD directory overrides user and package defaults.');
-      lines.push('Consider adding `bmad/` to `.gitignore` if these templates should remain local.');
+      lines.push(
+        'This project BMAD directory overrides user and package defaults.',
+      );
+      lines.push(
+        'Consider adding `bmad/` to `.gitignore` if these templates should remain local.',
+      );
     } else if (scope === 'user') {
-      lines.push('User templates apply when no project or environment override is present.');
+      lines.push(
+        'User templates apply when no project or environment override is present.',
+      );
     } else {
       lines.push('Set `BMAD_ROOT` to this path to use the custom templates:');
       lines.push(`export BMAD_ROOT=${target}`);
     }
     lines.push('');
-    lines.push('After making changes, restart the BMAD MCP server or reconnect your client.');
+    lines.push(
+      'After making changes, restart the BMAD MCP server or reconnect your client.',
+    );
     lines.push('Run `bmad *discover` to verify the active location.');
     lines.push('');
-  lines.push('Priority order: project -> command argument -> BMAD_ROOT -> user -> package');
+    lines.push(
+      'Priority order: project -> command argument -> BMAD_ROOT -> user -> package',
+    );
 
     return lines.join('\n');
   }
 
-  private getLocationStats(location: BmadLocationInfo): { agents: number; workflows: number; tasks: number } | undefined {
+  private getLocationStats(
+    location: BmadLocationInfo,
+  ): { agents: number; workflows: number; tasks: number } | undefined {
     if (location.status !== 'valid' || !location.resolvedRoot) {
       return undefined;
     }
@@ -932,7 +1015,10 @@ export class UnifiedBMADTool {
         tasks: loader.loadTaskManifest().length,
       };
     } catch (error) {
-      console.warn(`Unable to load manifests for ${location.resolvedRoot}:`, error);
+      console.warn(
+        `Unable to load manifests for ${location.resolvedRoot}:`,
+        error,
+      );
       return undefined;
     }
   }
@@ -948,7 +1034,7 @@ export class UnifiedBMADTool {
   /**
    * Show help and command reference.
    */
-  private async help(): Promise<BMADToolResult> {
+  private help(): BMADToolResult {
     const contentParts = [
       '# BMAD MCP Server - Command Reference\n',
       '## Available Commands\n',
@@ -971,8 +1057,8 @@ export class UnifiedBMADTool {
       '- `bmad *list-agents` → Show all available agents',
       '- `bmad *list-workflows` → Show all available workflows',
       '- `bmad *list-tasks` → Show all available tasks',
-  '- `bmad *discover` → Inspect available BMAD locations and resolution order',
-  '- `bmad *init --help` → Initialize writable BMAD templates',
+      '- `bmad *discover` → Inspect available BMAD locations and resolution order',
+      '- `bmad *init --help` → Initialize writable BMAD templates',
       '- `bmad *help` → Show this help message\n',
       '## Quick Start',
       '1. **Discover agents:** `bmad *list-agents`',
@@ -1000,11 +1086,11 @@ export class UnifiedBMADTool {
   /**
    * Execute workflow by loading its configuration and instructions.
    */
-  private async executeWorkflow(workflowName: string): Promise<BMADToolResult> {
+  private executeWorkflow(workflowName: string): BMADToolResult {
     console.log(`Executing workflow: ${workflowName}`);
 
     // Find workflow in manifest
-    const workflow = this.workflows.find(w => w.name === workflowName);
+    const workflow = this.workflows.find((w) => w.name === workflowName);
 
     if (!workflow) {
       return {
@@ -1023,8 +1109,10 @@ export class UnifiedBMADTool {
         const workflowYamlRaw = this.fileReader.readFile(workflowPath);
         // Dynamically replace {project-root} with {mcp-resources}
         workflowYaml = this.resolveWorkflowPlaceholders(workflowYamlRaw);
-      } catch (error: any) {
-        workflowYaml = `[Error reading workflow file: ${error.message}]`;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        workflowYaml = `[Error reading workflow file: ${errorMessage}]`;
         console.error(`Error reading workflow file ${workflowPath}:`, error);
       }
     }
@@ -1213,7 +1301,10 @@ Agent and workflow names must use ASCII characters only:
 Try using ASCII equivalents.`;
   }
 
-  private formatNameTooShortError(name: string, commandType: 'agent' | 'workflow'): string {
+  private formatNameTooShortError(
+    name: string,
+    commandType: 'agent' | 'workflow',
+  ): string {
     const entity = commandType === 'agent' ? 'Agent' : 'Workflow';
     const available = this.formatAvailableList(commandType);
 
@@ -1234,7 +1325,10 @@ The provided name is ${length} characters long. Names must be at most ${MAX_NAME
 Please use a shorter agent or workflow name.`;
   }
 
-  private formatInvalidFormatError(name: string, commandType: 'agent' | 'workflow'): string {
+  private formatInvalidFormatError(
+    name: string,
+    commandType: 'agent' | 'workflow',
+  ): string {
     if (commandType === 'agent') {
       return `Error: Invalid agent name format
 
@@ -1282,7 +1376,10 @@ Valid examples:
     return message;
   }
 
-  private formatUnknownWorkflowError(name: string, suggestion?: string): string {
+  private formatUnknownWorkflowError(
+    name: string,
+    suggestion?: string,
+  ): string {
     let message = `Error: Unknown workflow '*${name}'\n\n`;
 
     if (suggestion) {
@@ -1334,7 +1431,7 @@ Note: All agent and workflow names use lowercase letters only.`;
 
       if (this.workflows.length > 10) {
         lines.push(
-          `  ... (${this.workflows.length - 10} more, use list-workflows for complete list)`
+          `  ... (${this.workflows.length - 10} more, use list-workflows for complete list)`,
         );
       }
 

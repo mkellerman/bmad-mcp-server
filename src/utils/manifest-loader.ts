@@ -46,7 +46,7 @@ export class ManifestLoader {
     }
 
     throw new Error(
-      `BMAD manifest directory not found. Checked ${srcCfg}, ${nestedPath} and ${directPath}`
+      `BMAD manifest directory not found. Checked ${srcCfg}, ${nestedPath} and ${directPath}`,
     );
   }
 
@@ -103,14 +103,18 @@ export class ManifestLoader {
       }) as T[];
 
       // Filter out completely empty rows
-      const filtered = records.filter((row: any) =>
-        Object.values(row).some(value => String(value).trim() !== '')
+      const filtered = records.filter((row) =>
+        Object.values(row as Record<string, unknown>).some(
+          (value) => String(value).trim() !== '',
+        ),
       );
 
       console.log(`Loaded ${filtered.length} entries from ${filename}`);
       return filtered;
-    } catch (error: any) {
-      console.error(`Error loading manifest ${manifestPath}:`, error.message);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`Error loading manifest ${manifestPath}:`, errorMessage);
       return [];
     }
   }
@@ -123,7 +127,7 @@ export class ManifestLoader {
    */
   getAgentByName(agentName: string): Agent | undefined {
     const agents = this.loadAgentManifest();
-    return agents.find(a => a.name === agentName);
+    return agents.find((a) => a.name === agentName);
   }
 
   /**
@@ -134,6 +138,6 @@ export class ManifestLoader {
    */
   getWorkflowByName(workflowName: string): Workflow | undefined {
     const workflows = this.loadWorkflowManifest();
-    return workflows.find(w => w.name === workflowName);
+    return workflows.find((w) => w.name === workflowName);
   }
 }

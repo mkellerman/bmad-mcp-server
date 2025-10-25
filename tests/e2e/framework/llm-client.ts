@@ -11,7 +11,7 @@ export class LLMClient {
 
   constructor(
     baseURL: string = process.env.LITELLM_PROXY_URL || 'http://localhost:4000',
-    apiKey: string = process.env.LITELLM_PROXY_API_KEY || 'sk-test-bmad-1234'
+    apiKey: string = process.env.LITELLM_PROXY_API_KEY || 'sk-test-bmad-1234',
   ) {
     this.baseURL = baseURL;
     this.apiKey = apiKey;
@@ -31,7 +31,7 @@ export class LLMClient {
       temperature?: number;
       max_tokens?: number;
       tools?: Array<any>;
-    } = {}
+    } = {},
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
     return await this.client.chat.completions.create({
       model,
@@ -65,7 +65,7 @@ export class LLMClient {
       if (!response.ok) return false;
       const data = await response.json();
       return data.status === 'healthy';
-    } catch (error) {
+    } catch {
       return false;
     }
   }

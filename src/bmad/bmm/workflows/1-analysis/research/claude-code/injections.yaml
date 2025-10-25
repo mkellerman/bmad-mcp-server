@@ -12,7 +12,7 @@ subagents:
 
   # Installation configuration
   installation:
-    prompt: "The Market Research workflow includes specialized AI subagents for enhanced research capabilities. Would you like to install them?"
+    prompt: 'The Market Research workflow includes specialized AI subagents for enhanced research capabilities. Would you like to install them?'
     location_options:
       - project # Install to .claude/agents/ in project
       - user # Install to ~/.claude/agents/ for all projects
@@ -20,8 +20,8 @@ subagents:
 
 # Content injections for the workflow
 injections:
-  - injection_point: "market-research-subagents"
-    description: "Injects subagent activation instructions into the workflow"
+  - injection_point: 'market-research-subagents'
+    description: 'Injects subagent activation instructions into the workflow'
     content: |
       <critical>
       Claude Code Enhanced Mode: The following specialized subagents are available to enhance your market research:
@@ -36,8 +36,8 @@ injections:
       Use them PROACTIVELY throughout the workflow for enhanced insights.
       </critical>
 
-  - injection_point: "market-tam-calculations"
-    description: "Enhanced TAM calculation with data analyst"
+  - injection_point: 'market-tam-calculations'
+    description: 'Enhanced TAM calculation with data analyst'
     content: |
       <invoke-subagent name="bmm-data-analyst">
       Calculate TAM using multiple methodologies and provide confidence intervals.
@@ -45,8 +45,8 @@ injections:
       Show detailed calculations and assumptions.
       </invoke-subagent>
 
-  - injection_point: "market-trends-analysis"
-    description: "Enhanced trend analysis with trend spotter"
+  - injection_point: 'market-trends-analysis'
+    description: 'Enhanced trend analysis with trend spotter'
     content: |
       <invoke-subagent name="bmm-trend-spotter">
       Identify emerging trends, weak signals, and future disruptions.
@@ -54,8 +54,8 @@ injections:
       Provide timeline estimates for mainstream adoption.
       </invoke-subagent>
 
-  - injection_point: "market-customer-segments"
-    description: "Enhanced customer research"
+  - injection_point: 'market-customer-segments'
+    description: 'Enhanced customer research'
     content: |
       <invoke-subagent name="bmm-user-researcher">
       Develop detailed user personas with jobs-to-be-done analysis.
@@ -63,8 +63,8 @@ injections:
       Provide behavioral and psychographic insights.
       </invoke-subagent>
 
-  - injection_point: "market-executive-summary"
-    description: "Enhanced executive summary synthesis"
+  - injection_point: 'market-executive-summary'
+    description: 'Enhanced executive summary synthesis'
     content: |
       <invoke-subagent name="bmm-market-researcher">
       Synthesize all research findings into a compelling executive summary.
@@ -107,8 +107,8 @@ configuration:
 
 # Metadata
 metadata:
-  compatible_with: "claude-code-1.0+"
-  workflow: "market-research"
-  module: "bmm"
-  author: "BMad Builder"
-  description: "Claude Code enhancements for comprehensive market research"
+  compatible_with: 'claude-code-1.0+'
+  workflow: 'market-research'
+  module: 'bmm'
+  author: 'BMad Builder'
+  description: 'Claude Code enhancements for comprehensive market research'

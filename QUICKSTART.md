@@ -73,30 +73,35 @@ bmad-mcp-server/
 ## Features Implemented
 
 ### ✅ Unified Tool Interface
+
 - Single `bmad` tool with instruction-based routing
 - Agent loading (e.g., `bmad analyst`)
 - Workflow execution (e.g., `bmad *party-mode`)
 - Discovery commands (`*list-agents`, `*list-workflows`, `*help`)
 
 ### ✅ Security
+
 - Path traversal protection
 - Character validation (no dangerous chars)
 - ASCII-only enforcement
 - Name length validation
 
 ### ✅ Error Handling
+
 - Fuzzy matching for typo suggestions
 - Case sensitivity detection
 - Missing asterisk detection for workflows
 - Helpful error messages with suggestions
 
 ### ✅ MCP Integration
+
 - Full MCP SDK implementation
 - Prompt handlers (BMAD agents)
 - Tool handlers (unified bmad tool)
 - Stdio transport for communication
 
 ### ✅ Workflow Context
+
 - Server path resolution
 - Agent manifest inline embedding
 - Placeholder replacement (`{project-root}` → `{mcp-resources}`)
@@ -113,7 +118,9 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "bmad": {
       "command": "node",
-      "args": ["/absolute/path/to/bmad-mcp-server/bmad-mcp-server/build/index.js"]
+      "args": [
+        "/absolute/path/to/bmad-mcp-server/bmad-mcp-server/build/index.js"
+      ]
     }
   }
 }
@@ -129,15 +136,15 @@ Use the same configuration as Claude Desktop in Cursor's MCP settings.
 
 ## Available Commands
 
-| Command | Action | Example |
-|---------|--------|---------|
-| `bmad` | Load bmad-master agent | `bmad` |
-| `bmad <agent-name>` | Load specific agent | `bmad analyst` |
-| `bmad *<workflow>` | Execute workflow | `bmad *party-mode` |
-| `bmad *list-agents` | Show all agents | - |
-| `bmad *list-workflows` | Show all workflows | - |
-| `bmad *list-tasks` | Show all tasks | - |
-| `bmad *help` | Show help | - |
+| Command                | Action                 | Example            |
+| ---------------------- | ---------------------- | ------------------ |
+| `bmad`                 | Load bmad-master agent | `bmad`             |
+| `bmad <agent-name>`    | Load specific agent    | `bmad analyst`     |
+| `bmad *<workflow>`     | Execute workflow       | `bmad *party-mode` |
+| `bmad *list-agents`    | Show all agents        | -                  |
+| `bmad *list-workflows` | Show all workflows     | -                  |
+| `bmad *list-tasks`     | Show all tasks         | -                  |
+| `bmad *help`           | Show help              | -                  |
 
 ## Development Commands
 
@@ -214,6 +221,7 @@ For actual testing, configure it in an MCP client (Claude Desktop, Copilot, or C
 ## Support
 
 For issues or questions:
+
 - Check the README.md for troubleshooting
 - Review CONVERSION-SUMMARY.md for technical details
 - See MIGRATION-GUIDE.md for Python → TypeScript patterns
@@ -223,6 +231,7 @@ For issues or questions:
 **✅ COMPLETE** - The Node.js MCP server is fully functional and ready for testing!
 
 ### Build Status
+
 - ✅ TypeScript compilation successful
 - ✅ All source files created
 - ✅ Dependencies installed
@@ -230,6 +239,7 @@ For issues or questions:
 - ✅ Entry point executable (`build/index.js`)
 
 ### Next Milestone
+
 Test with actual MCP clients and implement comprehensive test suite.
 
 ---

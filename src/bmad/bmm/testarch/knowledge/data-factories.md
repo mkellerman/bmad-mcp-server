@@ -120,7 +120,9 @@ type Order = {
   createdAt: Date;
 };
 
-export const createOrderItem = (overrides: Partial<OrderItem> = {}): OrderItem => {
+export const createOrderItem = (
+  overrides: Partial<OrderItem> = {},
+): OrderItem => {
   const product = overrides.product || createProduct();
   const quantity = overrides.quantity || faker.number.int({ min: 1, max: 5 });
 
@@ -193,9 +195,15 @@ test('user can view order details', async ({ page, apiRequest }) => {
 // playwright/support/helpers/seed-helpers.ts
 import { APIRequestContext } from '@playwright/test';
 import { User, createUser } from '../../test-utils/factories/user-factory';
-import { Product, createProduct } from '../../test-utils/factories/product-factory';
+import {
+  Product,
+  createProduct,
+} from '../../test-utils/factories/product-factory';
 
-export async function seedUser(request: APIRequestContext, overrides: Partial<User> = {}): Promise<User> {
+export async function seedUser(
+  request: APIRequestContext,
+  overrides: Partial<User> = {},
+): Promise<User> {
   const user = createUser(overrides);
 
   const response = await request.post('/api/users', {
@@ -209,7 +217,10 @@ export async function seedUser(request: APIRequestContext, overrides: Partial<Us
   return user;
 }
 
-export async function seedProduct(request: APIRequestContext, overrides: Partial<Product> = {}): Promise<Product> {
+export async function seedProduct(
+  request: APIRequestContext,
+  overrides: Partial<Product> = {},
+): Promise<Product> {
   const product = createProduct(overrides);
 
   const response = await request.post('/api/products', {
@@ -314,7 +325,10 @@ test('admin can delete user', async ({ page }) => {
 ```typescript
 // ✅ GOOD: Factory-based data
 test('user can login', async ({ page, apiRequest }) => {
-  const user = createUser({ email: 'unique@example.com', password: 'secure123' });
+  const user = createUser({
+    email: 'unique@example.com',
+    password: 'secure123',
+  });
 
   // Seed via API (fast, parallel-safe)
   await apiRequest({ method: 'POST', url: '/api/users', data: user });
@@ -366,11 +380,14 @@ export const createUser = (overrides: Partial<User> = {}): User => ({
 });
 
 // Compose specialized factories
-export const createAdminUser = (overrides: Partial<User> = {}): User => createUser({ role: 'admin', ...overrides });
+export const createAdminUser = (overrides: Partial<User> = {}): User =>
+  createUser({ role: 'admin', ...overrides });
 
-export const createModeratorUser = (overrides: Partial<User> = {}): User => createUser({ role: 'moderator', ...overrides });
+export const createModeratorUser = (overrides: Partial<User> = {}): User =>
+  createUser({ role: 'moderator', ...overrides });
 
-export const createInactiveUser = (overrides: Partial<User> = {}): User => createUser({ isActive: false, ...overrides });
+export const createInactiveUser = (overrides: Partial<User> = {}): User =>
+  createUser({ isActive: false, ...overrides });
 
 // Account-level factories with feature flags
 type Account = {
@@ -398,7 +415,9 @@ export const createProAccount = (overrides: Partial<Account> = {}): Account =>
     ...overrides,
   });
 
-export const createEnterpriseAccount = (overrides: Partial<Account> = {}): Account =>
+export const createEnterpriseAccount = (
+  overrides: Partial<Account> = {},
+): Account =>
   createAccount({
     plan: 'enterprise',
     features: ['advanced-analytics', 'priority-support', 'sso', 'audit-logs'],

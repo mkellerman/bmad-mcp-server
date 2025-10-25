@@ -2,7 +2,14 @@
  * Unit tests for BMADMCPServer
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  jest,
+} from '@jest/globals';
 import { BMADMCPServer } from '../../src/server.js';
 import {
   createTestFixture,
@@ -24,11 +31,19 @@ describe('BMADMCPServer', () => {
     createBMADStructure(fixture.tmpDir);
     createAgentManifest(fixture.tmpDir);
     createWorkflowManifest(fixture.tmpDir);
-    
+
     // Create sample files
     createAgentFile(fixture.tmpDir, 'core/agents/bmad-master.md', SAMPLE_AGENT);
-    createAgentFile(fixture.tmpDir, 'bmm/agents/analyst.md', '# Analyst\n\nBusiness analyst.');
-    createWorkflowFile(fixture.tmpDir, 'core/workflows/party-mode/party-mode.xml', SAMPLE_WORKFLOW);
+    createAgentFile(
+      fixture.tmpDir,
+      'bmm/agents/analyst.md',
+      '# Analyst\n\nBusiness analyst.',
+    );
+    createWorkflowFile(
+      fixture.tmpDir,
+      'core/workflows/party-mode/party-mode.xml',
+      SAMPLE_WORKFLOW,
+    );
   });
 
   afterEach(() => {
@@ -42,34 +57,40 @@ describe('BMADMCPServer', () => {
     });
 
     it('should load manifests on initialization', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
       new BMADMCPServer(fixture.tmpDir);
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Loaded')
+        expect.stringContaining('Loaded'),
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('agents from manifest')
+        expect.stringContaining('agents from manifest'),
       );
       consoleSpy.mockRestore();
     });
 
     it('should initialize with src/bmad structure', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
       new BMADMCPServer(fixture.tmpDir);
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('src/bmad/_cfg')
+        expect.stringContaining('src/bmad/_cfg'),
       );
       consoleSpy.mockRestore();
     });
 
     it('should log successful initialization', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
       new BMADMCPServer(fixture.tmpDir);
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
-        'BMAD MCP Server initialized successfully'
+        'BMAD MCP Server initialized successfully',
       );
       consoleSpy.mockRestore();
     });
@@ -77,25 +98,29 @@ describe('BMADMCPServer', () => {
 
   describe('path resolution', () => {
     it('should detect src/bmad/_cfg structure', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
       new BMADMCPServer(fixture.tmpDir);
-      
-      const manifestDirLog = consoleSpy.mock.calls.find(call => 
-        call[0]?.toString().includes('Manifest directory:')
+
+      const manifestDirLog = consoleSpy.mock.calls.find((call) =>
+        call[0]?.toString().includes('Manifest directory:'),
       );
-      
+
       expect(manifestDirLog?.[0]).toContain('src/bmad/_cfg');
       consoleSpy.mockRestore();
     });
 
     it('should set correct project root', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
       new BMADMCPServer(fixture.tmpDir);
-      
-      const projectRootLog = consoleSpy.mock.calls.find(call => 
-        call[0]?.toString().includes('Project root:')
+
+      const projectRootLog = consoleSpy.mock.calls.find((call) =>
+        call[0]?.toString().includes('Project root:'),
       );
-      
+
       expect(projectRootLog).toBeDefined();
       consoleSpy.mockRestore();
     });
@@ -109,13 +134,15 @@ describe('BMADMCPServer', () => {
     });
 
     it('should handle multiple agents', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
       new BMADMCPServer(fixture.tmpDir);
-      
-      const loadLog = consoleSpy.mock.calls.find(call =>
-        call[0]?.toString().includes('agents from manifest')
+
+      const loadLog = consoleSpy.mock.calls.find((call) =>
+        call[0]?.toString().includes('agents from manifest'),
       );
-      
+
       expect(loadLog).toBeDefined();
       consoleSpy.mockRestore();
     });
@@ -124,7 +151,7 @@ describe('BMADMCPServer', () => {
   describe('error handling', () => {
     it('should throw error for invalid BMAD root', () => {
       const invalidPath = fixture.tmpDir + '/nonexistent';
-      
+
       expect(() => {
         new BMADMCPServer(invalidPath);
       }).toThrow();
@@ -133,7 +160,7 @@ describe('BMADMCPServer', () => {
     it('should throw error if manifest directory not found', () => {
       const emptyDir = fixture.tmpDir + '/empty';
       require('fs').mkdirSync(emptyDir, { recursive: true });
-      
+
       expect(() => {
         new BMADMCPServer(emptyDir);
       }).toThrow('BMAD manifest directory not found');

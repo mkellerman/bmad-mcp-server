@@ -14,8 +14,9 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       'playwright-report/**',
-      'test-results/**'
-    ]
+      'test-results/**',
+      '**/*.d.ts',
+    ],
   },
   {
     files: ['**/*.{js,cjs,mjs}'],
@@ -23,45 +24,61 @@ export default tseslint.config(
     languageOptions: {
       sourceType: 'module',
       globals: {
-        ...globals.node
-      }
+        ...globals.node,
+      },
     },
     rules: {
       'no-console': 'warn',
       quotes: ['error', 'single'],
-      semi: ['error', 'always']
-    }
+      semi: ['error', 'always'],
+    },
   },
   {
-    files: ['**/*.ts'],
+    files: ['src/**/*.ts'],
     extends: [
       ...tseslint.configs.recommendedTypeChecked,
-      ...tseslint.configs.stylisticTypeChecked
+      ...tseslint.configs.stylisticTypeChecked,
     ],
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.test.json'],
-        projectService: true,
-        tsconfigRootDir: __dirname
+        project: './tsconfig.json',
+        tsconfigRootDir: __dirname,
       },
       globals: {
-        ...globals.node
-      }
+        ...globals.node,
+      },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
       'no-console': 'warn',
       quotes: ['error', 'single'],
-      semi: ['error', 'always']
-    }
+      semi: ['error', 'always'],
+    },
   },
   {
-    files: ['tests/**/*.ts'],
+    files: ['tests/**/*.ts', 'playwright.config.ts'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+      },
+      globals: {
+        ...globals.node,
+      },
+    },
     rules: {
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off'
-    }
-  }
+      'no-console': 'off',
+      quotes: ['error', 'single'],
+      semi: ['error', 'always'],
+    },
+  },
+  {
+    files: ['scripts/**/*.{js,mjs}', 'test-*.mjs'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 );

@@ -503,7 +503,9 @@ npm run test:e2e:p1  # Run P0 + P1 tests (pre-merge)
 All tests follow BDD format for clarity:
 
 ```typescript
-test('[P0] should login with valid credentials and load dashboard', async ({ page }) => {
+test('[P0] should login with valid credentials and load dashboard', async ({
+  page,
+}) => {
   // GIVEN: User is on login page
   await page.goto('/login');
 
@@ -531,7 +533,9 @@ test('[P0] should display user name', async ({ page }) => {
 // ❌ WRONG: Multiple assertions (not atomic)
 test('[P0] should display user info', async ({ page }) => {
   await expect(page.locator('[data-testid="user-name"]')).toHaveText('John');
-  await expect(page.locator('[data-testid="user-email"]')).toHaveText('john@example.com');
+  await expect(page.locator('[data-testid="user-email"]')).toHaveText(
+    'john@example.com',
+  );
 });
 ```
 
@@ -554,7 +558,9 @@ test('should load user dashboard after login', async ({ page }) => {
   // NOW navigate
   await page.goto('/dashboard');
 
-  await expect(page.locator('[data-testid="user-name"]')).toHaveText('Test User');
+  await expect(page.locator('[data-testid="user-name"]')).toHaveText(
+    'Test User',
+  );
 });
 ```
 
@@ -613,7 +619,8 @@ export const createUser = (overrides = {}) => ({
   ...overrides,
 });
 
-export const createUsers = (count: number) => Array.from({ length: count }, () => createUser());
+export const createUsers = (count: number) =>
+  Array.from({ length: count }, () => createUser());
 
 // API helper for cleanup
 export const deleteUser = async (userId: number) => {

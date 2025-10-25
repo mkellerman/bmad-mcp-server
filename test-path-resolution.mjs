@@ -29,7 +29,8 @@ const tests = (() => {
       env: { BMAD_ROOT: __dirname },
       args: [],
       cwd: envWorkspace,
-      expectedPattern: /Active BMAD location \(BMAD_ROOT environment variable\):/,
+      expectedPattern:
+        /Active BMAD location \(BMAD_ROOT environment variable\):/,
       cleanup: () => fs.rmSync(envWorkspace, { recursive: true, force: true }),
     },
     {
@@ -54,12 +55,12 @@ async function runTest(test) {
   return new Promise((resolve) => {
     console.log(`\n📋 ${test.name}`);
     console.log('─'.repeat(60));
-    
+
     const serverPath = path.join(__dirname, 'build', 'index.js');
     const proc = spawn('node', [serverPath, ...test.args], {
       env: { ...process.env, ...test.env },
       cwd: test.cwd || process.cwd(),
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
 
     let stderr = '';
@@ -81,21 +82,27 @@ async function runTest(test) {
       // Check for expected message
       if (test.expectedPattern.test(output)) {
         hasExpectedMessage = true;
-        console.log(`✅ Found expected message: "${output.trim().substring(0, 80)}..."`);
+        console.log(
+          `✅ Found expected message: "${output.trim().substring(0, 80)}..."`,
+        );
       }
-      
+
       // Check if server initialized
-      if (output.includes('BMAD MCP Server initialized successfully') ||
-          output.includes('BMAD MCP Server running')) {
+      if (
+        output.includes('BMAD MCP Server initialized successfully') ||
+        output.includes('BMAD MCP Server running')
+      ) {
         hasInitialized = true;
       }
-      
+
       // Log initialization messages
-      if (output.includes('Active BMAD location') ||
-          output.includes('BMAD root:') || 
-          output.includes('Project root:') ||
-          output.includes('Loaded') ||
-          output.includes('initialized')) {
+      if (
+        output.includes('Active BMAD location') ||
+        output.includes('BMAD root:') ||
+        output.includes('Project root:') ||
+        output.includes('Loaded') ||
+        output.includes('initialized')
+      ) {
         console.log(`   ${output.trim().substring(0, 80)}`);
       }
     }
@@ -103,7 +110,7 @@ async function runTest(test) {
     // Kill server after 2 seconds
     setTimeout(() => {
       proc.kill();
-      
+
       if (hasExpectedMessage && hasInitialized) {
         console.log(`✅ TEST PASSED: ${test.name}`);
         if (test.cleanup) {
@@ -150,7 +157,7 @@ async function runAllTests() {
   }
 }
 
-runAllTests().catch(err => {
+runAllTests().catch((err) => {
   console.error('Test error:', err);
   process.exit(1);
 });

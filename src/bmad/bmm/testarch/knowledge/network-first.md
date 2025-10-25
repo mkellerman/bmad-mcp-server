@@ -31,7 +31,9 @@ Network-first patterns provide:
 // ✅ CORRECT: Intercept BEFORE navigate
 test('user can view dashboard data', async ({ page }) => {
   // Step 1: Register interception FIRST
-  const usersPromise = page.waitForResponse((resp) => resp.url().includes('/api/users') && resp.status() === 200);
+  const usersPromise = page.waitForResponse(
+    (resp) => resp.url().includes('/api/users') && resp.status() === 200,
+  );
 
   // Step 2: THEN trigger the request
   await page.goto('/dashboard');
@@ -218,7 +220,9 @@ test('order times out after 10 seconds', async ({ page }) => {
   await page.click('[data-testid="submit-order"]');
 
   // App should show timeout message after configured timeout
-  await expect(page.getByText('Request timed out')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Request timed out')).toBeVisible({
+    timeout: 15000,
+  });
 });
 
 // Test partial data response
@@ -282,7 +286,9 @@ describe('Order Edge Cases', () => {
 ```typescript
 // ✅ GOOD: Wait for response with predicate
 test('wait for specific response', async ({ page }) => {
-  const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/users') && resp.status() === 200);
+  const responsePromise = page.waitForResponse(
+    (resp) => resp.url().includes('/api/users') && resp.status() === 200,
+  );
 
   await page.goto('/dashboard');
   const response = await responsePromise;
@@ -300,7 +306,11 @@ test('wait for all required data', async ({ page }) => {
   await page.goto('/dashboard');
 
   // Wait for all in parallel
-  const [users, products, orders] = await Promise.all([usersPromise, productsPromise, ordersPromise]);
+  const [users, products, orders] = await Promise.all([
+    usersPromise,
+    productsPromise,
+    ordersPromise,
+  ]);
 
   expect(users.status()).toBe(200);
   expect(products.status()).toBe(200);
@@ -393,7 +403,9 @@ test('flaky test - navigate then mock', async ({ page }) => {
 
 // ❌ BAD: No wait for response
 test('flaky test - no explicit wait', async ({ page }) => {
-  await page.route('**/api/users', (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
+  await page.route('**/api/users', (route) =>
+    route.fulfill({ status: 200, body: JSON.stringify([]) }),
+  );
 
   await page.goto('/dashboard');
 

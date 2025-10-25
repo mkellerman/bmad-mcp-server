@@ -3,13 +3,13 @@ services:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-proxy
     ports:
-      - "4000:4000"
+      - '4000:4000'
     volumes:
       - ../../support/litellm-config.yaml:/app/config.yaml:ro
       - ~/.config/litellm:/root/.config/litellm
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    command: ['--config', '/app/config.yaml', '--port', '4000']
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:4000/health']
       interval: 10s
       timeout: 5s
       retries: 5

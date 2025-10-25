@@ -38,7 +38,9 @@ const environment = process.env.TEST_ENV || 'local';
 // Fail fast if environment not supported
 if (!Object.keys(envConfigMap).includes(environment)) {
   console.error(`❌ No configuration found for environment: ${environment}`);
-  console.error(`   Available environments: ${Object.keys(envConfigMap).join(', ')}`);
+  console.error(
+    `   Available environments: ${Object.keys(envConfigMap).join(', ')}`,
+  );
   process.exit(1);
 }
 
@@ -238,7 +240,9 @@ test('API returns quickly', async ({ page }) => {
   await expect(page.getByTestId('user-name')).toBeVisible({ timeout: 5000 }); // 5s instead of 10s
 
   // Override expect timeout for slow external API
-  await expect(page.getByTestId('weather-widget')).toBeVisible({ timeout: 20000 }); // 20s instead of 10s
+  await expect(page.getByTestId('weather-widget')).toBeVisible({
+    timeout: 20000,
+  }); // 20s instead of 10s
 });
 ```
 

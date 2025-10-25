@@ -12,9 +12,7 @@ console.log('Testing LiteLLM proxy with GitHub Copilot...\n');
 try {
   const completion = await client.chat.completions.create({
     model: 'gpt-4.1',
-    messages: [
-      { role: 'user', content: 'How are you today?' }
-    ],
+    messages: [{ role: 'user', content: 'How are you today?' }],
     max_tokens: 100,
     temperature: 0.7,
   });

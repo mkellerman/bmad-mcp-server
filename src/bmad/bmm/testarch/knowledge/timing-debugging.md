@@ -30,7 +30,10 @@ Race conditions arise when tests make assumptions about asynchronous timing (net
 import { test, expect } from '@playwright/test';
 
 test.describe('Race Condition Prevention Patterns', () => {
-  test('❌ Anti-Pattern: Navigate then intercept (race condition)', async ({ page, context }) => {
+  test('❌ Anti-Pattern: Navigate then intercept (race condition)', async ({
+    page,
+    context,
+  }) => {
     // BAD: Navigation starts before interception ready
     await page.goto('/products'); // ⚠️ Race! API might load before route is set
 
@@ -41,7 +44,10 @@ test.describe('Race Condition Prevention Patterns', () => {
     // Test may see real API response or mock (non-deterministic)
   });
 
-  test('✅ Pattern: Intercept BEFORE navigate (deterministic)', async ({ page, context }) => {
+  test('✅ Pattern: Intercept BEFORE navigate (deterministic)', async ({
+    page,
+    context,
+  }) => {
     // GOOD: Interception ready before navigation
     await context.route('**/api/products', (route) => {
       route.fulfill({
@@ -65,7 +71,9 @@ test.describe('Race Condition Prevention Patterns', () => {
     await expect(page.getByText('Product A')).toBeVisible();
   });
 
-  test('✅ Pattern: Wait for element state change (loading → loaded)', async ({ page }) => {
+  test('✅ Pattern: Wait for element state change (loading → loaded)', async ({
+    page,
+  }) => {
     await page.goto('/dashboard');
 
     // Wait for loading indicator to appear (confirms load started)
@@ -78,7 +86,9 @@ test.describe('Race Condition Prevention Patterns', () => {
     await expect(page.getByTestId('dashboard-data')).toBeVisible();
   });
 
-  test('✅ Pattern: Explicit visibility check (not just presence)', async ({ page }) => {
+  test('✅ Pattern: Explicit visibility check (not just presence)', async ({
+    page,
+  }) => {
     await page.goto('/modal-demo');
 
     await page.getByRole('button', { name: 'Open Modal' }).click();
@@ -88,10 +98,14 @@ test.describe('Race Condition Prevention Patterns', () => {
 
     // ✅ Good: Wait for visibility (accounts for animations)
     await expect(page.getByTestId('modal')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Modal Title' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Modal Title' }),
+    ).toBeVisible();
   });
 
-  test('❌ Anti-Pattern: waitForLoadState("networkidle") in SPAs', async ({ page }) => {
+  test('❌ Anti-Pattern: waitForLoadState("networkidle") in SPAs', async ({
+    page,
+  }) => {
     // ⚠️ Deprecated for SPAs (WebSocket connections never idle)
     // await page.goto('/dashboard')
     // await page.waitForLoadState('networkidle') // May timeout in SPAs
@@ -137,7 +151,9 @@ test.describe('Deterministic Waiting Patterns', () => {
   });
 
   test('waitForResponse() with predicate function', async ({ page }) => {
-    const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/search') && resp.status() === 200);
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/search') && resp.status() === 200,
+    );
 
     await page.goto('/search');
     await page.getByPlaceholder('Search').fill('laptop');
@@ -161,7 +177,9 @@ test.describe('Deterministic Waiting Patterns', () => {
     await expect(page.getByTestId('user-count')).not.toHaveText('0');
   });
 
-  test('waitFor() element state (attached, visible, hidden, detached)', async ({ page }) => {
+  test('waitFor() element state (attached, visible, hidden, detached)', async ({
+    page,
+  }) => {
     await page.goto('/products');
 
     // Wait for element to be attached to DOM
@@ -211,7 +229,9 @@ test.describe('Deterministic Waiting Patterns', () => {
 import { test, expect } from '@playwright/test';
 
 test.describe('Timing Anti-Patterns to Avoid', () => {
-  test('❌ NEVER: page.waitForTimeout() (arbitrary delay)', async ({ page }) => {
+  test('❌ NEVER: page.waitForTimeout() (arbitrary delay)', async ({
+    page,
+  }) => {
     await page.goto('/dashboard');
 
     // ❌ Bad: Arbitrary 3-second wait (flaky)
@@ -237,7 +257,9 @@ test.describe('Timing Anti-Patterns to Avoid', () => {
     */
   });
 
-  test('❌ NEVER: Multiple hard waits in sequence (compounding delays)', async ({ page }) => {
+  test('❌ NEVER: Multiple hard waits in sequence (compounding delays)', async ({
+    page,
+  }) => {
     await page.goto('/checkout');
 
     // ❌ Bad: Stacked hard waits (6+ seconds wasted)
@@ -255,7 +277,9 @@ test.describe('Timing Anti-Patterns to Avoid', () => {
     await page.waitForURL('**/confirmation');
   });
 
-  test('❌ NEVER: waitForLoadState("networkidle") in SPAs', async ({ page }) => {
+  test('❌ NEVER: waitForLoadState("networkidle") in SPAs', async ({
+    page,
+  }) => {
     // ❌ Bad: Unreliable in SPAs (WebSocket connections never idle)
     // await page.goto('/dashboard')
     // await page.waitForLoadState('networkidle') // Timeout in SPAs!

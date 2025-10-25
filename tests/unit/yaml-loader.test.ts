@@ -47,7 +47,7 @@ tests:
 
       expect(suite.name).toBe('Sample Tests');
       expect(suite.description).toBe('Test description');
-    expect(suite.config.llm_model).toBe('gpt-4');
+      expect(suite.config.llm_model).toBe('gpt-4');
       expect(suite.config.temperature).toBe(0.1);
       expect(suite.tests).toHaveLength(1);
       expect(suite.tests[0].id).toBe('test-001');
@@ -66,10 +66,10 @@ tests: []
 
       const suite = YAMLTestLoader.loadTestFile(filePath);
 
-  expect(suite.config.llm_model).toBe('gpt-4.1');
+      expect(suite.config.llm_model).toBe('gpt-4.1');
       expect(suite.config.temperature).toBe(0.1);
       expect(suite.config.timeout).toBe(30000);
-    expect(suite.config.judge_model).toBe('gpt-4.1');
+      expect(suite.config.judge_model).toBe('gpt-4.1');
       expect(suite.config.judge_threshold).toBe(0.8);
     });
 
@@ -136,7 +136,7 @@ tests: []
 
     it('should handle directory with no YAML files', () => {
       fs.writeFileSync(path.join(tempDir, 'file.txt'), 'not yaml');
-      
+
       const suites = YAMLTestLoader.loadTestDirectory(tempDir);
 
       expect(suites).toHaveLength(0);

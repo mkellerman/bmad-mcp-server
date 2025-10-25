@@ -1,6 +1,6 @@
 /**
  * BMAD MCP Server - Main server implementation with unified tool.
- * 
+ *
  * This server exposes BMAD methodology through the Model Context Protocol,
  * using a single unified 'bmad' tool with instruction-based routing.
  * The LLM processes files according to BMAD methodology instructions.
@@ -31,9 +31,7 @@ import { UnifiedBMADTool } from './tools/unified-tool.js';
 // Fall back to build directory for test environments
 function getDirname(): string {
   try {
-    // @ts-ignore - import.meta.url not available in test environment
-    if (typeof import.meta !== 'undefined' && import.meta.url) {
-      // @ts-ignore
+    if (import.meta?.url) {
       return path.dirname(fileURLToPath(import.meta.url));
     }
   } catch {
@@ -47,12 +45,12 @@ const __dirname = getDirname();
 
 /**
  * MCP Server for BMAD methodology with unified tool interface.
- * 
+ *
  * Exposes a single 'bmad' tool that uses instruction-based routing:
  * - `bmad` → Load bmad-master agent (default)
  * - `bmad <agent-name>` → Load specified agent
  * - `bmad *<workflow-name>` → Execute specified workflow
- * 
+ *
  * The server acts as a file proxy - no parsing or transformation.
  * LLM processes files using BMAD methodology loaded in context.
  */
@@ -102,7 +100,7 @@ export class BMADMCPServer {
           tools: {},
           prompts: {},
         },
-      }
+      },
     );
 
     this.setupHandlers();
@@ -113,11 +111,13 @@ export class BMADMCPServer {
    */
   private setupHandlers(): void {
     // List available prompts (BMAD agents)
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      console.log(`list_prompts called - returning ${this.agents.length} agents`);
+    this.server.setRequestHandler(ListPromptsRequestSchema, () => {
+      console.log(
+        `list_prompts called - returning ${this.agents.length} agents`,
+      );
 
       return {
-        prompts: this.agents.map(agent => {
+        prompts: this.agents.map((agent) => {
           // Use agent name as prompt name (with bmad- prefix if not present)
           let promptName = agent.name || '';
           if (!promptName.startsWith('bmad-')) {
@@ -138,7 +138,7 @@ export class BMADMCPServer {
     });
 
     // Get a specific prompt (BMAD agent)
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
       const name = request.params.name;
       console.log(`get_prompt called for: ${name}`);
 
@@ -159,7 +159,7 @@ export class BMADMCPServer {
 
       if (!agent || !agentName) {
         // Agent not found
-        const errorMsg = `Agent '${name}' not found. Available agents: ${this.agents.map(a => a.name).join(', ')}`;
+        const errorMsg = `Agent '${name}' not found. Available agents: ${this.agents.map((a) => a.name).join(', ')}`;
         console.warn(errorMsg);
         return {
           description: 'Error: Agent not found',
@@ -176,7 +176,7 @@ export class BMADMCPServer {
       }
 
       // Use unified tool to load agent
-      const result = await this.unifiedTool.execute(agentName);
+      const result = this.unifiedTool.execute(agentName);
 
       if (!result.success) {
         return {
@@ -186,7 +186,7 @@ export class BMADMCPServer {
               role: 'user',
               content: {
                 type: 'text',
-                text: result.error || 'Unknown error',
+                text: result.error ?? 'Unknown error',
               },
             },
           ],
@@ -194,13 +194,13 @@ export class BMADMCPServer {
       }
 
       return {
-        description: `BMAD Agent: ${result.displayName} - ${agent.title || ''}`,
+        description: `BMAD Agent: ${result.displayName} - ${agent.title ?? ''}`,
         messages: [
           {
             role: 'user',
             content: {
               type: 'text',
-              text: result.content || '',
+              text: result.content ?? '',
             },
           },
         ],
@@ -208,7 +208,7 @@ export class BMADMCPServer {
     });
 
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    this.server.setRequestHandler(ListToolsRequestSchema, () => {
       console.log('list_tools called - returning unified bmad tool');
 
       const tools: Tool[] = [
@@ -270,7 +270,8 @@ The tool provides helpful suggestions if you:
             properties: {
               command: {
                 type: 'string',
-                description: 'Command to execute: empty string for default, \'agent-name\' for agents, \'*workflow-name\' for workflows',
+                description:
+                  "Command to execute: empty string for default, 'agent-name' for agents, '*workflow-name' for workflows",
               },
             },
             required: ['command'],
@@ -282,7 +283,7 @@ The tool provides helpful suggestions if you:
     });
 
     // Call a tool
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, (request) => {
       const { name, arguments: args } = request.params;
       console.log(`call_tool called: ${name} with args:`, args);
 
@@ -298,15 +299,15 @@ The tool provides helpful suggestions if you:
         };
       }
 
-      const command = (args?.command as string) || '';
+      const command = (args?.command as string) ?? '';
       console.log(`Executing bmad tool with command: '${command}'`);
 
       // Execute through unified tool
-      const result = await this.unifiedTool.execute(command);
+      const result = this.unifiedTool.execute(command);
 
       // Check if error occurred
       if (!result.success) {
-        const errorText = result.error || 'Unknown error occurred';
+        const errorText = result.error ?? 'Unknown error occurred';
         console.error(`BMAD tool error: ${errorText}`);
 
         return {
@@ -326,7 +327,7 @@ The tool provides helpful suggestions if you:
           content: [
             {
               type: 'text',
-              text: result.content || '',
+              text: result.content ?? '',
             } as TextContent,
           ],
         };
@@ -334,18 +335,26 @@ The tool provides helpful suggestions if you:
         // Workflow executed successfully
         const responseParts: string[] = [];
         responseParts.push(`# Workflow: ${result.name}`);
-        responseParts.push(`\n**Description:** ${result.description || ''}\n`);
+        responseParts.push(`\n**Description:** ${result.description ?? ''}\n`);
 
         // Add workflow context (server paths and agent manifest)
         if (result.context) {
           const context = result.context;
           responseParts.push('## Workflow Context\n');
-          responseParts.push('**MCP Server Resources (use these, not user\'s workspace):**\n');
+          responseParts.push(
+            "**MCP Server Resources (use these, not user's workspace):**\n",
+          );
           responseParts.push(`- MCP Server Root: \`${context.mcpResources}\``);
-          responseParts.push(`- Agent Manifest: \`${context.agentManifestPath}\``);
+          responseParts.push(
+            `- Agent Manifest: \`${context.agentManifestPath}\``,
+          );
           responseParts.push(`- Available Agents: ${context.agentCount}\n`);
-          responseParts.push('**NOTE:** All `{mcp-resources}` references in this workflow point to the MCP server,');
-          responseParts.push('not the user\'s workspace. Use the Agent Roster data provided below.\n');
+          responseParts.push(
+            '**NOTE:** All `{mcp-resources}` references in this workflow point to the MCP server,',
+          );
+          responseParts.push(
+            "not the user's workspace. Use the Agent Roster data provided below.\n",
+          );
 
           // Include agent manifest data inline
           const agentData = context.agentManifestData;
@@ -409,7 +418,7 @@ Begin workflow execution now.`);
           content: [
             {
               type: 'text',
-              text: result.content || '',
+              text: result.content ?? '',
             } as TextContent,
           ],
         };
@@ -462,7 +471,9 @@ export async function main(): Promise<void> {
   }
 
   console.error('Starting BMAD MCP Server...');
-  console.error(`Active BMAD location (${discovery.activeLocation.displayName}): ${activeRoot}`);
+  console.error(
+    `Active BMAD location (${discovery.activeLocation.displayName}): ${activeRoot}`,
+  );
 
   try {
     const server = new BMADMCPServer(activeRoot, discovery);

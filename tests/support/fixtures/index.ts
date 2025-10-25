@@ -10,9 +10,10 @@ type TestFixtures = {
 };
 
 export const test = base.extend<TestFixtures>({
+  // eslint-disable-next-line no-empty-pattern
   mcpClient: async ({}, use) => {
     const client = new MCPServerClient(
-      process.env.MCP_SERVER_URL || 'http://localhost:3000'
+      process.env.MCP_SERVER_URL || 'http://localhost:3000',
     );
     await client.connect();
     await use(client);

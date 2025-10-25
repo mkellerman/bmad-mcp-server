@@ -1,30 +1,30 @@
 # Test Suite: Error Handling
 # Validates graceful error handling for invalid commands
 
-test_suite: "Error Handling Tests"
-description: "Validate error handling for invalid BMAD commands"
+test_suite: 'Error Handling Tests'
+description: 'Validate error handling for invalid BMAD commands'
 
 config:
-  llm_model: "gpt-4.1"
+  llm_model: 'gpt-4.1'
   temperature: 0.1
   timeout: 20000
-  judge_model: "gpt-4.1"
+  judge_model: 'gpt-4.1'
   judge_threshold: 0.7
 
 tests:
-  - id: "error-001"
-    name: "Invalid agent name"
+  - id: 'error-001'
+    name: 'Invalid agent name'
     prompt: |
       User: "Load the nonexistent-agent from BMAD"
-      
+
       Call bmad tool with command "nonexistent-agent"
-    
+
     expectations:
-      - type: "contains"
-        value: "not found"
+      - type: 'contains'
+        value: 'not found'
         case_sensitive: false
-        description: "Should indicate agent not found"
-      
+        description: 'Should indicate agent not found'
+
       # TODO: LLM Judge validation - Work in Progress
       # - type: "llm_judge"
       #   criteria: |
@@ -35,18 +35,18 @@ tests:
       #     4. Maintain a professional tone
       #   threshold: 0.7
 
-  - id: "error-002"
-    name: "Malformed command"
+  - id: 'error-002'
+    name: 'Malformed command'
     prompt: |
       User provides: "bmad do something random"
-      
+
       Call bmad with command "do something random"
-    
+
     expectations:
-      - type: "not_contains"
-        value: "stack trace"
+      - type: 'not_contains'
+        value: 'stack trace'
         case_sensitive: false
-      
+
       # TODO: LLM Judge validation - Work in Progress
       # - type: "llm_judge"
       #   criteria: |
@@ -56,19 +56,19 @@ tests:
       #     3. Doesn't expose internal errors
       #   threshold: 0.65
 
-  - id: "error-003"
-    name: "Empty command"
+  - id: 'error-003'
+    name: 'Empty command'
     prompt: |
       User accidentally sends empty command.
-      
+
       Call bmad with command ""
-    
+
     expectations:
-      - type: "response_length"
+      - type: 'response_length'
         min: 50
         max: 2000
-        description: "Should provide some error feedback"
-      
+        description: 'Should provide some error feedback'
+
       # TODO: LLM Judge validation - Work in Progress
       # - type: "llm_judge"
       #   criteria: |

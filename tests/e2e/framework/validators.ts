@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { Expectation } from './yaml-loader';
 import { LLMClient } from './llm-client';
 
@@ -14,7 +15,10 @@ export interface ValidationResult {
  * Base validator interface
  */
 export interface Validator {
-  validate(response: string, expectation: Expectation): Promise<ValidationResult>;
+  validate(
+    response: string,
+    expectation: Expectation,
+  ): Promise<ValidationResult>;
 }
 
 /**
@@ -22,15 +26,18 @@ export interface Validator {
  * Checks if response contains a specific string
  */
 export class ContainsValidator implements Validator {
-  async validate(response: string, expectation: Expectation): Promise<ValidationResult> {
+  async validate(
+    response: string,
+    expectation: Expectation,
+  ): Promise<ValidationResult> {
     const value = expectation.value || '';
     const caseSensitive = expectation.case_sensitive ?? false;
-    
+
     const responseToCheck = caseSensitive ? response : response.toLowerCase();
     const valueToCheck = caseSensitive ? value : value.toLowerCase();
-    
+
     const pass = responseToCheck.includes(valueToCheck);
-    
+
     return {
       pass,
       message: pass
@@ -45,15 +52,18 @@ export class ContainsValidator implements Validator {
  * Checks if response does NOT contain a specific string
  */
 export class NotContainsValidator implements Validator {
-  async validate(response: string, expectation: Expectation): Promise<ValidationResult> {
+  async validate(
+    response: string,
+    expectation: Expectation,
+  ): Promise<ValidationResult> {
     const value = expectation.value || '';
     const caseSensitive = expectation.case_sensitive ?? false;
-    
+
     const responseToCheck = caseSensitive ? response : response.toLowerCase();
     const valueToCheck = caseSensitive ? value : value.toLowerCase();
-    
+
     const pass = !responseToCheck.includes(valueToCheck);
-    
+
     return {
       pass,
       message: pass
@@ -68,10 +78,13 @@ export class NotContainsValidator implements Validator {
  * Checks if response matches a regex pattern
  */
 export class RegexValidator implements Validator {
-  async validate(response: string, expectation: Expectation): Promise<ValidationResult> {
+  async validate(
+    response: string,
+    expectation: Expectation,
+  ): Promise<ValidationResult> {
     const pattern = new RegExp(expectation.pattern || '', 'i');
     const pass = pattern.test(response);
-    
+
     return {
       pass,
       message: pass
@@ -86,13 +99,16 @@ export class RegexValidator implements Validator {
  * Checks if response length is within specified range
  */
 export class ResponseLengthValidator implements Validator {
-  async validate(response: string, expectation: Expectation): Promise<ValidationResult> {
+  async validate(
+    response: string,
+    expectation: Expectation,
+  ): Promise<ValidationResult> {
     const length = response.length;
     const min = expectation.min ?? 0;
     const max = expectation.max ?? Infinity;
-    
+
     const pass = length >= min && length <= max;
-    
+
     return {
       pass,
       message: pass
@@ -109,11 +125,14 @@ export class ResponseLengthValidator implements Validator {
  */
 export class LLMJudgeValidator implements Validator {
   constructor(
-    private llmClient: LLMClient,
-    private judgeModel: string = 'claude-3-5-sonnet'
+    private _llmClient: LLMClient,
+    private _judgeModel: string = 'claude-3-5-sonnet',
   ) {}
 
-  async validate(response: string, expectation: Expectation): Promise<ValidationResult> {
+  async validate(
+    response: string,
+    expectation: Expectation,
+  ): Promise<ValidationResult> {
     const criteria = expectation.criteria || '';
     const threshold = expectation.threshold ?? 0.8;
 
@@ -138,14 +157,14 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 }`;
 
     try {
-      const completion = await this.llmClient.chat(
-        this.judgeModel,
+      const completion = await this._llmClient.chat(
+        this._judgeModel,
         [{ role: 'user', content: judgePrompt }],
-        { temperature: 0.1, max_tokens: 500 }
+        { temperature: 0.1, max_tokens: 500 },
       );
 
-      const responseText = this.llmClient.getResponseText(completion);
-      
+      const responseText = this._llmClient.getResponseText(completion);
+
       // Try to parse JSON response
       let judgment: any;
       try {
@@ -199,7 +218,10 @@ export class ValidatorRegistry {
     this.validators.set('not_contains', new NotContainsValidator());
     this.validators.set('regex', new RegexValidator());
     this.validators.set('response_length', new ResponseLengthValidator());
-    this.validators.set('llm_judge', new LLMJudgeValidator(llmClient, judgeModel));
+    this.validators.set(
+      'llm_judge',
+      new LLMJudgeValidator(llmClient, judgeModel),
+    );
   }
 
   get(type: string): Validator {
@@ -210,7 +232,10 @@ export class ValidatorRegistry {
     return validator;
   }
 
-  async validate(response: string, expectation: Expectation): Promise<ValidationResult> {
+  async validate(
+    response: string,
+    expectation: Expectation,
+  ): Promise<ValidationResult> {
     const validator = this.get(expectation.type);
     return await validator.validate(response, expectation);
   }

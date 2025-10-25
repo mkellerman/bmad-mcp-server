@@ -87,7 +87,9 @@ test.describe('Magic Link Authentication', () => {
 
     // Assert: Success message
     await expect(page.getByTestId('check-email-message')).toBeVisible();
-    await expect(page.getByTestId('check-email-message')).toContainText('Check your email');
+    await expect(page.getByTestId('check-email-message')).toContainText(
+      'Check your email',
+    );
 
     // Retrieve magic link from email
     const magicLink = await getMagicLinkFromEmail(testEmail);
@@ -100,19 +102,24 @@ test.describe('Magic Link Authentication', () => {
     await expect(page.getByTestId('user-email')).toContainText(testEmail);
 
     // Verify session storage preserved
-    const localStorage = await page.evaluate(() => JSON.stringify(window.localStorage));
+    const localStorage = await page.evaluate(() =>
+      JSON.stringify(window.localStorage),
+    );
     expect(localStorage).toContain('authToken');
   });
 
   test('should handle expired magic link', async ({ page }) => {
     // Use pre-expired link (older than 15 minutes)
-    const expiredLink = 'http://localhost:3000/auth/verify?token=expired-token-123';
+    const expiredLink =
+      'http://localhost:3000/auth/verify?token=expired-token-123';
 
     await page.goto(expiredLink);
 
     // Assert: Error message displayed
     await expect(page.getByTestId('error-message')).toBeVisible();
-    await expect(page.getByTestId('error-message')).toContainText('link has expired');
+    await expect(page.getByTestId('error-message')).toContainText(
+      'link has expired',
+    );
 
     // Assert: User NOT authenticated
     await expect(page.getByTestId('user-menu')).not.toBeVisible();
@@ -139,7 +146,9 @@ test.describe('Magic Link Authentication', () => {
     // Try to reuse same link (should fail)
     await page.goto(magicLink);
     await expect(page.getByTestId('error-message')).toBeVisible();
-    await expect(page.getByTestId('error-message')).toContainText('link has already been used');
+    await expect(page.getByTestId('error-message')).toContainText(
+      'link has already been used',
+    );
   });
 });
 ```
@@ -215,7 +224,9 @@ export const test = base.extend<EmailAuthFixture>({
       await page.goto('/dashboard');
 
       // Validate session is still valid
-      const isAuthenticated = await page.getByTestId('user-menu').isVisible({ timeout: 2000 });
+      const isAuthenticated = await page
+        .getByTestId('user-menu')
+        .isVisible({ timeout: 2000 });
 
       if (isAuthenticated) {
         console.log(`✅ Reusing cached session for ${testEmail}`);
@@ -223,7 +234,9 @@ export const test = base.extend<EmailAuthFixture>({
         return;
       }
     } catch (error) {
-      console.log(`📧 No cached session, requesting magic link for ${testEmail}`);
+      console.log(
+        `📧 No cached session, requesting magic link for ${testEmail}`,
+      );
     }
 
     // Request new magic link
@@ -239,7 +252,9 @@ export const test = base.extend<EmailAuthFixture>({
     await expect(page.getByTestId('user-menu')).toBeVisible();
 
     // Extract auth token from localStorage
-    const authToken = await page.evaluate(() => localStorage.getItem('authToken'));
+    const authToken = await page.evaluate(() =>
+      localStorage.getItem('authToken'),
+    );
 
     // Save session state for reuse
     await context.storageState({ path: storageStatePath });
@@ -375,7 +390,9 @@ test.describe('Email Auth Negative Flows', () => {
 
     // Assert: Error displayed
     await expect(page.getByTestId('error-message')).toBeVisible();
-    await expect(page.getByTestId('error-message')).toContainText(/link.*expired|expired.*link/i);
+    await expect(page.getByTestId('error-message')).toContainText(
+      /link.*expired|expired.*link/i,
+    );
 
     // Assert: Link to request new one
     await expect(page.getByTestId('request-new-link')).toBeVisible();
@@ -385,13 +402,16 @@ test.describe('Email Auth Negative Flows', () => {
   });
 
   test('should reject invalid magic link token', async ({ page }) => {
-    const invalidLink = 'http://localhost:3000/auth/verify?token=invalid-garbage';
+    const invalidLink =
+      'http://localhost:3000/auth/verify?token=invalid-garbage';
 
     await page.goto(invalidLink);
 
     // Assert: Error displayed
     await expect(page.getByTestId('error-message')).toBeVisible();
-    await expect(page.getByTestId('error-message')).toContainText(/invalid.*link|link.*invalid/i);
+    await expect(page.getByTestId('error-message')).toContainText(
+      /invalid.*link|link.*invalid/i,
+    );
 
     // Assert: User not authenticated
     await expect(page.getByTestId('user-menu')).not.toBeVisible();
@@ -422,7 +442,9 @@ test.describe('Email Auth Negative Flows', () => {
 
     // Assert: Link already used error
     await expect(page.getByTestId('error-message')).toBeVisible();
-    await expect(page.getByTestId('error-message')).toContainText(/already.*used|link.*used/i);
+    await expect(page.getByTestId('error-message')).toContainText(
+      /already.*used|link.*used/i,
+    );
 
     // Assert: User not authenticated
     await expect(page.getByTestId('user-menu')).not.toBeVisible();
@@ -485,7 +507,9 @@ test.describe('Email Auth Negative Flows', () => {
 
       if (errorVisible) {
         console.log(`Rate limit hit after ${i + 1} requests`);
-        await expect(page.getByTestId('rate-limit-error')).toContainText(/too many.*requests|rate.*limit/i);
+        await expect(page.getByTestId('rate-limit-error')).toContainText(
+          /too many.*requests|rate.*limit/i,
+        );
         return;
       }
     }
@@ -575,23 +599,26 @@ function signIn({ userName, password }) {
  * Register and sign in with email caching
  * ONE EMAIL PER MACHINE (cypress run or cypress open)
  */
-Cypress.Commands.add('registerAndSignIn', ({ fullName, userName, email, password }) => {
-  return dataSession({
-    name: email, // Unique session per email
+Cypress.Commands.add(
+  'registerAndSignIn',
+  ({ fullName, userName, email, password }) => {
+    return dataSession({
+      name: email, // Unique session per email
 
-    // First time: Full registration (form → email → code)
-    init: () => register({ fullName, userName, email, password }),
+      // First time: Full registration (form → email → code)
+      init: () => register({ fullName, userName, email, password }),
 
-    // Subsequent specs: Just check email exists (code already used)
-    setup: () => confirmRegistration(email),
+      // Subsequent specs: Just check email exists (code already used)
+      setup: () => confirmRegistration(email),
 
-    // Always runs after init/setup: Sign in
-    recreate: () => signIn({ userName, password }),
+      // Always runs after init/setup: Sign in
+      recreate: () => signIn({ userName, password }),
 
-    // Share across ALL specs (one email for entire test run)
-    shareAcrossSpecs: true,
-  });
-});
+      // Share across ALL specs (one email for entire test run)
+      shareAcrossSpecs: true,
+    });
+  },
+);
 ```
 
 **Usage across multiple specs**:

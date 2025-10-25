@@ -307,7 +307,8 @@ Expands test automation coverage by generating comprehensive test suites at appr
      ...overrides,
    });
 
-   export const createUsers = (count: number) => Array.from({ length: count }, () => createUser());
+   export const createUsers = (count: number) =>
+     Array.from({ length: count }, () => createUser());
 
    // API helper for cleanup
    export const deleteUser = async (userId: number) => {
@@ -329,7 +330,11 @@ Expands test automation coverage by generating comprehensive test suites at appr
 
    ```typescript
    // tests/support/helpers/wait-for.ts
-   export const waitFor = async (condition: () => Promise<boolean>, timeout = 5000, interval = 100): Promise<void> => {
+   export const waitFor = async (
+     condition: () => Promise<boolean>,
+     timeout = 5000,
+     interval = 100,
+   ): Promise<void> => {
      const startTime = Date.now();
      while (Date.now() - startTime < timeout) {
        if (await condition()) return;
@@ -371,7 +376,9 @@ Expands test automation coverage by generating comprehensive test suites at appr
    import { test, expect } from '@playwright/test';
 
    test.describe('User Authentication', () => {
-     test('[P0] should login with valid credentials and load dashboard', async ({ page }) => {
+     test('[P0] should login with valid credentials and load dashboard', async ({
+       page,
+     }) => {
        // GIVEN: User is on login page
        await page.goto('/login');
 
@@ -385,7 +392,9 @@ Expands test automation coverage by generating comprehensive test suites at appr
        await expect(page.locator('[data-testid="user-name"]')).toBeVisible();
      });
 
-     test('[P1] should display error for invalid credentials', async ({ page }) => {
+     test('[P1] should display error for invalid credentials', async ({
+       page,
+     }) => {
        // GIVEN: User is on login page
        await page.goto('/login');
 
@@ -395,7 +404,9 @@ Expands test automation coverage by generating comprehensive test suites at appr
        await page.click('[data-testid="login-button"]');
 
        // THEN: Error message is displayed
-       await expect(page.locator('[data-testid="error-message"]')).toHaveText('Invalid email or password');
+       await expect(page.locator('[data-testid="error-message"]')).toHaveText(
+         'Invalid email or password',
+       );
      });
    });
    ```
@@ -414,7 +425,9 @@ Expands test automation coverage by generating comprehensive test suites at appr
    import { test, expect } from '@playwright/test';
 
    test.describe('User Authentication API', () => {
-     test('[P1] POST /api/auth/login - should return token for valid credentials', async ({ request }) => {
+     test('[P1] POST /api/auth/login - should return token for valid credentials', async ({
+       request,
+     }) => {
        // GIVEN: Valid user credentials
        const credentials = {
          email: 'user@example.com',
@@ -430,10 +443,14 @@ Expands test automation coverage by generating comprehensive test suites at appr
        expect(response.status()).toBe(200);
        const body = await response.json();
        expect(body).toHaveProperty('token');
-       expect(body.token).toMatch(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/); // JWT format
+       expect(body.token).toMatch(
+         /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/,
+       ); // JWT format
      });
 
-     test('[P1] POST /api/auth/login - should return 401 for invalid credentials', async ({ request }) => {
+     test('[P1] POST /api/auth/login - should return 401 for invalid credentials', async ({
+       request,
+     }) => {
        // GIVEN: Invalid credentials
        const credentials = {
          email: 'invalid@example.com',
@@ -509,7 +526,12 @@ Expands test automation coverage by generating comprehensive test suites at appr
 
      test('[P2] should return false for malformed email', () => {
        // GIVEN: Malformed email addresses
-       const invalidEmails = ['notanemail', '@example.com', 'user@', 'user @example.com'];
+       const invalidEmails = [
+         'notanemail',
+         '@example.com',
+         'user@',
+         'user @example.com',
+       ];
 
        // WHEN/THEN: Each should fail validation
        invalidEmails.forEach((email) => {
@@ -538,7 +560,9 @@ Expands test automation coverage by generating comprehensive test suites at appr
      // NOW navigate
      await page.goto('/dashboard');
 
-     await expect(page.locator('[data-testid="user-name"]')).toHaveText('Test User');
+     await expect(page.locator('[data-testid="user-name"]')).toHaveText(
+       'Test User',
+     );
    });
    ```
 

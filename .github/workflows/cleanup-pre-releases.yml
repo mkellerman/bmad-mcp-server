@@ -1,0 +1,39 @@
+name: Cleanup Pre-releases
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - v2-node
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete Pre-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Delete pre-releases for this PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          
+          echo "Cleaning up pre-releases for PR #$PR_NUMBER"
+          
+          # Find and delete all releases matching this PR
+          gh release list --limit 100 | \
+            grep "^pr-${PR_NUMBER}-" | \
+            awk '{print $1}' | \
+            while read tag; do
+              echo "Deleting release and tag: $tag"
+              gh release delete "$tag" --yes 2>/dev/null || true
+              git push origin ":refs/tags/$tag" 2>/dev/null || true
+            done
+          
+          echo "Cleanup complete"

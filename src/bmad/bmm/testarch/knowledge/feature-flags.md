@@ -181,7 +181,10 @@ test.describe('Checkout Flow - Feature Flag Variations', () => {
     });
   });
 
-  test('should use NEW checkout flow when flag is ENABLED', async ({ page, request }) => {
+  test('should use NEW checkout flow when flag is ENABLED', async ({
+    page,
+    request,
+  }) => {
     // Arrange: Enable flag for test user
     await request.post('/api/feature-flags/target', {
       data: {
@@ -207,7 +210,9 @@ test.describe('Checkout Flow - Feature Flag Variations', () => {
     await expect(page.getByTestId('checkout-v1-container')).not.toBeVisible();
 
     // Assert: Telemetry event fired
-    const analyticsEvents = await page.evaluate(() => (window as any).__ANALYTICS_EVENTS__ || []);
+    const analyticsEvents = await page.evaluate(
+      () => (window as any).__ANALYTICS_EVENTS__ || [],
+    );
     expect(analyticsEvents).toContainEqual(
       expect.objectContaining({
         event: 'checkout_started',
@@ -218,7 +223,10 @@ test.describe('Checkout Flow - Feature Flag Variations', () => {
     );
   });
 
-  test('should use LEGACY checkout flow when flag is DISABLED', async ({ page, request }) => {
+  test('should use LEGACY checkout flow when flag is DISABLED', async ({
+    page,
+    request,
+  }) => {
     // Arrange: Disable flag for test user (or don't target at all)
     await request.post('/api/feature-flags/target', {
       data: {
@@ -244,7 +252,9 @@ test.describe('Checkout Flow - Feature Flag Variations', () => {
     await expect(page.getByTestId('express-payment-options')).not.toBeVisible();
 
     // Assert: Telemetry event fired with correct variant
-    const analyticsEvents = await page.evaluate(() => (window as any).__ANALYTICS_EVENTS__ || []);
+    const analyticsEvents = await page.evaluate(
+      () => (window as any).__ANALYTICS_EVENTS__ || [],
+    );
     expect(analyticsEvents).toContainEqual(
       expect.objectContaining({
         event: 'checkout_started',
@@ -255,9 +265,14 @@ test.describe('Checkout Flow - Feature Flag Variations', () => {
     );
   });
 
-  test('should handle flag evaluation errors gracefully', async ({ page, request }) => {
+  test('should handle flag evaluation errors gracefully', async ({
+    page,
+    request,
+  }) => {
     // Arrange: Simulate flag service unavailable
-    await page.route('**/api/feature-flags/evaluate', (route) => route.fulfill({ status: 500, body: 'Service Unavailable' }));
+    await page.route('**/api/feature-flags/evaluate', (route) =>
+      route.fulfill({ status: 500, body: 'Service Unavailable' }),
+    );
 
     // Act: Navigate (should fallback to default state)
     await page.goto('/checkout', {
@@ -274,7 +289,9 @@ test.describe('Checkout Flow - Feature Flag Variations', () => {
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
-    expect(consoleErrors).toContain(expect.stringContaining('Feature flag evaluation failed'));
+    expect(consoleErrors).toContain(
+      expect.stringContaining('Feature flag evaluation failed'),
+    );
   });
 });
 ```
@@ -372,7 +389,11 @@ type FlagVariation = boolean | string | number | object;
  * Set flag variation for specific user
  * Uses LaunchDarkly API to create user target
  */
-export async function setFlagForUser(flagKey: FlagKey, userId: string, variation: FlagVariation): Promise<void> {
+export async function setFlagForUser(
+  flagKey: FlagKey,
+  userId: string,
+  variation: FlagVariation,
+): Promise<void> {
   const response = await playwrightRequest.newContext().then((ctx) =>
     ctx.post(`${LD_API_BASE}/flags/${flagKey}/targeting`, {
       headers: {
@@ -391,7 +412,9 @@ export async function setFlagForUser(flagKey: FlagKey, userId: string, variation
   );
 
   if (!response.ok()) {
-    throw new Error(`Failed to set flag ${flagKey} for user ${userId}: ${response.status()}`);
+    throw new Error(
+      `Failed to set flag ${flagKey} for user ${userId}: ${response.status()}`,
+    );
   }
 }
 
@@ -399,7 +422,10 @@ export async function setFlagForUser(flagKey: FlagKey, userId: string, variation
  * Remove user from flag targeting
  * CRITICAL for test cleanup
  */
-export async function removeFlagTarget(flagKey: FlagKey, userId: string): Promise<void> {
+export async function removeFlagTarget(
+  flagKey: FlagKey,
+  userId: string,
+): Promise<void> {
   const response = await playwrightRequest.newContext().then((ctx) =>
     ctx.delete(`${LD_API_BASE}/flags/${flagKey}/targeting/users/${userId}`, {
       headers: {
@@ -410,7 +436,9 @@ export async function removeFlagTarget(flagKey: FlagKey, userId: string): Promis
 
   if (!response.ok() && response.status() !== 404) {
     // 404 is acceptable (user wasn't targeted)
-    throw new Error(`Failed to remove flag ${flagKey} target for user ${userId}: ${response.status()}`);
+    throw new Error(
+      `Failed to remove flag ${flagKey} target for user ${userId}: ${response.status()}`,
+    );
   }
 }
 
@@ -418,7 +446,10 @@ export async function removeFlagTarget(flagKey: FlagKey, userId: string): Promis
  * Percentage rollout helper
  * Enable flag for N% of users
  */
-export async function setFlagRolloutPercentage(flagKey: FlagKey, percentage: number): Promise<void> {
+export async function setFlagRolloutPercentage(
+  flagKey: FlagKey,
+  percentage: number,
+): Promise<void> {
   if (percentage < 0 || percentage > 100) {
     throw new Error('Percentage must be between 0 and 100');
   }
@@ -441,7 +472,9 @@ export async function setFlagRolloutPercentage(flagKey: FlagKey, percentage: num
   );
 
   if (!response.ok()) {
-    throw new Error(`Failed to set rollout for flag ${flagKey}: ${response.status()}`);
+    throw new Error(
+      `Failed to set rollout for flag ${flagKey}: ${response.status()}`,
+    );
   }
 }
 
@@ -476,7 +509,10 @@ export function stubFeatureFlags(flags: Record<FlagKey, FlagVariation>): void {
 ```typescript
 // playwright/fixtures/feature-flag-fixture.ts
 import { test as base } from '@playwright/test';
-import { setFlagForUser, removeFlagTarget } from '../support/feature-flag-helpers';
+import {
+  setFlagForUser,
+  removeFlagTarget,
+} from '../support/feature-flag-helpers';
 import { FlagKey } from '@/utils/feature-flags';
 
 type FeatureFlagFixture = {
@@ -536,7 +572,12 @@ export const test = base.extend<FeatureFlagFixture>({
  * Run weekly to detect stale flags requiring cleanup
  */
 
-import { FLAG_REGISTRY, FLAGS, getExpiredFlags, FlagKey } from '../src/utils/feature-flags';
+import {
+  FLAG_REGISTRY,
+  FLAGS,
+  getExpiredFlags,
+  FlagKey,
+} from '../src/utils/feature-flags';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -567,7 +608,9 @@ function auditFeatureFlags(): AuditResult {
 
   // Missing metadata
   const missingOwners = allFlags.filter((flag) => !FLAG_REGISTRY[flag].owner);
-  const missingDates = allFlags.filter((flag) => !FLAG_REGISTRY[flag].createdDate);
+  const missingDates = allFlags.filter(
+    (flag) => !FLAG_REGISTRY[flag].createdDate,
+  );
 
   // Permanent flags (no expiry, requiresCleanup = false)
   const permanentFlags = allFlags.filter((flag) => {
@@ -693,7 +736,10 @@ const report = generateReport(audit);
 // Save report
 const outputPath = path.join(__dirname, '../feature-flag-audit-report.md');
 fs.writeFileSync(outputPath, report);
-fs.writeFileSync(path.join(__dirname, '../FEATURE-FLAG-CHECKLIST.md'), FLAG_LIFECYCLE_CHECKLIST);
+fs.writeFileSync(
+  path.join(__dirname, '../FEATURE-FLAG-CHECKLIST.md'),
+  FLAG_LIFECYCLE_CHECKLIST,
+);
 
 console.log(`✅ Audit complete. Report saved to: ${outputPath}`);
 console.log(`Total flags: ${audit.totalFlags}`);

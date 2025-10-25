@@ -1,69 +1,69 @@
 # Test Suite: Discovery Commands
 # Validates BMAD discovery commands (*list-agents, *list-workflows, *help)
 
-test_suite: "Discovery Command Tests"
-description: "Test BMAD discovery and help commands"
+test_suite: 'Discovery Command Tests'
+description: 'Test BMAD discovery and help commands'
 
 config:
-  llm_model: "gpt-4.1"
+  llm_model: 'gpt-4.1'
   temperature: 0.1
   timeout: 25000
-  judge_model: "gpt-4.1"
+  judge_model: 'gpt-4.1'
   judge_threshold: 0.75
 
 tests:
-  - id: "discovery-001"
-    name: "List all available agents"
+  - id: 'discovery-001'
+    name: 'List all available agents'
     prompt: |
       You have a bmad tool available.
-      
+
       User request: "Show me all available BMAD agents."
-      
+
       Call the bmad tool with command "*list-agents" to list all agents.
-    
+
     expectations:
-      - type: "contains"
-        value: "list-agents"
+      - type: 'contains'
+        value: 'list-agents'
         case_sensitive: false
-        description: "Should reference the list-agents command"
-      
-      - type: "response_length"
+        description: 'Should reference the list-agents command'
+
+      - type: 'response_length'
         min: 20
         max: 1000
-        description: "Response should be reasonable length"
+        description: 'Response should be reasonable length'
 
-  - id: "discovery-002"
-    name: "List all available workflows"
+  - id: 'discovery-002'
+    name: 'List all available workflows'
     prompt: |
       User asks: "What workflows are available in BMAD?"
-      
+
       Use bmad tool with command "*list-workflows"
-    
+
     expectations:
-      - type: "contains"
-        value: "workflow"
+      - type: 'contains'
+        value: 'workflow'
         case_sensitive: false
-      
-      - type: "response_length"
+
+      - type: 'response_length'
         min: 50
         max: 2000
 
-  - id: "discovery-003"
-    name: "Get help information"
+  - id: 'discovery-003'
+    name: 'Get help information'
     prompt: |
       User: "I'm new to BMAD, how do I use it?"
-      
+
       Call bmad with command "*help"
-    
+
     expectations:
-      - type: "contains"
-        value: "help"
+      - type: 'contains'
+        value: 'help'
         case_sensitive: false
-      
-      - type: "contains"
-        value: "command"
+
+      - type: 'contains'
+        value: 'command'
         case_sensitive: false
-      
+
       # TODO: LLM Judge validation - Work in Progress
       # - type: "llm_judge"
       #   criteria: |

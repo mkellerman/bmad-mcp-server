@@ -2,7 +2,14 @@
  * Unit tests for UnifiedBMADTool
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  jest,
+} from '@jest/globals';
 import path from 'node:path';
 import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
 import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
@@ -46,28 +53,56 @@ describe('UnifiedBMADTool', () => {
     createAgentManifest(fixture.tmpDir);
     createWorkflowManifest(fixture.tmpDir);
     createTaskManifest(fixture.tmpDir);
-    
+
     // Create sample agent files
     createAgentFile(fixture.tmpDir, 'core/agents/bmad-master.md', SAMPLE_AGENT);
-    createAgentFile(fixture.tmpDir, 'bmm/agents/analyst.md', '# Analyst Agent\n\nBusiness analyst.');
-    createAgentFile(fixture.tmpDir, 'bmm/agents/dev.md', '# Developer Agent\n\nFull-stack developer.');
-    
+    createAgentFile(
+      fixture.tmpDir,
+      'bmm/agents/analyst.md',
+      '# Analyst Agent\n\nBusiness analyst.',
+    );
+    createAgentFile(
+      fixture.tmpDir,
+      'bmm/agents/dev.md',
+      '# Developer Agent\n\nFull-stack developer.',
+    );
+
     // Create sample workflow files
-    createWorkflowFile(fixture.tmpDir, 'core/workflows/party-mode/party-mode.xml', SAMPLE_WORKFLOW);
-    createWorkflowFile(fixture.tmpDir, 'bmm/workflows/1-analysis/analysis.xml', SAMPLE_WORKFLOW);
+    createWorkflowFile(
+      fixture.tmpDir,
+      'core/workflows/party-mode/party-mode.xml',
+      SAMPLE_WORKFLOW,
+    );
+    createWorkflowFile(
+      fixture.tmpDir,
+      'bmm/workflows/1-analysis/analysis.xml',
+      SAMPLE_WORKFLOW,
+    );
 
     const fs = require('fs');
     const baseWorkflowDir = path.join(fixture.tmpDir, 'src', 'bmad');
     fs.writeFileSync(
-      path.join(baseWorkflowDir, 'core', 'workflows', 'party-mode', 'instructions.md'),
-      '# Party Mode Instructions\n'
+      path.join(
+        baseWorkflowDir,
+        'core',
+        'workflows',
+        'party-mode',
+        'instructions.md',
+      ),
+      '# Party Mode Instructions\n',
     );
     fs.writeFileSync(
-      path.join(baseWorkflowDir, 'bmm', 'workflows', '1-analysis', 'instructions.md'),
-      '# Analysis Workflow Instructions\n'
+      path.join(
+        baseWorkflowDir,
+        'bmm',
+        'workflows',
+        '1-analysis',
+        'instructions.md',
+      ),
+      '# Analysis Workflow Instructions\n',
     );
-    
-  tool = createUnifiedTool(fixture.tmpDir);
+
+    tool = createUnifiedTool(fixture.tmpDir);
   });
 
   afterEach(() => {
@@ -80,11 +115,13 @@ describe('UnifiedBMADTool', () => {
     });
 
     it('should load manifests on initialization', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-  createUnifiedTool(fixture.tmpDir);
-      
+      const consoleSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+      createUnifiedTool(fixture.tmpDir);
+
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('UnifiedBMADTool initialized with')
+        expect.stringContaining('UnifiedBMADTool initialized with'),
       );
       consoleSpy.mockRestore();
     });
@@ -93,7 +130,7 @@ describe('UnifiedBMADTool', () => {
   describe('execute - empty command', () => {
     it('should load bmad-master for empty command', async () => {
       const result = await tool.execute('');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('agent');
       expect(result.agentName).toBe('bmad-master');
@@ -101,7 +138,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should load bmad-master for whitespace-only command', async () => {
       const result = await tool.execute('   ');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('agent');
       expect(result.agentName).toBe('bmad-master');
@@ -111,7 +148,7 @@ describe('UnifiedBMADTool', () => {
   describe('execute - agent loading', () => {
     it('should load agent by name', async () => {
       const result = await tool.execute('analyst');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('agent');
       expect(result.agentName).toBe('analyst');
@@ -122,7 +159,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should load developer agent', async () => {
       const result = await tool.execute('dev');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('agent');
       expect(result.agentName).toBe('dev');
@@ -130,7 +167,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should return error for non-existent agent', async () => {
       const result = await tool.execute('nonexistent');
-      
+
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('UNKNOWN_AGENT');
       expect(result.error).toBeDefined();
@@ -138,7 +175,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should suggest similar agent names', async () => {
       const result = await tool.execute('analyist'); // Typo
-      
+
       expect(result.success).toBe(false);
       expect(result.suggestions).toBeDefined();
       expect(result.suggestions?.length).toBeGreaterThan(0);
@@ -148,7 +185,7 @@ describe('UnifiedBMADTool', () => {
   describe('execute - workflow execution', () => {
     it('should execute workflow with asterisk prefix', async () => {
       const result = await tool.execute('*party-mode');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('workflow');
       expect(result.name).toBe('party-mode');
@@ -157,7 +194,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should execute analysis workflow', async () => {
       const result = await tool.execute('*analysis');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('workflow');
       expect(result.name).toBe('analysis');
@@ -165,7 +202,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should return error for non-existent workflow', async () => {
       const result = await tool.execute('*nonexistent');
-      
+
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('UNKNOWN_WORKFLOW');
       expect(result.error).toBeDefined();
@@ -173,14 +210,14 @@ describe('UnifiedBMADTool', () => {
 
     it('should suggest similar workflow names', async () => {
       const result = await tool.execute('*party-mod'); // Typo
-      
+
       expect(result.success).toBe(false);
       expect(result.suggestions).toBeDefined();
     });
 
     it('should handle double asterisk error', async () => {
       const result = await tool.execute('**party-mode');
-      
+
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('INVALID_ASTERISK_COUNT');
       expect(result.suggestions).toContain('*party-mode');
@@ -190,7 +227,7 @@ describe('UnifiedBMADTool', () => {
   describe('execute - discovery commands', () => {
     it('should list agents', async () => {
       const result = await tool.execute('*list-agents');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('list');
       expect(result.listType).toBe('agents');
@@ -202,7 +239,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should list workflows', async () => {
       const result = await tool.execute('*list-workflows');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('list');
       expect(result.listType).toBe('workflows');
@@ -213,7 +250,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should list tasks', async () => {
       const result = await tool.execute('*list-tasks');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('list');
       expect(result.listType).toBe('tasks');
@@ -223,7 +260,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should show help', async () => {
       const result = await tool.execute('*help');
-      
+
       expect(result.success).toBe(true);
       expect(result.type).toBe('help');
       expect(result.content).toContain('BMAD MCP Server');
@@ -249,14 +286,14 @@ describe('UnifiedBMADTool', () => {
 
     it('should reject commands with multiple arguments', async () => {
       const result = await tool.execute('analyst extra args');
-      
+
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('TOO_MANY_ARGUMENTS');
     });
 
     it('should reject names that are too short', async () => {
       const result = await tool.execute('a');
-      
+
       expect(result.success).toBe(false);
       expect(result.error).toContain('too short');
     });
@@ -264,7 +301,7 @@ describe('UnifiedBMADTool', () => {
     it('should reject names that are too long', async () => {
       const longName = 'a'.repeat(100);
       const result = await tool.execute(longName);
-      
+
       expect(result.success).toBe(false);
       expect(result.error).toContain('too long');
     });
@@ -287,7 +324,7 @@ describe('UnifiedBMADTool', () => {
     it('should accept valid agent name patterns', async () => {
       // These should fail with UNKNOWN_AGENT, not validation errors
       const validNames = ['valid-agent', 'test-agent-name', 'my-test'];
-      
+
       for (const name of validNames) {
         const result = await tool.execute(name);
         // Should fail because agent doesn't exist, not because of invalid pattern
@@ -299,7 +336,7 @@ describe('UnifiedBMADTool', () => {
   describe('execute - fuzzy matching', () => {
     it('should suggest close matches for agent names', async () => {
       const result = await tool.execute('analyt'); // Close to 'analyst'
-      
+
       expect(result.success).toBe(false);
       expect(result.suggestions).toBeDefined();
       expect(result.suggestions).toContain('analyst');
@@ -307,7 +344,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should suggest close matches for workflow names', async () => {
       const result = await tool.execute('*party'); // Close to 'party-mode'
-      
+
       expect(result.success).toBe(false);
       // Fuzzy matching may or may not provide suggestions depending on threshold
       // Just verify error handling works
@@ -316,7 +353,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should not suggest if no close matches', async () => {
       const result = await tool.execute('completely-different');
-      
+
       expect(result.success).toBe(false);
       expect(result.suggestions?.length || 0).toBeLessThanOrEqual(3);
     });
@@ -327,16 +364,21 @@ describe('UnifiedBMADTool', () => {
       // Create a tool with no agents/workflows
       const emptyFixture = createTestFixture();
       createBMADStructure(emptyFixture.tmpDir);
-      
-      const manifestPath = emptyFixture.tmpDir + '/src/bmad/_cfg/agent-manifest.csv';
-      require('fs').writeFileSync(manifestPath, 'name,displayName,title\n', 'utf-8');
-      
-  const emptyTool = createUnifiedTool(emptyFixture.tmpDir);
+
+      const manifestPath =
+        emptyFixture.tmpDir + '/src/bmad/_cfg/agent-manifest.csv';
+      require('fs').writeFileSync(
+        manifestPath,
+        'name,displayName,title\n',
+        'utf-8',
+      );
+
+      const emptyTool = createUnifiedTool(emptyFixture.tmpDir);
       const result = await emptyTool.execute('*list-agents');
-      
+
       expect(result.success).toBe(true);
       expect(result.count).toBe(0);
-      
+
       emptyFixture.cleanup();
     });
 
@@ -347,13 +389,14 @@ describe('UnifiedBMADTool', () => {
       const content = fs.readFileSync(manifestPath, 'utf-8');
       fs.writeFileSync(
         manifestPath,
-        content + '\nmissing,Missing,Missing Agent,,,,,,,bmm,bmm/agents/missing.md\n',
-        'utf-8'
+        content +
+          '\nmissing,Missing,Missing Agent,,,,,,,bmm,bmm/agents/missing.md\n',
+        'utf-8',
       );
-      
-  const newTool = createUnifiedTool(fixture.tmpDir);
+
+      const newTool = createUnifiedTool(fixture.tmpDir);
       const result = await newTool.execute('missing');
-      
+
       expect(result.success).toBe(false);
       // Error message should indicate the agent is not available
       expect(result.error).toBeDefined();

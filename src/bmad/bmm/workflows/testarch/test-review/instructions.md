@@ -495,7 +495,9 @@ await page.waitForTimeout(2000);
 await expect(page.locator('[data-testid="user-menu"]')).toBeVisible();
 
 // ✅ Good (recommended)
-await expect(page.locator('[data-testid="user-menu"]')).toBeVisible({ timeout: 10000 });
+await expect(page.locator('[data-testid="user-menu"]')).toBeVisible({
+  timeout: 10000,
+});
 ```
 ````
 

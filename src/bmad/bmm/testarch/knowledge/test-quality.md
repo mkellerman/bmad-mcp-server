@@ -48,7 +48,9 @@ test('user can view dashboard', async ({ page, apiRequest }) => {
   await apiRequest.post('/api/users', { data: user });
 
   // Network-first: Intercept BEFORE navigate
-  const dashboardPromise = page.waitForResponse((resp) => resp.url().includes('/api/dashboard') && resp.status() === 200);
+  const dashboardPromise = page.waitForResponse(
+    (resp) => resp.url().includes('/api/dashboard') && resp.status() === 200,
+  );
 
   await page.goto('/dashboard');
 
@@ -58,7 +60,9 @@ test('user can view dashboard', async ({ page, apiRequest }) => {
 
   // Explicit assertions with controlled data
   await expect(page.getByText(`Welcome, ${user.name}`)).toBeVisible();
-  await expect(page.getByTestId('dashboard-items')).toHaveCount(dashboard.items.length);
+  await expect(page.getByTestId('dashboard-items')).toHaveCount(
+    dashboard.items.length,
+  );
 
   // No conditionals - test always executes same path
   // No try-catch - failures bubble up clearly
@@ -67,7 +71,10 @@ test('user can view dashboard', async ({ page, apiRequest }) => {
 // Cypress equivalent
 describe('Dashboard', () => {
   it('should display user dashboard', () => {
-    const user = createUser({ email: 'test@example.com', hasSeenWelcome: true });
+    const user = createUser({
+      email: 'test@example.com',
+      hasSeenWelcome: true,
+    });
 
     // Setup via task (fast, controlled)
     cy.task('db:seed', { users: [user] });
@@ -83,7 +90,10 @@ describe('Dashboard', () => {
 
       // Explicit assertions
       cy.contains(`Welcome, ${user.name}`).should('be.visible');
-      cy.get('[data-cy="dashboard-items"]').should('have.length', dashboard.items.length);
+      cy.get('[data-cy="dashboard-items"]').should(
+        'have.length',
+        dashboard.items.length,
+      );
     });
   });
 });
@@ -224,7 +234,10 @@ describe('Admin User Management', () => {
 ```typescript
 // ❌ BAD: Assertions hidden in helper functions
 // helpers/api-validators.ts
-export async function validateUserCreation(response: Response, expectedEmail: string) {
+export async function validateUserCreation(
+  response: Response,
+  expectedEmail: string,
+) {
   const user = await response.json();
   expect(response.status()).toBe(201);
   expect(user.email).toBe(expectedEmail);
@@ -265,7 +278,9 @@ test('create user via API', async ({ request }) => {
 
 // ✅ ACCEPTABLE: Helper for data extraction, NOT assertions
 // helpers/api-extractors.ts
-export async function extractUserFromResponse(response: Response): Promise<User> {
+export async function extractUserFromResponse(
+  response: Response,
+): Promise<User> {
   const user = await response.json();
   return user; // Just extracts, no assertions
 }
@@ -431,7 +446,10 @@ test('admin can assign permissions', async ({ adminPage, seedUser }) => {
 });
 
 // Test 3: Notification preferences (70 lines)
-test('admin can update notification preferences', async ({ adminPage, seedUser }) => {
+test('admin can update notification preferences', async ({
+  adminPage,
+  seedUser,
+}) => {
   const user = await seedUser({ email: faker.internet.email() });
 
   await adminPage.goto(`/admin/users/${user.id}/notifications`);
@@ -443,7 +461,9 @@ test('admin can update notification preferences', async ({ adminPage, seedUser }
   await expect(adminPage.getByText('Preferences saved')).toBeVisible();
 
   // Verify preferences
-  const response = await adminPage.request.get(`/api/users/${user.id}/preferences`);
+  const response = await adminPage.request.get(
+    `/api/users/${user.id}/preferences`,
+  );
   const prefs = await response.json();
   expect(prefs.emailEnabled).toBe(true);
   expect(prefs.smsEnabled).toBe(false);

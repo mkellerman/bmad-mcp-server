@@ -38,17 +38,17 @@ for (const suite of testSuites) {
       if (!isHealthy) {
         throw new Error(
           '❌ LiteLLM proxy is not running!\n\n' +
-          '   Start it with:\n' +
-          '   docker-compose up -d\n\n' +
-          '   Or check health:\n' +
-          '   npm run litellm:docker:health'
+            '   Start it with:\n' +
+            '   docker-compose up -d\n\n' +
+            '   Or check health:\n' +
+            '   npm run litellm:docker:health',
         );
       }
 
       // Initialize validators
       validators = new ValidatorRegistry(llmClient, suite.config.judge_model);
-      
-      console.log(`\n✅ LiteLLM proxy is healthy`);
+
+      console.log('\n✅ LiteLLM proxy is healthy');
       console.log(`📦 Suite: ${suite.name}`);
       console.log(`🤖 Model: ${suite.config.llm_model}`);
       console.log(`⚖️  Judge: ${suite.config.judge_model}\n`);
@@ -60,9 +60,10 @@ for (const suite of testSuites) {
           // Set test timeout
           test.setTimeout(suite.config.timeout || 30000);
 
-          const promptPreview = testCase.prompt.length > 80 
-            ? testCase.prompt.substring(0, 80) + '...' 
-            : testCase.prompt;
+          const promptPreview =
+            testCase.prompt.length > 80
+              ? testCase.prompt.substring(0, 80) + '...'
+              : testCase.prompt;
           console.log(`\n🧪 ${testCase.name}`);
           console.log(`   ${promptPreview}`);
 
@@ -71,21 +72,21 @@ for (const suite of testSuites) {
           const completion = await llmClient.chat(
             suite.config.llm_model,
             [{ role: 'user', content: testCase.prompt }],
-            { temperature: suite.config.temperature }
+            { temperature: suite.config.temperature },
           );
           const responseTime = Date.now() - startTime;
 
           const responseText = llmClient.getResponseText(completion);
-          const responsePreview = responseText.length > 100 
-            ? responseText.substring(0, 100) + '...' 
-            : responseText;
+          const responsePreview =
+            responseText.length > 100
+              ? responseText.substring(0, 100) + '...'
+              : responseText;
           console.log(`   ✓ Response (${responseTime}ms): ${responsePreview}`);
 
           // Run all validators
-          let allPassed = true;
           for (const expectation of testCase.expectations) {
             const result = await validators.validate(responseText, expectation);
-            
+
             if (result.pass) {
               console.log(`   ✓ ${expectation.type}`);
             } else {
@@ -93,7 +94,6 @@ for (const suite of testSuites) {
               if (result.details) {
                 console.log(`     ${JSON.stringify(result.details)}`);
               }
-              allPassed = false;
             }
 
             // Assert validation passed
