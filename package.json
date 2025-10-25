@@ -7,7 +7,7 @@
     "bmad-mcp-server": "./build/index.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x build/index.js",
+    "build": "tsc && node ./scripts/copy-bmad.mjs && chmod +x build/index.js",
     "prepare": "npm run build",
     "start": "node build/index.js",
     "dev": "tsx src/index.ts",
@@ -28,8 +28,7 @@
     "litellm:docker:health": "curl -s http://localhost:4000/health/readiness | jq"
   },
   "files": [
-    "build/",
-    "bmad/"
+    "build/"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",

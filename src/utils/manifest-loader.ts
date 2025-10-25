@@ -24,13 +24,30 @@ export class ManifestLoader {
 
   constructor(bmadRoot: string) {
     this.bmadRoot = path.resolve(bmadRoot);
-    const bmadPath = path.join(this.bmadRoot, 'bmad', '_cfg');
-    
-    if (fs.existsSync(bmadPath)) {
-      this.manifestDir = bmadPath;
-    } else {
-      throw new Error(`BMAD manifest directory not found at ${bmadPath}`);
+    const srcCfg = path.join(this.bmadRoot, 'src', 'bmad', '_cfg');
+    const nestedPath = path.join(this.bmadRoot, 'bmad', '_cfg');
+    const directPath = path.join(this.bmadRoot, '_cfg');
+
+    if (fs.existsSync(srcCfg) && fs.statSync(srcCfg).isDirectory()) {
+      this.manifestDir = srcCfg;
+      this.bmadRoot = path.dirname(srcCfg);
+      return;
     }
+
+    if (fs.existsSync(nestedPath) && fs.statSync(nestedPath).isDirectory()) {
+      this.manifestDir = nestedPath;
+      this.bmadRoot = path.dirname(nestedPath);
+      return;
+    }
+
+    if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
+      this.manifestDir = directPath;
+      return;
+    }
+
+    throw new Error(
+      `BMAD manifest directory not found. Checked ${srcCfg}, ${nestedPath} and ${directPath}`
+    );
   }
 
   /**

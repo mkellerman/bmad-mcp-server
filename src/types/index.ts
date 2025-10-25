@@ -18,6 +18,8 @@ export interface Agent {
   principles?: string;
   module: string;
   path: string;
+  sourceRoot?: string;
+  sourceLocation?: string;
 }
 
 /**
@@ -29,6 +31,8 @@ export interface Workflow {
   trigger?: string;
   module: string;
   path: string;
+  sourceRoot?: string;
+  sourceLocation?: string;
 }
 
 /**
@@ -39,6 +43,8 @@ export interface Task {
   description: string;
   module: string;
   path?: string;
+  sourceRoot?: string;
+  sourceLocation?: string;
 }
 
 /**
@@ -57,7 +63,7 @@ export interface ValidationResult {
  */
 export interface BMADToolResult {
   success: boolean;
-  type?: 'agent' | 'workflow' | 'list' | 'help';
+  type?: 'agent' | 'workflow' | 'list' | 'help' | 'diagnostic' | 'init';
   content?: string;
   error?: string;
   errorCode?: string;
@@ -77,6 +83,7 @@ export interface BMADToolResult {
   // List-specific fields
   listType?: string;
   count?: number;
+  data?: unknown;
 }
 
 /**

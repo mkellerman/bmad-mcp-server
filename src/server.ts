@@ -16,11 +16,15 @@ import {
   Tool,
   TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
-import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { Agent } from './types/index.js';
 import { ManifestLoader } from './utils/manifest-loader.js';
+import {
+  resolveBmadPaths,
+  type BmadPathResolution,
+} from './utils/bmad-path-resolver.js';
 import { UnifiedBMADTool } from './tools/unified-tool.js';
 
 // Compute __dirname - use import.meta.url when available (production)
@@ -59,32 +63,27 @@ export class BMADMCPServer {
   private unifiedTool: UnifiedBMADTool;
   private agents: Agent[];
   private server: Server;
-
-  constructor(bmadRoot: string) {
+  private discovery: BmadPathResolution;
+  constructor(bmadRoot: string, discovery: BmadPathResolution) {
+    this.discovery = discovery;
     this.bmadRoot = path.resolve(bmadRoot);
     console.log(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
 
-    // Validate BMAD installation - handle both project root and bmad directory
-    let manifestDir: string;
-    const bmadManifests = path.join(this.bmadRoot, 'bmad', '_cfg');
-    const directManifests = path.join(this.bmadRoot, '_cfg');
-    
-    if (fs.existsSync(bmadManifests)) {
-      // Project root - bmad_root points to project, manifests in bmad/_cfg
-      manifestDir = bmadManifests;
-      this.projectRoot = this.bmadRoot;
-    } else if (fs.existsSync(directManifests)) {
-      // BMAD directory - bmad_root points to bmad, manifests in _cfg
-      manifestDir = directManifests;
-      this.projectRoot = path.dirname(this.bmadRoot);
-    } else {
-      throw new Error(`BMAD manifest directory not found in ${bmadManifests} or ${directManifests}`);
-    }    console.log(`Project root: ${this.projectRoot}`);
+    const manifestDir = discovery.activeLocation.manifestDir;
+    if (!manifestDir) {
+      throw new Error('Active BMAD location missing manifest directory');
+    }
+
+    this.projectRoot = this.bmadRoot;
+    console.log(`Project root: ${this.projectRoot}`);
     console.log(`Manifest directory: ${manifestDir}`);
 
     // Initialize components
     this.manifestLoader = new ManifestLoader(this.projectRoot);
-    this.unifiedTool = new UnifiedBMADTool(this.projectRoot);
+    this.unifiedTool = new UnifiedBMADTool({
+      bmadRoot: this.projectRoot,
+      discovery,
+    });
 
     // Load manifests for prompts
     this.agents = this.manifestLoader.loadAgentManifest();
@@ -442,15 +441,31 @@ Begin workflow execution now.`);
  * Main entry point for BMAD MCP Server
  */
 export async function main(): Promise<void> {
-  // Determine BMAD root - when running from build/, go up one level to bmad-mcp-server/
-  // The bmad folder should be at bmad-mcp-server/bmad/
-  const bmadRoot = path.resolve(__dirname, '..');
+  const packageRoot = path.resolve(__dirname, '..');
+  const cwd = process.cwd();
+  const cliArg = process.argv.length > 2 ? process.argv[2] : undefined;
+  const envVar = process.env.BMAD_ROOT;
+  const userBmadPath = path.join(os.homedir(), '.bmad');
+
+  const discovery = resolveBmadPaths({
+    cwd,
+    cliArg,
+    envVar,
+    packageRoot,
+    userBmadPath,
+  });
+
+  const activeRoot = discovery.activeLocation.resolvedRoot;
+
+  if (!activeRoot) {
+    throw new Error('Unable to determine active BMAD root');
+  }
 
   console.error('Starting BMAD MCP Server...');
-  console.error(`BMAD root: ${bmadRoot}`);
+  console.error(`Active BMAD location (${discovery.activeLocation.displayName}): ${activeRoot}`);
 
   try {
-    const server = new BMADMCPServer(bmadRoot);
+    const server = new BMADMCPServer(activeRoot, discovery);
     await server.run();
   } catch (error) {
     console.error('Server error:', error);

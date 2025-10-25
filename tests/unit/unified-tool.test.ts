@@ -3,7 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import path from 'node:path';
 import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
+import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
 import {
   createTestFixture,
   createBMADStructure,
@@ -16,6 +18,23 @@ import {
   SAMPLE_WORKFLOW,
   type TestFixture,
 } from '../helpers/test-fixtures.js';
+
+function createUnifiedTool(baseDir: string): UnifiedBMADTool {
+  const discovery = resolveBmadPaths({
+    cwd: baseDir,
+    packageRoot: baseDir,
+    cliArg: undefined,
+    envVar: undefined,
+    userBmadPath: path.join(baseDir, '.bmad'),
+  });
+
+  const root = discovery.activeLocation.resolvedRoot ?? baseDir;
+
+  return new UnifiedBMADTool({
+    bmadRoot: root,
+    discovery,
+  });
+}
 
 describe('UnifiedBMADTool', () => {
   let fixture: TestFixture;
@@ -36,8 +55,19 @@ describe('UnifiedBMADTool', () => {
     // Create sample workflow files
     createWorkflowFile(fixture.tmpDir, 'core/workflows/party-mode/party-mode.xml', SAMPLE_WORKFLOW);
     createWorkflowFile(fixture.tmpDir, 'bmm/workflows/1-analysis/analysis.xml', SAMPLE_WORKFLOW);
+
+    const fs = require('fs');
+    const baseWorkflowDir = path.join(fixture.tmpDir, 'src', 'bmad');
+    fs.writeFileSync(
+      path.join(baseWorkflowDir, 'core', 'workflows', 'party-mode', 'instructions.md'),
+      '# Party Mode Instructions\n'
+    );
+    fs.writeFileSync(
+      path.join(baseWorkflowDir, 'bmm', 'workflows', '1-analysis', 'instructions.md'),
+      '# Analysis Workflow Instructions\n'
+    );
     
-    tool = new UnifiedBMADTool(fixture.tmpDir);
+  tool = createUnifiedTool(fixture.tmpDir);
   });
 
   afterEach(() => {
@@ -51,7 +81,7 @@ describe('UnifiedBMADTool', () => {
 
     it('should load manifests on initialization', () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      new UnifiedBMADTool(fixture.tmpDir);
+  createUnifiedTool(fixture.tmpDir);
       
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('UnifiedBMADTool initialized with')
@@ -301,7 +331,7 @@ describe('UnifiedBMADTool', () => {
       const manifestPath = emptyFixture.tmpDir + '/src/bmad/_cfg/agent-manifest.csv';
       require('fs').writeFileSync(manifestPath, 'name,displayName,title\n', 'utf-8');
       
-      const emptyTool = new UnifiedBMADTool(emptyFixture.tmpDir);
+  const emptyTool = createUnifiedTool(emptyFixture.tmpDir);
       const result = await emptyTool.execute('*list-agents');
       
       expect(result.success).toBe(true);
@@ -321,7 +351,7 @@ describe('UnifiedBMADTool', () => {
         'utf-8'
       );
       
-      const newTool = new UnifiedBMADTool(fixture.tmpDir);
+  const newTool = createUnifiedTool(fixture.tmpDir);
       const result = await newTool.execute('missing');
       
       expect(result.success).toBe(false);

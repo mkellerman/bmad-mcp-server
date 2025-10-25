@@ -28,51 +28,117 @@ npm run build
 
 ## Configuration
 
+The BMAD MCP server locates BMAD templates using this priority order:
+1. **Local project** – `./bmad` inside the current workspace
+2. **Command-line argument** – `node build/index.js /path/to/bmad`
+3. **Environment variable** – `BMAD_ROOT=/path/to/bmad`
+4. **User defaults** – `~/.bmad` (create with `bmad *init --user`)
+5. **Package defaults** – read-only templates bundled with the server
+
+Use `bmad *discover` to inspect which location is active, and `bmad *init --help` to copy templates into a writable directory.
+
 ### GitHub Copilot (VS Code)
 
-**Remote (recommended):**
+**Scenario 1: Remote installation (npx) - Workspace has `bmad/` folder**
+
+The server will automatically find the `bmad/` folder in your current workspace:
+
 ```json
 {
   "servers": {
     "bmad": {
       "command": "npx",
-      "args": ["git+https://github.com/mkellerman/bmad-mcp-server#v2-node", "bmad-mcp-server"]
+      "args": ["-y", "git+https://github.com/mkellerman/bmad-mcp-server#v2-node", "bmad-mcp-server"]
     }
   }
 }
 ```
 
-**Local:**
+**Scenario 2: Local installation - Working in the bmad-mcp-server repo**
 
-Auto-discovered when repository is open locally.
+When the MCP server repo is your workspace, the built-in `bmad/` directory is detected automatically. `BMAD_ROOT` is optional:
+
+```json
+{
+  "servers": {
+    "bmad": {
+      "command": "node",
+      "args": ["${workspaceFolder}/build/index.js"],
+      "env": {
+        "BMAD_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+**Scenario 3: Local installation - Workspace elsewhere**
+
+Point the locally-installed server to a different workspace:
+
+```json
+{
+  "servers": {
+    "bmad": {
+      "command": "node",
+      "args": ["/path/to/bmad-mcp-server/build/index.js"],
+      "env": {
+        "BMAD_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
 
 ### Claude Desktop / Cursor
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
-**Remote (recommended):**
+**Remote installation (npx) - Recommended**
+
 ```json
 {
   "mcpServers": {
     "bmad": {
       "command": "npx",
-      "args": ["git+https://github.com/mkellerman/bmad-mcp-server#v2-node", "bmad-mcp-server"]
+      "args": ["-y", "git+https://github.com/mkellerman/bmad-mcp-server#v2-node", "bmad-mcp-server"],
+      "env": {
+        "BMAD_ROOT": "/absolute/path/to/your/project"
+      }
     }
   }
 }
 ```
 
-**Local:**
+**Local installation**
+
 ```json
 {
   "mcpServers": {
     "bmad": {
       "command": "node",
-      "args": ["/absolute/path/to/bmad-mcp-server/build/index.js"]
+      "args": ["/absolute/path/to/bmad-mcp-server/build/index.js"],
+      "env": {
+        "BMAD_ROOT": "/absolute/path/to/your/project"
+      }
     }
   }
 }
 ```
+
+**Note**: Claude Desktop's working directory may be undefined (like `/` on macOS), so always use:
+- Absolute paths for the server command
+- `BMAD_ROOT` or a project-level `bmad/` directory to specify your BMAD location
+
+### Initialize Templates (optional)
+
+Run the MCP server and execute one of the following commands:
+
+- `bmad *init --project` → Copy templates into your current workspace (`./bmad`)
+- `bmad *init --user` → Copy templates into `~/.bmad` for reuse across projects
+- `bmad *init <path>` → Copy templates into a shared or custom location
+
+After initialization, restart your MCP client or reconnect the server, then run `bmad *discover` to verify the active location.
 
 ## Development
 

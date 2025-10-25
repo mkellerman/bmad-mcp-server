@@ -36,14 +36,24 @@ export class PathTraversalError extends FileReadError {
  * Prevents path traversal attacks and unauthorized file access.
  */
 export class FileReader {
-  private bmadRoot: string;
+  private primaryRoot: string;
+  private roots: string[];
 
-  constructor(bmadRoot: string) {
-    this.bmadRoot = path.resolve(bmadRoot);
+  constructor(bmadRoot: string | string[]) {
+    if (Array.isArray(bmadRoot)) {
+      const resolved = bmadRoot.map(root => path.resolve(root));
+      this.primaryRoot = resolved[0];
+      this.roots = resolved;
+    } else {
+      this.primaryRoot = path.resolve(bmadRoot);
+      this.roots = [this.primaryRoot];
+    }
 
-    // Validate BMAD root exists
-    if (!fs.existsSync(this.bmadRoot)) {
-      console.warn(`BMAD root directory not found: ${this.bmadRoot}`);
+    // Validate BMAD roots exist
+    for (const root of this.roots) {
+      if (!fs.existsSync(root)) {
+        console.warn(`BMAD root directory not found: ${root}`);
+      }
     }
   }
 
@@ -56,32 +66,30 @@ export class FileReader {
    * @throws FileReadError if file doesn't exist or can't be read
    */
   readFile(filePath: string): string {
-    // Resolve the path (handles relative paths, symlinks, .., etc.)
-    const resolvedPath = this.resolvePath(filePath);
+    const lastErrors: Error[] = [];
 
-    // Validate path is within BMAD root
-    this.validatePath(resolvedPath);
+    for (const root of this.roots) {
+      try {
+        const resolvedPath = this.resolvePath(root, filePath);
+        this.validatePath(root, resolvedPath);
 
-    // Read file
-    try {
-      const content = fs.readFileSync(resolvedPath, 'utf-8');
-      console.log(`Read ${content.length} bytes from ${resolvedPath}`);
-      return content;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        const errorMsg = `File not found: ${filePath}`;
-        console.error(errorMsg);
-        throw new FileReadError(errorMsg);
-      } else if (error.code === 'EACCES') {
-        const errorMsg = `Permission denied reading file: ${filePath}`;
-        console.error(errorMsg);
-        throw new FileReadError(errorMsg);
-      } else {
-        const errorMsg = `Error reading file ${filePath}: ${error.message}`;
-        console.error(errorMsg);
-        throw new FileReadError(errorMsg);
+        const content = fs.readFileSync(resolvedPath, 'utf-8');
+        console.log(`Read ${content.length} bytes from ${resolvedPath}`);
+        return content;
+      } catch (error: any) {
+        if (error instanceof PathTraversalError) {
+          throw error;
+        }
+        lastErrors.push(error);
       }
     }
+
+    const errorMsg = `File not found across BMAD roots: ${filePath}`;
+    console.error(errorMsg);
+    if (lastErrors.length > 0) {
+      lastErrors.forEach(err => console.error('  Cause:', err.message ?? err));
+    }
+    throw new FileReadError(errorMsg);
   }
 
   /**
@@ -91,13 +99,18 @@ export class FileReader {
    * @returns True if file exists and is within BMAD root, false otherwise
    */
   fileExists(filePath: string): boolean {
-    try {
-      const resolvedPath = this.resolvePath(filePath);
-      this.validatePath(resolvedPath);
-      return fs.existsSync(resolvedPath);
-    } catch {
-      return false;
+    for (const root of this.roots) {
+      try {
+        const resolvedPath = this.resolvePath(root, filePath);
+        this.validatePath(root, resolvedPath);
+        if (fs.existsSync(resolvedPath)) {
+          return true;
+        }
+      } catch {
+        // Ignore and continue to next root
+      }
     }
+    return false;
   }
 
   /**
@@ -107,14 +120,12 @@ export class FileReader {
    * @param filePath Path to resolve
    * @returns Absolute resolved path
    */
-  private resolvePath(filePath: string): string {
-    // If path is already absolute, use it
+  private resolvePath(root: string, filePath: string): string {
     if (path.isAbsolute(filePath)) {
       return path.resolve(filePath);
     }
 
-    // Otherwise, resolve relative to BMAD root
-    return path.resolve(this.bmadRoot, filePath);
+    return path.resolve(root, filePath);
   }
 
   /**
@@ -124,15 +135,15 @@ export class FileReader {
    * @param resolvedPath Absolute path to validate
    * @throws PathTraversalError if path is outside BMAD root
    */
-  private validatePath(resolvedPath: string): void {
+  private validatePath(root: string, resolvedPath: string): void {
     // Check if resolved path starts with BMAD root
     // Use path.relative to check if path escapes root
-    const relativePath = path.relative(this.bmadRoot, resolvedPath);
+    const relativePath = path.relative(root, resolvedPath);
 
     // If relative path starts with '..' or is absolute, it's outside root
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       const errorMsg =
-        `Path traversal detected: ${resolvedPath} is outside BMAD root ${this.bmadRoot}`;
+        `Path traversal detected: ${resolvedPath} is outside BMAD root ${root}`;
       console.error(errorMsg);
       throw new PathTraversalError(errorMsg);
     }

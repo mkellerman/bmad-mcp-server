@@ -10,6 +10,8 @@
  * in the tool description to understand how to route commands correctly.
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { ManifestLoader } from '../utils/manifest-loader.js';
 import { FileReader } from '../utils/file-reader.js';
@@ -21,6 +23,11 @@ import type {
   ParsedCommand,
   WorkflowContext,
 } from '../types/index.js';
+import {
+  detectManifestDirectory,
+  type BmadLocationInfo,
+  type BmadPathResolution,
+} from '../utils/bmad-path-resolver.js';
 
 // Validation patterns
 const AGENT_NAME_PATTERN = /^[a-z]+(-[a-z]+)*$/;
@@ -89,9 +96,25 @@ export class UnifiedBMADTool {
   private fileReader: FileReader;
   private agents: Agent[];
   private workflows: Workflow[];
+  private discovery: BmadPathResolution;
+  private packageBmadPath: string;
+  private userBmadPath: string;
+  private projectRoot: string;
+  private manifestDir: string;
 
-  constructor(bmadRoot: string) {
+  constructor(options: { bmadRoot: string; discovery: BmadPathResolution }) {
+    const { bmadRoot, discovery } = options;
+    this.discovery = discovery;
+    this.packageBmadPath = discovery.packageBmadPath;
+    this.userBmadPath = discovery.userBmadPath;
+    this.projectRoot = discovery.projectRoot;
+
     this.bmadRoot = path.resolve(bmadRoot);
+    const manifestDir = discovery.activeLocation.manifestDir;
+    if (!manifestDir) {
+      throw new Error('Active location missing manifest directory.');
+    }
+    this.manifestDir = manifestDir;
     this.manifestLoader = new ManifestLoader(this.bmadRoot);
     this.fileReader = new FileReader(this.bmadRoot);
 
@@ -131,6 +154,12 @@ export class UnifiedBMADTool {
     } else if (normalized === '*list-tasks') {
       console.log('Discovery command: list-tasks');
       return this.listTasks();
+    } else if (normalized === '*discover') {
+      console.log('Discovery command: discover');
+      return this.discover();
+    } else if (normalized.startsWith('*init')) {
+      console.log('Initialization command received');
+      return this.init(normalized);
     } else if (normalized === '*help') {
       console.log('Discovery command: help');
       return this.help();
@@ -633,6 +662,289 @@ export class UnifiedBMADTool {
     };
   }
 
+  private discover(): BMADToolResult {
+    const active = this.discovery.activeLocation;
+    const lines: string[] = [];
+
+    lines.push('# BMAD Discovery Report');
+    lines.push('');
+    lines.push(`Active Location: ${active.displayName}`);
+    lines.push(`- Priority: ${active.priority}`);
+    lines.push(`- Path: ${this.formatLocationPath(active)}`);
+    lines.push(`- Status: ${this.formatLocationStatus(active)}`);
+
+    const activeStats = this.getLocationStats(active);
+    if (activeStats) {
+      lines.push(
+        `- Catalog: ${activeStats.agents} agents, ` +
+        `${activeStats.workflows} workflows, ${activeStats.tasks} tasks`
+      );
+    }
+
+    lines.push('');
+    lines.push('Locations (priority order):');
+
+    const sorted = [...this.discovery.locations].sort(
+      (a, b) => a.priority - b.priority
+    );
+
+    for (const location of sorted) {
+      const marker = location === active ? ' [active]' : '';
+      const status = this.formatLocationStatus(location);
+      const pathLine = this.formatLocationPath(location);
+      const stats = this.getLocationStats(location);
+      let summary = `${location.priority}. ${location.displayName}${marker} - ${status}`;
+      summary += ` - ${pathLine}`;
+      if (stats) {
+        summary += ` - ${stats.agents} agents / ${stats.workflows} workflows / ${stats.tasks} tasks`;
+      }
+      lines.push(summary);
+      if (location.details) {
+        lines.push(`   Notes: ${location.details}`);
+      }
+    }
+
+    lines.push('');
+    lines.push('To initialize a writable BMAD directory, run `bmad *init --help`.');
+
+    return {
+      success: true,
+      type: 'diagnostic',
+      content: lines.join('\n'),
+      data: {
+        activeLocation: active,
+        locations: sorted,
+      },
+      exitCode: 0,
+    };
+  }
+
+  private async init(command: string): Promise<BMADToolResult> {
+    const rawArgs = command.slice('*init'.length).trim();
+    const normalizedArgs = rawArgs.toLowerCase();
+
+    if (!rawArgs || normalizedArgs === '--project' || normalizedArgs === 'project') {
+      return this.performInitialization({ scope: 'project' });
+    }
+
+    if (normalizedArgs === '--user' || normalizedArgs === 'user') {
+      return this.performInitialization({ scope: 'user' });
+    }
+
+    if (normalizedArgs === '--help' || normalizedArgs === '-h' || normalizedArgs === 'help') {
+      return this.initHelp();
+    }
+
+    return this.performInitialization({ scope: 'custom', customPath: rawArgs });
+  }
+
+  private initHelp(): BMADToolResult {
+    const lines = [
+      '# BMAD Initialization',
+      '',
+      'Create a writable BMAD directory populated with the default templates.',
+      '',
+      'Usage:',
+  '- `bmad *init --project` -> Copy into the current workspace (`./bmad`)',
+  '- `bmad *init --user` -> Copy into the user directory (`~/.bmad`)',
+  '- `bmad *init <path>` -> Copy into a custom path',
+      '',
+      'Priority order for resolving BMAD content:',
+      '1. Local project (`./bmad`)',
+      '2. Command argument (when provided)',
+      '3. `BMAD_ROOT` environment variable',
+      '4. User defaults (`~/.bmad`)',
+      '5. Package defaults (read-only)',
+      '',
+      'After initialization, restart the BMAD MCP server or reconnect your client to load the new configuration.',
+    ];
+
+    return {
+      success: true,
+      type: 'help',
+      content: lines.join('\n'),
+      exitCode: 0,
+    };
+  }
+
+  private performInitialization(options: { scope: 'project' | 'user' | 'custom'; customPath?: string }): BMADToolResult {
+    const source = this.packageBmadPath;
+
+    if (!fs.existsSync(source)) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: `Package BMAD templates not found at ${source}. Reinstall the server to restore templates.`,
+      };
+    }
+
+    const target = this.resolveInitTarget(options);
+    if (!target) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: 'Initialization aborted: unable to determine target directory.',
+      };
+    }
+
+    const existingManifest = detectManifestDirectory(target);
+    if (existingManifest) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: `BMAD already initialized at ${existingManifest.resolvedRoot}. Remove it before running *init again.`,
+      };
+    }
+
+    if (fs.existsSync(target)) {
+      const stats = fs.statSync(target);
+      if (!stats.isDirectory()) {
+        return {
+          success: false,
+          exitCode: 1,
+          error: `Target path exists and is not a directory: ${target}`,
+        };
+      }
+
+      const contents = fs.readdirSync(target);
+      if (contents.length > 0) {
+        return {
+          success: false,
+          exitCode: 1,
+          error: `Target directory is not empty: ${target}. Choose an empty directory or remove existing files.`,
+        };
+      }
+    } else {
+      fs.mkdirSync(target, { recursive: true });
+    }
+
+    try {
+      this.copyBmadTemplate(source, target);
+    } catch (error: any) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: `Failed to copy BMAD templates: ${error.message ?? error}`,
+      };
+    }
+
+    const message = this.buildInitSuccessMessage(options.scope, target);
+
+    return {
+      success: true,
+      type: 'init',
+      content: message,
+      exitCode: 0,
+    };
+  }
+
+  private resolveInitTarget(options: { scope: 'project' | 'user' | 'custom'; customPath?: string }): string | undefined {
+    if (options.scope === 'project') {
+      return path.join(this.projectRoot, 'bmad');
+    }
+
+    if (options.scope === 'user') {
+      return this.userBmadPath;
+    }
+
+    if (options.customPath) {
+      const expanded = this.expandHomePath(options.customPath);
+      return path.resolve(expanded);
+    }
+
+    return undefined;
+  }
+
+  private expandHomePath(input: string): string {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      return trimmed;
+    }
+
+    if (trimmed === '~') {
+      return os.homedir();
+    }
+
+    if (trimmed.startsWith('~/')) {
+      return path.join(os.homedir(), trimmed.slice(2));
+    }
+
+    if (trimmed.startsWith('~')) {
+      return path.join(os.homedir(), trimmed.slice(1));
+    }
+
+    return trimmed;
+  }
+
+  private copyBmadTemplate(source: string, destination: string): void {
+    const entries = fs.readdirSync(source, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const sourcePath = path.join(source, entry.name);
+      const destinationPath = path.join(destination, entry.name);
+
+      if (entry.isDirectory()) {
+        fs.mkdirSync(destinationPath, { recursive: true });
+        this.copyBmadTemplate(sourcePath, destinationPath);
+      } else {
+        fs.copyFileSync(sourcePath, destinationPath, fs.constants.COPYFILE_EXCL);
+      }
+    }
+  }
+
+  private buildInitSuccessMessage(scope: 'project' | 'user' | 'custom', target: string): string {
+    const lines: string[] = [];
+    lines.push('# BMAD Templates Copied');
+    lines.push('');
+    lines.push(`Scope: ${scope}`);
+    lines.push(`Location: ${target}`);
+    lines.push('');
+    lines.push('Customize agents, workflows, and tasks in this directory.');
+    lines.push('');
+    if (scope === 'project') {
+      lines.push('This project BMAD directory overrides user and package defaults.');
+      lines.push('Consider adding `bmad/` to `.gitignore` if these templates should remain local.');
+    } else if (scope === 'user') {
+      lines.push('User templates apply when no project or environment override is present.');
+    } else {
+      lines.push('Set `BMAD_ROOT` to this path to use the custom templates:');
+      lines.push(`export BMAD_ROOT=${target}`);
+    }
+    lines.push('');
+    lines.push('After making changes, restart the BMAD MCP server or reconnect your client.');
+    lines.push('Run `bmad *discover` to verify the active location.');
+    lines.push('');
+  lines.push('Priority order: project -> command argument -> BMAD_ROOT -> user -> package');
+
+    return lines.join('\n');
+  }
+
+  private getLocationStats(location: BmadLocationInfo): { agents: number; workflows: number; tasks: number } | undefined {
+    if (location.status !== 'valid' || !location.resolvedRoot) {
+      return undefined;
+    }
+
+    try {
+      const loader = new ManifestLoader(location.resolvedRoot);
+      return {
+        agents: loader.loadAgentManifest().length,
+        workflows: loader.loadWorkflowManifest().length,
+        tasks: loader.loadTaskManifest().length,
+      };
+    } catch (error) {
+      console.warn(`Unable to load manifests for ${location.resolvedRoot}:`, error);
+      return undefined;
+    }
+  }
+
+  private formatLocationPath(location: BmadLocationInfo): string {
+    return location.resolvedRoot ?? location.originalPath ?? 'not configured';
+  }
+
+  private formatLocationStatus(location: BmadLocationInfo): string {
+    return location.status.toUpperCase();
+  }
+
   /**
    * Show help and command reference.
    */
@@ -659,6 +971,8 @@ export class UnifiedBMADTool {
       '- `bmad *list-agents` → Show all available agents',
       '- `bmad *list-workflows` → Show all available workflows',
       '- `bmad *list-tasks` → Show all available tasks',
+  '- `bmad *discover` → Inspect available BMAD locations and resolution order',
+  '- `bmad *init --help` → Initialize writable BMAD templates',
       '- `bmad *help` → Show this help message\n',
       '## Quick Start',
       '1. **Discover agents:** `bmad *list-agents`',
@@ -768,7 +1082,7 @@ export class UnifiedBMADTool {
       bmadServerRoot: this.bmadRoot,
       projectRoot: this.bmadRoot,
       mcpResources: this.bmadRoot,
-      agentManifestPath: path.join(this.bmadRoot, 'bmad', '_cfg', 'agent-manifest.csv'),
+      agentManifestPath: path.join(this.manifestDir, 'agent-manifest.csv'),
       agentManifestData: this.agents,
       agentCount: this.agents.length,
     };
