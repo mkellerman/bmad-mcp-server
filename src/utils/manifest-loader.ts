@@ -107,7 +107,7 @@ export class ManifestLoader {
         Object.values(row as Record<string, unknown>).some(
           (value) => String(value).trim() !== '',
         ),
-      );
+      ) as T[];
 
       console.error(`Loaded ${filtered.length} entries from ${filename}`);
       return filtered;

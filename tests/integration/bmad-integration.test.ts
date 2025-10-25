@@ -3,9 +3,11 @@
  * Tests the full workflow from command to response
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import path from 'node:path';
 import { BMADMCPServer } from '../../src/server.js';
 import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
+import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
 import {
   createTestFixture,
   createBMADStructure,
@@ -50,12 +52,35 @@ describe('BMAD MCP Server Integration', () => {
     );
     createWorkflowFile(
       fixture.tmpDir,
+      'core/workflows/party-mode/instructions.md',
+      '# Party Mode Instructions\n\nLet\'s party!',
+    );
+    createWorkflowFile(
+      fixture.tmpDir,
       'bmm/workflows/1-analysis/analysis.xml',
       SAMPLE_WORKFLOW,
     );
+    createWorkflowFile(
+      fixture.tmpDir,
+      'bmm/workflows/1-analysis/instructions.md',
+      '# Analysis Instructions\n\nAnalyze the requirements.',
+    );
 
-    server = new BMADMCPServer(fixture.tmpDir);
-    tool = new UnifiedBMADTool(fixture.tmpDir);
+    const discovery = resolveBmadPaths({
+      cwd: fixture.tmpDir,
+      packageRoot: fixture.tmpDir,
+      cliArg: undefined,
+      envVar: undefined,
+      userBmadPath: path.join(fixture.tmpDir, '.bmad'),
+    });
+
+    server = new BMADMCPServer(fixture.tmpDir, discovery);
+    
+    const root = discovery.activeLocation.resolvedRoot ?? fixture.tmpDir;
+    tool = new UnifiedBMADTool({
+      bmadRoot: root,
+      discovery,
+    });
   });
 
   afterEach(() => {

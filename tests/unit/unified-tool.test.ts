@@ -8,8 +8,8 @@ import {
   expect,
   beforeEach,
   afterEach,
-  jest,
-} from '@jest/globals';
+  vi,
+} from 'vitest';
 import path from 'node:path';
 import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
 import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
@@ -115,7 +115,7 @@ describe('UnifiedBMADTool', () => {
     });
 
     it('should load manifests on initialization', () => {
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       createUnifiedTool(fixture.tmpDir);

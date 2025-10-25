@@ -153,49 +153,20 @@ After initialization, restart your MCP client or reconnect the server, then run 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Run in development mode (with tsx)
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm test
-
-# Run E2E tests
-npm run test:e2e
-
-# Start E2E test environment (LiteLLM proxy)
-npm run e2e:start
-
-# Stop E2E test environment
-npm run e2e:stop
-
-# View E2E environment logs
-npm run e2e:logs
-
-# Lint code
-npm run lint
-
-# Auto-fix linting issues
-npm run lint:fix
-
-# Format code
-npm run format
+npm install              # Install dependencies
+npm run dev              # Run in development mode (tsx)
+npm run build            # Build for production
+npm test                 # Run tests (131 passing)
+npm run test:coverage    # With coverage report
+npm run lint:fix         # Auto-fix linting
+npm run format           # Format code
 ```
+
+See `tests/README.md` for comprehensive testing documentation including LLM-powered E2E tests.
 
 ### Pre-commit Hooks
 
-This project uses [Husky](https://typicode.github.io/husky/) to automatically run linting and formatting before each commit:
-
-- **Auto-fix**: ESLint will automatically fix issues where possible
-- **Format**: Prettier will format all staged files
-- **Run manually**: `npm run precommit`
-
-The pre-commit hook runs `npm run precommit`, which executes `lint:fix` and `format`.
+Husky runs linting and formatting automatically before each commit. Run manually with `npm run precommit`.
 
 ## Contributor Guide
 

@@ -8,8 +8,8 @@ import {
   expect,
   beforeEach,
   afterEach,
-  jest,
-} from '@jest/globals';
+  vi,
+} from 'vitest';
 import {
   FileReader,
   FileReadError,
@@ -50,7 +50,7 @@ describe('FileReader', () => {
     });
 
     it('should warn if BMAD root does not exist', () => {
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, 'warn')
         .mockImplementation(() => {});
       const nonExistentPath = path.join(fixture.tmpDir, 'nonexistent');
@@ -110,7 +110,7 @@ describe('FileReader', () => {
     });
 
     it('should log successful reads', () => {
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       const testFile = path.join(fixture.tmpDir, 'src', 'bmad', 'test.txt');
