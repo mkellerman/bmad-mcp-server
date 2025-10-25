@@ -11,6 +11,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { ManifestLoader } from './utils/manifest-loader.js';
 import { resolveBmadPaths, } from './utils/bmad-path-resolver.js';
 import { UnifiedBMADTool } from './tools/unified-tool.js';
@@ -394,6 +395,17 @@ export async function main() {
     const cliArg = process.argv.length > 2 ? process.argv[2] : undefined;
     const envVar = process.env.BMAD_ROOT;
     const userBmadPath = path.join(os.homedir(), '.bmad');
+    // Read version from package.json
+    let version = 'unknown';
+    try {
+        const packageJsonPath = path.join(packageRoot, 'package.json');
+        const packageJsonContent = readFileSync(packageJsonPath, 'utf-8');
+        const packageJson = JSON.parse(packageJsonContent);
+        version = packageJson.version ?? 'unknown';
+    }
+    catch {
+        // Silently fall back to 'unknown' if package.json can't be read
+    }
     const discovery = resolveBmadPaths({
         cwd,
         cliArg,
@@ -405,6 +417,7 @@ export async function main() {
     if (!activeRoot) {
         throw new Error('Unable to determine active BMAD root');
     }
+    console.error(`BMAD MCP Server v${version}`);
     console.error('Starting BMAD MCP Server...');
     console.error(`Active BMAD location (${discovery.activeLocation.displayName}): ${activeRoot}`);
     try {
