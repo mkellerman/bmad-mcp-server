@@ -36,10 +36,10 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-      - name: Run unit tests
+      - name: Run tests
         env:
           CI: true
-        run: npm run test -- --ci --runInBand
+        run: npm test
 
       - name: Build package
         run: npm run build

@@ -53,16 +53,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Jest
+      - name: Run tests
         env:
           CI: true
-        run: npm run test -- --ci --runInBand --coverage
+        run: npm run test:coverage
 
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: coverage-jest
+          name: coverage-vitest
           path: coverage/
           if-no-files-found: ignore
 
