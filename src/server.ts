@@ -271,7 +271,7 @@ The tool provides helpful suggestions if you:
               command: {
                 type: 'string',
                 description:
-                  "Command to execute: empty string for default, 'agent-name' for agents, '*workflow-name' for workflows",
+                  'Command to execute: empty string for default, \'agent-name\' for agents, \'*workflow-name\' for workflows',
               },
             },
             required: ['command'],
@@ -342,7 +342,7 @@ The tool provides helpful suggestions if you:
           const context = result.context;
           responseParts.push('## Workflow Context\n');
           responseParts.push(
-            "**MCP Server Resources (use these, not user's workspace):**\n",
+            '**MCP Server Resources (use these, not user\'s workspace):**\n',
           );
           responseParts.push(`- MCP Server Root: \`${context.mcpResources}\``);
           responseParts.push(
@@ -353,7 +353,7 @@ The tool provides helpful suggestions if you:
             '**NOTE:** All `{mcp-resources}` references in this workflow point to the MCP server,',
           );
           responseParts.push(
-            "not the user's workspace. Use the Agent Roster data provided below.\n",
+            'not the user\'s workspace. Use the Agent Roster data provided below.\n',
           );
 
           // Include agent manifest data inline
