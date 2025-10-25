@@ -65,17 +65,11 @@ export class BMADMCPServer {
     console.log(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
 
     // Validate BMAD installation - handle both project root and bmad directory
-    // Priority: src/bmad/_cfg (new location) > bmad/_cfg (legacy)
     let manifestDir: string;
-    const srcBmadManifests = path.join(this.bmadRoot, 'src', 'bmad', '_cfg');
     const bmadManifests = path.join(this.bmadRoot, 'bmad', '_cfg');
     const directManifests = path.join(this.bmadRoot, '_cfg');
     
-    if (fs.existsSync(srcBmadManifests)) {
-      // Repository root - manifests are under src/bmad/_cfg
-      manifestDir = srcBmadManifests;
-      this.projectRoot = this.bmadRoot;
-    } else if (fs.existsSync(bmadManifests)) {
+    if (fs.existsSync(bmadManifests)) {
       // Project root - bmad_root points to project, manifests in bmad/_cfg
       manifestDir = bmadManifests;
       this.projectRoot = this.bmadRoot;
@@ -84,10 +78,8 @@ export class BMADMCPServer {
       manifestDir = directManifests;
       this.projectRoot = path.dirname(this.bmadRoot);
     } else {
-      throw new Error(`BMAD manifest directory not found in ${srcBmadManifests}, ${bmadManifests}, or ${directManifests}`);
-    }
-
-    console.log(`Project root: ${this.projectRoot}`);
+      throw new Error(`BMAD manifest directory not found in ${bmadManifests} or ${directManifests}`);
+    }    console.log(`Project root: ${this.projectRoot}`);
     console.log(`Manifest directory: ${manifestDir}`);
 
     // Initialize components

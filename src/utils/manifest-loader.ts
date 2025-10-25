@@ -24,16 +24,12 @@ export class ManifestLoader {
 
   constructor(bmadRoot: string) {
     this.bmadRoot = path.resolve(bmadRoot);
-    // Try src/bmad/_cfg first (new location), then fall back to bmad/_cfg (old location)
-    const srcBmadPath = path.join(this.bmadRoot, 'src', 'bmad', '_cfg');
     const bmadPath = path.join(this.bmadRoot, 'bmad', '_cfg');
     
-    if (fs.existsSync(srcBmadPath)) {
-      this.manifestDir = srcBmadPath;
-    } else if (fs.existsSync(bmadPath)) {
+    if (fs.existsSync(bmadPath)) {
       this.manifestDir = bmadPath;
     } else {
-      throw new Error(`BMAD manifest directory not found at ${srcBmadPath} or ${bmadPath}`);
+      throw new Error(`BMAD manifest directory not found at ${bmadPath}`);
     }
   }
 
