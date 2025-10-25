@@ -1,0 +1,83 @@
+# Test Suite: Agent Loading
+# Validates that LLM can successfully load BMAD agents through tool calling
+
+test_suite: "Agent Loading Tests"
+description: "Validate BMAD agent loading functionality via LLM tool calls"
+
+config:
+  llm_model: "gpt-4.1"
+  temperature: 0.1
+  timeout: 30000
+  judge_model: "gpt-4.1"
+  judge_threshold: 0.8
+
+tests:
+  - id: "agent-001"
+    name: "Load Business Analyst Agent"
+    prompt: |
+      You have access to a BMAD MCP tool called 'bmad' that can load different AI agents.
+      
+      User request: "I need help with business analysis. Load the analyst agent."
+      
+      Use the bmad tool with command "analyst" to load the Business Analyst agent.
+    
+    expectations:
+      - type: "contains"
+        value: "analyst"
+        case_sensitive: false
+        description: "Should reference the analyst command or agent"
+      
+      - type: "response_length"
+        min: 10
+        max: 500
+        description: "Response should be concise"
+      
+      # TODO: LLM Judge validation - Work in Progress
+      # - type: "llm_judge"
+      #   criteria: |
+      #     Evaluate if the response shows intent to load or use the analyst agent for business analysis help.
+      #     The response should be coherent and relevant to loading a business analyst tool or agent.
+      #   threshold: 0.7
+
+  - id: "agent-002"
+    name: "Load Test Architect Agent"
+    prompt: |
+      You have access to a BMAD MCP tool called 'bmad'.
+      
+      User request: "I want to set up testing for my project. Load the tea agent."
+      
+      Call the bmad tool with command "tea" to load the Test Architect.
+    
+    expectations:
+      - type: "contains"
+        value: "tea"
+        case_sensitive: false
+        description: "Should reference the tea command"
+      
+      - type: "response_length"
+        min: 5
+        max: 300
+        description: "Response should be brief"
+
+  - id: "agent-003"
+    name: "Load System Architect Agent"
+    prompt: |
+      User says: "I need architecture design help. Load the architect agent."
+      
+      Use the bmad tool with command="architect" to load this agent.
+    
+    expectations:
+      - type: "contains"
+        value: "architect"
+        case_sensitive: false
+        description: "Should reference architect"
+      
+      - type: "not_contains"
+        value: "error"
+        case_sensitive: false
+        description: "Should not contain errors"
+      
+      - type: "response_length"
+        min: 10
+        max: 500
+        description: "Response should be concise"

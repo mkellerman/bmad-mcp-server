@@ -19,8 +19,11 @@ dist/
 coverage/
 .nyc_output/
 *.lcov
+test-results/
+playwright-report/
+test-output.log
 
-# Environment variables
+# Environment variables (legacy - not used with Docker setup)
 .env
 .env.local
 .env.development.local
@@ -80,3 +83,5 @@ temp/
 .yarn/install-state.gz
 .pnp.*
 pyproject.toml
+test-results/
+playwright-report/

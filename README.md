@@ -13,7 +13,14 @@ BMAD (Business Methodology for Agile Development) provides 11 specialist AI agen
 
 ## Installation
 
+### Quick Start (No Clone Required)
+
+Use directly from GitHub via `npx` - no installation needed!
+
+### Local Development
+
 ```bash
+git clone https://github.com/mkellerman/bmad-mcp-server.git
 cd bmad-mcp-server
 npm install
 npm run build
@@ -23,26 +30,49 @@ npm run build
 
 ### GitHub Copilot (VS Code)
 
-Auto-discovered when repository is open. Ensure MCP is enabled in Copilot settings.
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
+**Remote (recommended):**
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "bmad": {
-      "command": "node",
-      "args": ["/absolute/path/to/bmad-mcp-server/bmad-mcp-server/build/index.js"]
+      "command": "npx",
+      "args": ["git+https://github.com/mkellerman/bmad-mcp-server#v2-node", "bmad-mcp-server"]
     }
   }
 }
 ```
 
-### Cursor
+**Local:**
 
-Add to Cursor's MCP settings with same configuration as Claude Desktop.
+Auto-discovered when repository is open locally.
+
+### Claude Desktop / Cursor
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+**Remote (recommended):**
+```json
+{
+  "mcpServers": {
+    "bmad": {
+      "command": "npx",
+      "args": ["git+https://github.com/mkellerman/bmad-mcp-server#v2-node", "bmad-mcp-server"]
+    }
+  }
+}
+```
+
+**Local:**
+```json
+{
+  "mcpServers": {
+    "bmad": {
+      "command": "node",
+      "args": ["/absolute/path/to/bmad-mcp-server/build/index.js"]
+    }
+  }
+}
+```
 
 ## Development
 

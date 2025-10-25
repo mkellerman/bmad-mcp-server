@@ -1,59 +1,340 @@
-# BMAD MCP Server - Test Suite
+# BMAD MCP Server - Test Suite# BMAD MCP Server - Test Suite
 
-## Overview
 
-Comprehensive test suite for the BMAD MCP Server with **66 passing tests** covering all core functionality.
 
-## Test Coverage
+Comprehensive test suite with unit tests (Jest) and E2E tests (Playwright + LLM).## Overview
 
-- **90.28%** overall code coverage
-- **96.10%** utils coverage (FileReader, ManifestLoader)
-- **88.81%** tools coverage (UnifiedBMADTool)
 
-## Test Structure
 
-```
-tests/
-├── helpers/
-│   └── test-fixtures.ts          # Test utilities and fixtures
-├── unit/
-│   ├── file-reader.test.ts       # FileReader tests (19 tests) ✓
-│   ├── manifest-loader.test.ts   # ManifestLoader tests (18 tests) ✓
-│   └── unified-tool.test.ts      # UnifiedBMADTool tests (29 tests) ✓
-├── integration/
-│   └── bmad-integration.test.ts  # Integration tests (WIP)
-└── e2e/
-    └── (Future end-to-end tests)
-```
+## Quick StartComprehensive test suite for the BMAD MCP Server featuring:
 
-## Running Tests
+- **Unit Tests (Jest):** 66 passing tests with 90.28% coverage
+
+### Unit Tests- **E2E Tests (Playwright + LLM):** YAML-based LLM-powered integration tests
 
 ```bash
-# Run all tests
+
+npm test                    # Run all unit tests## Test Coverage
+
+npm test -- --coverage      # With coverage report
+
+```- **90.28%** overall code coverage
+
+- **96.10%** utils coverage (FileReader, ManifestLoader)
+
+### E2E Tests- **88.81%** tools coverage (UnifiedBMADTool)
+
+
+
+**1. Start LiteLLM Proxy**## Test Structure
+
+```bash
+
+docker-compose up -d        # Start in background```
+
+npm run litellm:docker:health  # Verify healthytests/
+
+```├── e2e/                          # LLM-powered E2E tests (NEW!)
+
+│   ├── framework/                # Test execution engine
+
+**2. Run Tests**│   │   ├── llm-client.ts         # LiteLLM proxy client
+
+```bash│   │   ├── yaml-loader.ts        # YAML test parser
+
+npm run test:e2e           # Run all E2E tests│   │   ├── validators.ts         # Validation strategies
+
+npm run test:e2e:ui        # Interactive UI mode│   │   └── runner.spec.ts        # Playwright test runner
+
+npm run test:report        # View HTML report│   └── test-cases/               # YAML test definitions (QA writes these!)
+
+```│       ├── agent-loading.yaml    # Agent loading tests
+
+│       ├── discovery-commands.yaml # Discovery command tests
+
+**3. Stop Proxy**│       └── error-handling.yaml   # Error handling tests
+
+```bash├── support/
+
+docker-compose down        # Stop and remove container│   └── litellm-config.yaml       # LiteLLM proxy configuration
+
+```├── helpers/
+
+│   └── test-fixtures.ts          # Test utilities and fixtures
+
+> **Authentication**: Uses GitHub Copilot via `~/.config/litellm` volume mount. No API keys needed!├── unit/
+
+│   ├── file-reader.test.ts       # FileReader tests (19 tests) ✓
+
+## Test Coverage│   ├── manifest-loader.test.ts   # ManifestLoader tests (18 tests) ✓
+
+│   └── unified-tool.test.ts      # UnifiedBMADTool tests (29 tests) ✓
+
+Current status: **90.33% coverage** (91/91 tests passing)└── integration/
+
+    └── bmad-integration.test.ts  # Integration tests (WIP)
+
+| Component | Coverage | Tests |```
+
+|-----------|----------|-------|
+
+| Utils | 96.10% | 19 ✓ |## Running Tests
+
+| Tools | 88.81% | 29 ✓ |
+
+| Server | 85.71% | 43 ✓ |### Unit Tests (Jest)
+
+| **Total** | **90.33%** | **91 ✓** |
+
+```bash
+
+## Test Structure# Run all unit tests
+
 npm test
 
-# Run with coverage
-npm test -- --coverage
-
-# Run specific test file
-npm test -- tests/unit/file-reader.test.ts
-
-# Run in watch mode
-npm test -- --watch
 ```
+
+tests/# Run with coverage
+
+├── unit/                       # Jest unit testsnpm test -- --coverage
+
+│   ├── file-reader.test.ts    # 19 tests ✓
+
+│   ├── manifest-loader.test.ts # 18 tests ✓# Run specific test file
+
+│   └── unified-tool.test.ts    # 29 tests ✓npm test -- tests/unit/file-reader.test.ts
+
+├── e2e/                        # Playwright E2E tests
+
+│   ├── framework/              # Test engine# Run in watch mode
+
+│   │   ├── llm-client.ts      # LiteLLM clientnpm test -- --watch
+
+│   │   ├── yaml-loader.ts     # Test parser```
+
+│   │   ├── validators.ts      # Validation logic
+
+│   │   └── runner.spec.ts     # Test runner### E2E Tests (Playwright + LLM)
+
+│   └── test-cases/             # YAML test definitions
+
+│       ├── agent-loading.yaml**Prerequisites:** LiteLLM proxy must be running
+
+│       ├── discovery-commands.yaml
+
+│       └── error-handling.yaml```bash
+
+└── support/# 1. Start LiteLLM proxy (separate terminal)
+
+    └── litellm-config.yaml     # LiteLLM config (gpt-4.1)npm run litellm:start
+
+```
+
+# 2. Run E2E tests
+
+## Writing E2E Testsnpm run test:e2e              # Run all E2E tests
+
+npm run test:e2e:ui           # Run with Playwright UI
+
+Create a YAML file in `tests/e2e/test-cases/`:npm run test:e2e:headed       # Run in headed mode
+
+npm run test:e2e:debug        # Debug mode
+
+```yamlnpm run test:report           # View test report
+
+test_suite: "My Tests"```
+
+description: "Test description"
+
+## E2E Test Framework (NEW!)
+
+config:
+
+  llm_model: "gpt-4.1"### Architecture
+
+  temperature: 0.1
+
+  timeout: 30000The E2E framework uses **real LLMs** to test the BMAD MCP server:
+
+
+
+tests:1. **QA writes tests in YAML** (no coding required)
+
+  - id: "test-001"2. **Framework sends prompts to LLM** (via LiteLLM proxy)
+
+    name: "Test name"3. **LLM calls MCP tools** (bmad agent loading, workflows)
+
+    prompt: |4. **Validators check responses** (contains, regex, LLM judge)
+
+      You have a bmad tool.
+
+      User request: "Load analyst agent"### Writing E2E Tests
+
+    
+
+    expectations:Create YAML files in `tests/e2e/test-cases/`:
+
+      - type: "contains"
+
+        value: "analyst"```yaml
+
+        case_sensitive: falsetest_suite: "My Test Suite"
+
+      description: "What this tests"
+
+      - type: "response_length"
+
+        min: 10config:
+
+        max: 1000  llm_model: "gpt-4"
+
+```  temperature: 0.1
+
+  timeout: 30000
+
+### Available Validators  judge_model: "claude-3-5-sonnet"
+
+  judge_threshold: 0.8
+
+| Type | Description | Example |
+
+|------|-------------|---------|tests:
+
+| `contains` | String matching | `value: "analyst"` |  - id: "test-001"
+
+| `not_contains` | String absence | `value: "error"` |    name: "My test case"
+
+| `regex` | Pattern matching | `pattern: "bmad.*"` |    prompt: |
+
+| `response_length` | Length bounds | `min: 10, max: 500` |      You have a bmad tool.
+
+      User: "Load the analyst agent"
+
+> **Note**: LLM Judge validator is experimental (see `LLM-JUDGE-WIP.md`)    
+
+    expectations:
+
+## Docker Commands      - type: "contains"
+
+        value: "Mary"
+
+```bash      
+
+# Start proxy      - type: "llm_judge"
+
+docker-compose up -d        criteria: |
+
+npm run litellm:docker:start          Check if response introduces Mary
+
+          and shows a clear menu
+
+# Check health        threshold: 0.85
+
+npm run litellm:docker:health```
+
+curl http://localhost:4000/health/readiness
+
+### Validation Types
+
+# View logs
+
+docker logs -f litellm-proxy| Type | Description | Example |
+
+npm run litellm:docker:logs|------|-------------|---------|
+
+| `contains` | String must be in response | `value: "Mary"` |
+
+# Stop proxy| `not_contains` | String must NOT be in response | `value: "error"` |
+
+docker-compose down| `regex` | Regex pattern match | `pattern: "\\*\\w+"` |
+
+npm run litellm:docker:stop| `response_length` | Length within range | `min: 100, max: 5000` |
+
+```| `llm_judge` | LLM evaluates quality | `criteria: "Clear menu"` |
+
+
+
+## Troubleshooting### LLM Judge
+
+
+
+**Proxy not running:****LLM Judge** uses AI to evaluate response quality:
+
+```bash- Sends response + criteria to LLM (claude-3-5-sonnet)
+
+docker ps | grep litellm        # Check if container running- Returns pass/fail + confidence score (0.0-1.0)
+
+docker logs litellm-proxy       # View logs- Threshold-based validation (default 0.8)
+
+docker-compose restart          # Restart container- Perfect for qualitative checks (tone, clarity, completeness)
+
+```
+
+### Setup E2E Tests
+
+**Port 4000 in use:**
+
+```bash### Quick Start (Docker - Recommended)
+
+lsof -i :4000                   # Find process using port
+
+docker-compose down && docker-compose up -d1. **Start LiteLLM proxy:**
+
+```   ```bash
+
+   docker-compose up -d
+
+**Tests timeout:**   # or
+
+- Increase `timeout` in YAML config   npm run litellm:docker:start
+
+- Check LiteLLM logs for API errors   ```
+
+- Verify GitHub Copilot authentication
+
+2. **Run tests:**
+
+## CI/CD   ```bash
+
+   npm run test:e2e
+
+E2E tests are ready for CI/CD but require:   ```
+
+- Docker environment
+
+- GitHub Copilot authentication setup> **Note**: Authentication handled via `~/.config/litellm` volume mount. No API keys needed!
+
+- Dedicated test API key (optional)
+
+See `tests/DOCKER-SETUP.md` for detailed setup.
+
+## Documentation
 
 ## Test Categories
 
-### Unit Tests
+- `LLM-JUDGE-WIP.md` - LLM Judge validation (experimental, disabled)
+
+- `docker-compose.yml` - LiteLLM proxy configuration### Unit Tests
+
+- `playwright.config.ts` - Playwright settings
 
 #### FileReader Tests (19 tests)
-- ✅ Constructor and initialization
+
+## Models- ✅ Constructor and initialization
+
 - ✅ File reading (absolute/relative paths)
-- ✅ Path traversal protection
-- ✅ Symlink handling
-- ✅ Permission error handling
-- ✅ File existence checks
+
+Current setup uses:- ✅ Path traversal protection
+
+- **gpt-4.1** (github_copilot/gpt-4.1-2025-04-14)- ✅ Symlink handling
+
+- Authentication via `~/.config/litellm` volume mount- ✅ Permission error handling
+
+- No API keys required- ✅ File existence checks
+
 - ✅ Path validation
+
+To add other models, edit `tests/support/litellm-config.yaml`
 
 #### ManifestLoader Tests (18 tests)
 - ✅ Constructor with multiple directory structures
