@@ -123,8 +123,8 @@ export interface Prompt {
     updatedAt: Date;
 }
 
-export type Response<T> = {
+export interface Response<T> {
     success: boolean;
     data?: T;
     error?: string;
-};
+}

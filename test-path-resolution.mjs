@@ -116,7 +116,7 @@ async function runTest(test) {
           console.log(`   Missing expected pattern: ${test.expectedPattern}`);
         }
         if (!hasInitialized) {
-          console.log(`   Server did not initialize successfully`);
+          console.log('   Server did not initialize successfully');
         }
         console.log(`\n   Full output:\n${stderr}${stdout}`);
         if (test.cleanup) {

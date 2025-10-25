@@ -270,7 +270,7 @@ The tool provides helpful suggestions if you:
             properties: {
               command: {
                 type: 'string',
-                description: "Command to execute: empty string for default, 'agent-name' for agents, '*workflow-name' for workflows",
+                description: 'Command to execute: empty string for default, \'agent-name\' for agents, \'*workflow-name\' for workflows',
               },
             },
             required: ['command'],

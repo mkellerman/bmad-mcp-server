@@ -499,7 +499,7 @@ export class UnifiedBMADTool {
     // Agent markdown file
     const agentPath = agent.path;
     if (agentPath) {
-      contentParts.push(`## Agent Definition\n`);
+      contentParts.push('## Agent Definition\n');
       contentParts.push(`**File:** \`${agentPath}\`\n`);
 
       try {
@@ -520,7 +520,7 @@ export class UnifiedBMADTool {
     const module = agent.module || 'bmm';
     const customizePath = `bmad/_cfg/agents/${module}-${agentName}.customize.yaml`;
 
-    contentParts.push(`## Agent Customization\n`);
+    contentParts.push('## Agent Customization\n');
     contentParts.push(`**File:** \`${customizePath}\`\n`);
 
     try {
