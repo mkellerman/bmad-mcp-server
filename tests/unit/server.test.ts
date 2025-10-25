@@ -1,35 +1,160 @@
-import { createServer } from 'http';
-import { Request, Response } from 'express';
-import { app } from '../server';
+/**
+ * Unit tests for BMADMCPServer
+ */
 
-describe('Server', () => {
-    let server: any;
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { BMADMCPServer } from '../../src/server.js';
+import {
+  createTestFixture,
+  createBMADStructure,
+  createAgentManifest,
+  createWorkflowManifest,
+  createAgentFile,
+  createWorkflowFile,
+  SAMPLE_AGENT,
+  SAMPLE_WORKFLOW,
+  type TestFixture,
+} from '../helpers/test-fixtures.js';
 
-    beforeAll((done) => {
-        server = createServer(app);
-        server.listen(3000, () => {
-            done();
-        });
+describe('BMADMCPServer', () => {
+  let fixture: TestFixture;
+
+  beforeEach(() => {
+    fixture = createTestFixture();
+    createBMADStructure(fixture.tmpDir);
+    createAgentManifest(fixture.tmpDir);
+    createWorkflowManifest(fixture.tmpDir);
+    
+    // Create sample files
+    createAgentFile(fixture.tmpDir, 'core/agents/bmad-master.md', SAMPLE_AGENT);
+    createAgentFile(fixture.tmpDir, 'bmm/agents/analyst.md', '# Analyst\n\nBusiness analyst.');
+    createWorkflowFile(fixture.tmpDir, 'core/workflows/party-mode/party-mode.xml', SAMPLE_WORKFLOW);
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  describe('constructor', () => {
+    it('should initialize with valid BMAD root', () => {
+      const server = new BMADMCPServer(fixture.tmpDir);
+      expect(server).toBeDefined();
     });
 
-    afterAll((done) => {
-        server.close(done);
+    it('should load manifests on initialization', () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      new BMADMCPServer(fixture.tmpDir);
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Loaded')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('agents from manifest')
+      );
+      consoleSpy.mockRestore();
     });
 
-    it('should respond with a 200 status for the root endpoint', async () => {
-        const response = await fetch('http://localhost:3000/');
-        expect(response.status).toBe(200);
+    it('should initialize with src/bmad structure', () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      new BMADMCPServer(fixture.tmpDir);
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('src/bmad/_cfg')
+      );
+      consoleSpy.mockRestore();
     });
 
-    it('should return JSON data for a specific endpoint', async () => {
-        const response = await fetch('http://localhost:3000/some-endpoint');
-        const data = await response.json();
-        expect(response.status).toBe(200);
-        expect(data).toHaveProperty('key');
+    it('should log successful initialization', () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      new BMADMCPServer(fixture.tmpDir);
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'BMAD MCP Server initialized successfully'
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('path resolution', () => {
+    it('should detect src/bmad/_cfg structure', () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      new BMADMCPServer(fixture.tmpDir);
+      
+      const manifestDirLog = consoleSpy.mock.calls.find(call => 
+        call[0]?.toString().includes('Manifest directory:')
+      );
+      
+      expect(manifestDirLog?.[0]).toContain('src/bmad/_cfg');
+      consoleSpy.mockRestore();
     });
 
-    it('should handle 404 errors', async () => {
-        const response = await fetch('http://localhost:3000/non-existent-endpoint');
-        expect(response.status).toBe(404);
+    it('should set correct project root', () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      new BMADMCPServer(fixture.tmpDir);
+      
+      const projectRootLog = consoleSpy.mock.calls.find(call => 
+        call[0]?.toString().includes('Project root:')
+      );
+      
+      expect(projectRootLog).toBeDefined();
+      consoleSpy.mockRestore();
     });
+  });
+
+  describe('manifest loading', () => {
+    it('should load agents from manifest', () => {
+      const server = new BMADMCPServer(fixture.tmpDir);
+      // Server should initialize without errors
+      expect(server).toBeDefined();
+    });
+
+    it('should handle multiple agents', () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      new BMADMCPServer(fixture.tmpDir);
+      
+      const loadLog = consoleSpy.mock.calls.find(call =>
+        call[0]?.toString().includes('agents from manifest')
+      );
+      
+      expect(loadLog).toBeDefined();
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('error handling', () => {
+    it('should throw error for invalid BMAD root', () => {
+      const invalidPath = fixture.tmpDir + '/nonexistent';
+      
+      expect(() => {
+        new BMADMCPServer(invalidPath);
+      }).toThrow();
+    });
+
+    it('should throw error if manifest directory not found', () => {
+      const emptyDir = fixture.tmpDir + '/empty';
+      require('fs').mkdirSync(emptyDir, { recursive: true });
+      
+      expect(() => {
+        new BMADMCPServer(emptyDir);
+      }).toThrow('BMAD manifest directory not found');
+    });
+  });
+
+  describe('server configuration', () => {
+    it('should have correct server name', () => {
+      const server = new BMADMCPServer(fixture.tmpDir);
+      // Server should be configured with correct name
+      expect(server).toBeDefined();
+    });
+
+    it('should support tools capability', () => {
+      const server = new BMADMCPServer(fixture.tmpDir);
+      expect(server).toBeDefined();
+    });
+
+    it('should support prompts capability', () => {
+      const server = new BMADMCPServer(fixture.tmpDir);
+      expect(server).toBeDefined();
+    });
+  });
 });

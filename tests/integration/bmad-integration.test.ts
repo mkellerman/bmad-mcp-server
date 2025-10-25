@@ -1,0 +1,226 @@
+/**
+ * Integration tests for BMAD MCP Server
+ * Tests the full workflow from command to response
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { BMADMCPServer } from '../../src/server.js';
+import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
+import {
+  createTestFixture,
+  createBMADStructure,
+  createAgentManifest,
+  createWorkflowManifest,
+  createTaskManifest,
+  createAgentFile,
+  createWorkflowFile,
+  SAMPLE_AGENT,
+  SAMPLE_WORKFLOW,
+  type TestFixture,
+} from '../helpers/test-fixtures.js';
+
+describe('BMAD MCP Server Integration', () => {
+  let fixture: TestFixture;
+  let server: BMADMCPServer;
+  let tool: UnifiedBMADTool;
+
+  beforeEach(() => {
+    fixture = createTestFixture();
+    createBMADStructure(fixture.tmpDir);
+    createAgentManifest(fixture.tmpDir);
+    createWorkflowManifest(fixture.tmpDir);
+    createTaskManifest(fixture.tmpDir);
+    
+    // Create comprehensive test data
+    createAgentFile(fixture.tmpDir, 'core/agents/bmad-master.md', SAMPLE_AGENT);
+    createAgentFile(fixture.tmpDir, 'bmm/agents/analyst.md', '# Business Analyst\n\nRequirements expert.');
+    createAgentFile(fixture.tmpDir, 'bmm/agents/dev.md', '# Developer\n\nCode expert.');
+    createWorkflowFile(fixture.tmpDir, 'core/workflows/party-mode/party-mode.xml', SAMPLE_WORKFLOW);
+    createWorkflowFile(fixture.tmpDir, 'bmm/workflows/1-analysis/analysis.xml', SAMPLE_WORKFLOW);
+    
+    server = new BMADMCPServer(fixture.tmpDir);
+    tool = new UnifiedBMADTool(fixture.tmpDir);
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  describe('End-to-end agent loading', () => {
+    it('should load agent and return complete data', async () => {
+      const result = await tool.execute('analyst');
+      
+      expect(result.success).toBe(true);
+      expect(result.type).toBe('agent');
+      expect(result.agentName).toBe('analyst');
+      expect(result.displayName).toBe('Business Analyst');
+      expect(result.content).toContain('Requirements expert');
+    });
+
+    it('should load default agent on empty command', async () => {
+      const result = await tool.execute('');
+      
+      expect(result.success).toBe(true);
+      expect(result.agentName).toBe('bmad-master');
+    });
+
+    it('should handle sequential agent loads', async () => {
+      const result1 = await tool.execute('analyst');
+      expect(result1.success).toBe(true);
+      
+      const result2 = await tool.execute('dev');
+      expect(result2.success).toBe(true);
+      
+      const result3 = await tool.execute('bmad-master');
+      expect(result3.success).toBe(true);
+    });
+  });
+
+  describe('End-to-end workflow execution', () => {
+    it('should execute workflow and return complete data', async () => {
+      const result = await tool.execute('*party-mode');
+      
+      expect(result.success).toBe(true);
+      expect(result.type).toBe('workflow');
+      expect(result.name).toBe('party-mode');
+      expect(result.workflowYaml).toBeDefined();
+      expect(result.instructions).toBeDefined();
+    });
+
+    it('should execute multiple workflows', async () => {
+      const result1 = await tool.execute('*party-mode');
+      expect(result1.success).toBe(true);
+      
+      const result2 = await tool.execute('*analysis');
+      expect(result2.success).toBe(true);
+    });
+
+    it('should include workflow context', async () => {
+      const result = await tool.execute('*party-mode');
+      
+      expect(result.context).toBeDefined();
+      expect(result.context?.bmadServerRoot).toBeDefined();
+      expect(result.context?.agentManifestPath).toBeDefined();
+      expect(result.context?.agentCount).toBeGreaterThan(0);
+    });
+  });
+
+  describe('End-to-end discovery', () => {
+    it('should list all agents', async () => {
+      const result = await tool.execute('*list-agents');
+      
+      expect(result.success).toBe(true);
+      expect(result.count).toBeGreaterThan(0);
+      expect(result.content).toContain('bmad-master');
+      expect(result.content).toContain('analyst');
+      expect(result.content).toContain('dev');
+    });
+
+    it('should list all workflows', async () => {
+      const result = await tool.execute('*list-workflows');
+      
+      expect(result.success).toBe(true);
+      expect(result.count).toBeGreaterThan(0);
+      expect(result.content).toContain('party-mode');
+      expect(result.content).toContain('analysis');
+    });
+
+    it('should list all tasks', async () => {
+      const result = await tool.execute('*list-tasks');
+      
+      expect(result.success).toBe(true);
+      expect(result.count).toBeGreaterThan(0);
+      expect(result.content).toContain('daily-standup');
+      expect(result.content).toContain('retrospective');
+    });
+
+    it('should show help', async () => {
+      const result = await tool.execute('*help');
+      
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('BMAD MCP Server');
+    });
+  });
+
+  describe('Error handling integration', () => {
+    it('should handle invalid agent gracefully', async () => {
+      const result = await tool.execute('invalid-agent');
+      
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe('UNKNOWN_AGENT');
+      expect(result.error).toBeDefined();
+    });
+
+    it('should handle invalid workflow gracefully', async () => {
+      const result = await tool.execute('*invalid-workflow');
+      
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe('UNKNOWN_WORKFLOW');
+    });
+
+    it('should provide helpful suggestions', async () => {
+      const result = await tool.execute('analyt'); // Typo
+      
+      expect(result.success).toBe(false);
+      expect(result.suggestions).toBeDefined();
+      expect(result.suggestions?.length).toBeGreaterThan(0);
+    });
+
+    it('should reject dangerous commands', async () => {
+      const result = await tool.execute('agent; rm -rf /');
+      
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe('INVALID_CHARACTERS');
+    });
+  });
+
+  describe('Server and tool integration', () => {
+    it('should maintain consistency between server and tool', () => {
+      expect(server).toBeDefined();
+      expect(tool).toBeDefined();
+    });
+
+    it('should handle concurrent operations', async () => {
+      const promises = [
+        tool.execute('analyst'),
+        tool.execute('dev'),
+        tool.execute('*party-mode'),
+        tool.execute('*list-agents'),
+      ];
+      
+      const results = await Promise.all(promises);
+      
+      expect(results.every(r => r !== undefined)).toBe(true);
+      expect(results.filter(r => r.success).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Real-world scenarios', () => {
+    it('should support workflow -> agent -> workflow sequence', async () => {
+      const workflow1 = await tool.execute('*party-mode');
+      expect(workflow1.success).toBe(true);
+      
+      const agent = await tool.execute('analyst');
+      expect(agent.success).toBe(true);
+      
+      const workflow2 = await tool.execute('*analysis');
+      expect(workflow2.success).toBe(true);
+    });
+
+    it('should support discovery before execution', async () => {
+      const list = await tool.execute('*list-agents');
+      expect(list.success).toBe(true);
+      
+      const load = await tool.execute('analyst');
+      expect(load.success).toBe(true);
+    });
+
+    it('should handle error recovery', async () => {
+      const error = await tool.execute('invalid');
+      expect(error.success).toBe(false);
+      
+      const success = await tool.execute('analyst');
+      expect(success.success).toBe(true);
+    });
+  });
+});

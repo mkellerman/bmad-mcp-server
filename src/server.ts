@@ -16,14 +16,30 @@ import {
   Tool,
   TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Agent } from './types/index.js';
 import { ManifestLoader } from './utils/manifest-loader.js';
 import { UnifiedBMADTool } from './tools/unified-tool.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Compute __dirname - use import.meta.url when available (production)
+// Fall back to build directory for test environments
+function getDirname(): string {
+  try {
+    // @ts-ignore - import.meta.url not available in test environment
+    if (typeof import.meta !== 'undefined' && import.meta.url) {
+      // @ts-ignore
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch {
+    // Fall through to fallback
+  }
+  // Fallback for test environments - assume we're in build/
+  return path.join(process.cwd(), 'build');
+}
+
+const __dirname = getDirname();
 
 /**
  * MCP Server for BMAD methodology with unified tool interface.
@@ -49,18 +65,26 @@ export class BMADMCPServer {
     console.log(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
 
     // Validate BMAD installation - handle both project root and bmad directory
-    let manifestDir = path.join(this.bmadRoot, 'bmad', '_cfg');
-    if (manifestDir) {
-      // Project root - bmad_root points to project, manifests in bmad/_cfg
-      this.projectRoot = this.bmadRoot;
-    } else if (path.join(this.bmadRoot, 'src', 'bmad', '_cfg')) {
+    // Priority: src/bmad/_cfg (new location) > bmad/_cfg (legacy)
+    let manifestDir: string;
+    const srcBmadManifests = path.join(this.bmadRoot, 'src', 'bmad', '_cfg');
+    const bmadManifests = path.join(this.bmadRoot, 'bmad', '_cfg');
+    const directManifests = path.join(this.bmadRoot, '_cfg');
+    
+    if (fs.existsSync(srcBmadManifests)) {
       // Repository root - manifests are under src/bmad/_cfg
-      manifestDir = path.join(this.bmadRoot, 'src', 'bmad', '_cfg');
-      this.projectRoot = path.join(this.bmadRoot, 'src');
-    } else {
+      manifestDir = srcBmadManifests;
+      this.projectRoot = this.bmadRoot;
+    } else if (fs.existsSync(bmadManifests)) {
+      // Project root - bmad_root points to project, manifests in bmad/_cfg
+      manifestDir = bmadManifests;
+      this.projectRoot = this.bmadRoot;
+    } else if (fs.existsSync(directManifests)) {
       // BMAD directory - bmad_root points to bmad, manifests in _cfg
-      manifestDir = path.join(this.bmadRoot, '_cfg');
+      manifestDir = directManifests;
       this.projectRoot = path.dirname(this.bmadRoot);
+    } else {
+      throw new Error(`BMAD manifest directory not found in ${srcBmadManifests}, ${bmadManifests}, or ${directManifests}`);
     }
 
     console.log(`Project root: ${this.projectRoot}`);
