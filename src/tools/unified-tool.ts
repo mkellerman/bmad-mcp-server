@@ -128,7 +128,47 @@ export class UnifiedBMADTool {
     }
     this.manifestDir = manifestDir;
     this.manifestLoader = new ManifestLoader(this.bmadRoot);
-    this.fileReader = new FileReader(this.bmadRoot);
+
+    // Collect all BMAD roots for fallback file loading
+    // Priority order: project -> cli -> env -> user -> package
+    // Include ALL locations with resolved paths (even partial/invalid structures)
+    // to allow workspace files to override specific files without needing full BMAD structure
+    const validRoots: string[] = [];
+    
+    // Sort all locations by priority that have a resolved path (directory exists)
+    const sortedLocations = [...discovery.locations]
+      .filter((loc) => {
+        // Include if it has a resolvedRoot (valid or invalid structure)
+        // OR if it has an originalPath that exists (even if marked missing during discovery)
+        return loc.resolvedRoot ?? (loc.originalPath && fs.existsSync(loc.originalPath));
+      })
+      .sort((a, b) => a.priority - b.priority);
+    
+    for (const location of sortedLocations) {
+      const root = location.resolvedRoot ?? location.originalPath;
+      if (root && !validRoots.includes(root)) {
+        validRoots.push(root);
+      }
+    }
+    
+    // Always add package location as final fallback (if not already included)
+    if (!validRoots.includes(discovery.packageBmadPath)) {
+      validRoots.push(discovery.packageBmadPath);
+    }
+
+    console.error(
+      `FileReader fallback chain (${validRoots.length} locations):`,
+    );
+    validRoots.forEach((root, idx) => {
+      const location = discovery.locations.find(
+        (loc) => loc.resolvedRoot === root || loc.originalPath === root
+      );
+      const source = location?.displayName ?? 'Package';
+      const status = location ? ` [${location.status}]` : '';
+      console.error(`  ${idx + 1}. ${source}${status}: ${root}`);
+    });
+    
+    this.fileReader = new FileReader(validRoots);
 
     // Load manifests on init for validation
     this.agents = this.manifestLoader.loadAgentManifest();
