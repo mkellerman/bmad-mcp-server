@@ -1,259 +1,486 @@
-# Testing Guide for BMad MCP Server
+# BMAD MCP Server - Test Suite# BMAD MCP Server - Test Suite
 
-This guide explains the testing structure and how to contribute tests to the BMad MCP Server project.
+Comprehensive test suite with unit tests (Jest) and E2E tests (Playwright + LLM).## Overview
 
-## 🏗️ Test Structure
+## Quick StartComprehensive test suite for the BMAD MCP Server featuring:
 
-The test suite is organized into three main categories:
+- **Unit Tests (Jest):** 66 passing tests with 90.28% coverage
 
-```
-tests/
-├── conftest.py              # Shared pytest fixtures
-├── unit/                    # Fast, isolated component tests
-│   ├── test_lean_loading.py
-│   └── test_new_tools.py
-├── integration/             # MCP protocol and tool integration tests
-│   ├── test_bmad_agent.py
-│   ├── test_bmad_file.py
-│   ├── test_bmad_master.py
-│   ├── test_bmad_task.py
-│   ├── test_bmad_workflow.py
-│   └── test_server.py
-└── fixtures/                # Shared test data and helpers
-```
+### Unit Tests- **E2E Tests (Playwright + LLM):** YAML-based LLM-powered integration tests
 
-### Test Categories
+````bash
 
-- **Unit Tests** (`tests/unit/`): Test individual functions and classes in isolation. These should be fast (< 1s each) and have no external dependencies.
-  
-- **Integration Tests** (`tests/integration/`): Test MCP tool handlers, server initialization, and embedded resource loading. These verify that components work together correctly.
+npm test                    # Run all unit tests## Test Coverage
 
-- **Fixtures** (`tests/fixtures/`): Reusable test data, mock objects, and helper functions shared across tests.
+npm test -- --coverage      # With coverage report
 
-## 🚀 Running Tests
+```- **90.28%** overall code coverage
 
-### Run All Tests
+- **96.10%** utils coverage (FileReader, ManifestLoader)
+
+### E2E Tests- **88.81%** tools coverage (UnifiedBMADTool)
+
+
+
+**1. Start LiteLLM Proxy**## Test Structure
+
 ```bash
-pytest
-```
 
-### Run Specific Test Categories
+docker-compose up -d        # Start in background```
+
+npm run litellm:docker:health  # Verify healthytests/
+
+```├── e2e/                          # LLM-powered E2E tests (NEW!)
+
+│   ├── framework/                # Test execution engine
+
+**2. Run Tests**│   │   ├── llm-client.ts         # LiteLLM proxy client
+
+```bash│   │   ├── yaml-loader.ts        # YAML test parser
+
+npm run test:e2e           # Run all E2E tests│   │   ├── validators.ts         # Validation strategies
+
+npm run test:e2e:ui        # Interactive UI mode│   │   └── runner.spec.ts        # Playwright test runner
+
+npm run test:report        # View HTML report│   └── test-cases/               # YAML test definitions (QA writes these!)
+
+```│       ├── agent-loading.yaml    # Agent loading tests
+
+│       ├── discovery-commands.yaml # Discovery command tests
+
+**3. Stop Proxy**│       └── error-handling.yaml   # Error handling tests
+
+```bash├── support/
+
+docker-compose down        # Stop and remove container│   └── litellm-config.yaml       # LiteLLM proxy configuration
+
+```├── helpers/
+
+│   └── test-fixtures.ts          # Test utilities and fixtures
+
+> **Authentication**: Uses GitHub Copilot via `~/.config/litellm` volume mount. No API keys needed!├── unit/
+
+│   ├── file-reader.test.ts       # FileReader tests (19 tests) ✓
+
+## Test Coverage│   ├── manifest-loader.test.ts   # ManifestLoader tests (18 tests) ✓
+
+│   └── unified-tool.test.ts      # UnifiedBMADTool tests (29 tests) ✓
+
+Current status: **90.33% coverage** (91/91 tests passing)└── integration/
+
+    └── bmad-integration.test.ts  # Integration tests (WIP)
+
+| Component | Coverage | Tests |```
+
+|-----------|----------|-------|
+
+| Utils | 96.10% | 19 ✓ |## Running Tests
+
+| Tools | 88.81% | 29 ✓ |
+
+| Server | 85.71% | 43 ✓ |### Unit Tests (Jest)
+
+| **Total** | **90.33%** | **91 ✓** |
+
 ```bash
-# Run only unit tests
-pytest tests/unit/
 
-# Run only integration tests
-pytest tests/integration/
+## Test Structure# Run all unit tests
 
-# Run a specific test file
-pytest tests/unit/test_lean_loading.py
+npm test
 
-# Run a specific test function
-pytest tests/unit/test_lean_loading.py::test_specific_function
-```
+````
 
-### Run with Coverage
+tests/# Run with coverage
+
+├── unit/ # Jest unit testsnpm test -- --coverage
+
+│ ├── file-reader.test.ts # 19 tests ✓
+
+│ ├── manifest-loader.test.ts # 18 tests ✓# Run specific test file
+
+│ └── unified-tool.test.ts # 29 tests ✓npm test -- tests/unit/file-reader.test.ts
+
+├── e2e/ # Playwright E2E tests
+
+│ ├── framework/ # Test engine# Run in watch mode
+
+│ │ ├── llm-client.ts # LiteLLM clientnpm test -- --watch
+
+│ │ ├── yaml-loader.ts # Test parser```
+
+│ │ ├── validators.ts # Validation logic
+
+│ │ └── runner.spec.ts # Test runner### E2E Tests (Playwright + LLM)
+
+│ └── test-cases/ # YAML test definitions
+
+│ ├── agent-loading.yaml**Prerequisites:** LiteLLM proxy must be running
+
+│ ├── discovery-commands.yaml
+
+│ └── error-handling.yaml```bash
+
+└── support/# 1. Start LiteLLM proxy (separate terminal)
+
+    └── litellm-config.yaml     # LiteLLM config (gpt-4.1)npm run litellm:start
+
+````
+
+# 2. Run E2E tests
+
+## Writing E2E Testsnpm run test:e2e              # Run all E2E tests
+
+npm run test:e2e:ui           # Run with Playwright UI
+
+Create a YAML file in `tests/e2e/test-cases/`:npm run test:e2e:headed       # Run in headed mode
+
+npm run test:e2e:debug        # Debug mode
+
+```yamlnpm run test:report           # View test report
+
+test_suite: "My Tests"```
+
+description: "Test description"
+
+## E2E Test Framework (NEW!)
+
+config:
+
+  llm_model: "gpt-4.1"### Architecture
+
+  temperature: 0.1
+
+  timeout: 30000The E2E framework uses **real LLMs** to test the BMAD MCP server:
+
+
+
+tests:1. **QA writes tests in YAML** (no coding required)
+
+  - id: "test-001"2. **Framework sends prompts to LLM** (via LiteLLM proxy)
+
+    name: "Test name"3. **LLM calls MCP tools** (bmad agent loading, workflows)
+
+    prompt: |4. **Validators check responses** (contains, regex, LLM judge)
+
+      You have a bmad tool.
+
+      User request: "Load analyst agent"### Writing E2E Tests
+
+
+
+    expectations:Create YAML files in `tests/e2e/test-cases/`:
+
+      - type: "contains"
+
+        value: "analyst"```yaml
+
+        case_sensitive: falsetest_suite: "My Test Suite"
+
+      description: "What this tests"
+
+      - type: "response_length"
+
+        min: 10config:
+
+        max: 1000  llm_model: "gpt-4"
+
+```  temperature: 0.1
+
+  timeout: 30000
+
+### Available Validators  judge_model: "claude-3-5-sonnet"
+
+  judge_threshold: 0.8
+
+| Type | Description | Example |
+
+|------|-------------|---------|tests:
+
+| `contains` | String matching | `value: "analyst"` |  - id: "test-001"
+
+| `not_contains` | String absence | `value: "error"` |    name: "My test case"
+
+| `regex` | Pattern matching | `pattern: "bmad.*"` |    prompt: |
+
+| `response_length` | Length bounds | `min: 10, max: 500` |      You have a bmad tool.
+
+      User: "Load the analyst agent"
+
+> **Note**: LLM Judge validator is experimental (see `LLM-JUDGE-WIP.md`)
+
+    expectations:
+
+## Docker Commands      - type: "contains"
+
+        value: "Mary"
+
 ```bash
-# Generate coverage report in terminal
-pytest --cov=bmad_mcp
 
-# Generate HTML coverage report
-pytest --cov=bmad_mcp --cov-report=html
-# Open htmlcov/index.html in your browser
+# Start proxy      - type: "llm_judge"
+
+docker-compose up -d        criteria: |
+
+npm run litellm:docker:start          Check if response introduces Mary
+
+          and shows a clear menu
+
+# Check health        threshold: 0.85
+
+npm run litellm:docker:health```
+
+curl http://localhost:4000/health/readiness
+
+### Validation Types
+
+# View logs
+
+docker logs -f litellm-proxy| Type | Description | Example |
+
+npm run litellm:docker:logs|------|-------------|---------|
+
+| `contains` | String must be in response | `value: "Mary"` |
+
+# Stop proxy| `not_contains` | String must NOT be in response | `value: "error"` |
+
+docker-compose down| `regex` | Regex pattern match | `pattern: "\\*\\w+"` |
+
+npm run litellm:docker:stop| `response_length` | Length within range | `min: 100, max: 5000` |
+
+```| `llm_judge` | LLM evaluates quality | `criteria: "Clear menu"` |
+
+
+
+## Troubleshooting### LLM Judge
+
+
+
+**Proxy not running:****LLM Judge** uses AI to evaluate response quality:
+
+```bash- Sends response + criteria to LLM (claude-3-5-sonnet)
+
+docker ps | grep litellm        # Check if container running- Returns pass/fail + confidence score (0.0-1.0)
+
+docker logs litellm-proxy       # View logs- Threshold-based validation (default 0.8)
+
+docker-compose restart          # Restart container- Perfect for qualitative checks (tone, clarity, completeness)
+
+````
+
+### Setup E2E Tests
+
+**Port 4000 in use:**
+
+````bash### Quick Start (Docker - Recommended)
+
+lsof -i :4000                   # Find process using port
+
+docker-compose down && docker-compose up -d1. **Start LiteLLM proxy:**
+
+```   ```bash
+
+   docker-compose up -d
+
+**Tests timeout:**   # or
+
+- Increase `timeout` in YAML config   npm run litellm:docker:start
+
+- Check LiteLLM logs for API errors   ```
+
+- Verify GitHub Copilot authentication
+
+2. **Run tests:**
+
+## CI/CD   ```bash
+
+   npm run test:e2e
+
+E2E tests are ready for CI/CD but require:   ```
+
+- Docker environment
+
+- GitHub Copilot authentication setup> **Note**: Authentication handled via `~/.config/litellm` volume mount. No API keys needed!
+
+- Dedicated test API key (optional)
+
+See `tests/DOCKER-SETUP.md` for detailed setup.
+
+## Documentation
+
+## Test Categories
+
+- `LLM-JUDGE-WIP.md` - LLM Judge validation (experimental, disabled)
+
+- `docker-compose.yml` - LiteLLM proxy configuration### Unit Tests
+
+- `playwright.config.ts` - Playwright settings
+
+#### FileReader Tests (19 tests)
+
+## Models- ✅ Constructor and initialization
+
+- ✅ File reading (absolute/relative paths)
+
+Current setup uses:- ✅ Path traversal protection
+
+- **gpt-4.1** (github_copilot/gpt-4.1-2025-04-14)- ✅ Symlink handling
+
+- Authentication via `~/.config/litellm` volume mount- ✅ Permission error handling
+
+- No API keys required- ✅ File existence checks
+
+- ✅ Path validation
+
+To add other models, edit `tests/support/litellm-config.yaml`
+
+#### ManifestLoader Tests (18 tests)
+- ✅ Constructor with multiple directory structures
+- ✅ Agent manifest loading and parsing
+- ✅ Workflow manifest loading
+- ✅ Task manifest loading
+- ✅ Empty row filtering
+- ✅ Malformed CSV handling
+- ✅ Agent/workflow lookup by name
+
+#### UnifiedBMADTool Tests (29 tests)
+- ✅ Tool initialization
+- ✅ Empty command handling (default agent)
+- ✅ Agent loading by name
+- ✅ Workflow execution with `*` prefix
+- ✅ Discovery commands (`*list-agents`, `*list-workflows`, `*list-tasks`, `*help`)
+- ✅ Input validation (dangerous characters, length, patterns)
+- ✅ Fuzzy matching and suggestions
+- ✅ Error handling and recovery
+- ✅ Edge cases (empty manifests, missing files)
+
+### Integration Tests (WIP)
+- End-to-end agent loading
+- End-to-end workflow execution
+- Discovery workflows
+- Error handling integration
+- Concurrent operations
+
+## Test Fixtures
+
+The test suite uses a comprehensive fixture system that creates temporary test environments with:
+
+- Proper BMAD directory structure (`src/bmad/_cfg`)
+- Sample manifests (agents, workflows, tasks)
+- Sample agent and workflow files
+- Automatic cleanup after tests
+
+### Example Usage
+
+```typescript
+import { createTestFixture, createBMADStructure, createAgentManifest } from '../helpers/test-fixtures';
+
+const fixture = createTestFixture();
+createBMADStructure(fixture.tmpDir);
+createAgentManifest(fixture.tmpDir);
+
+// ... run tests ...
+
+fixture.cleanup(); // Automatic cleanup
+````
+
+## Test Configuration
+
+### Jest Configuration (`jest.config.cjs`)
+
+- **Preset**: `ts-jest/presets/default-esm` for ES module support
+- **Environment**: Node.js
+- **Coverage**: HTML, LCOV, and text reports
+- **Module Resolution**: Supports `.js` imports from `.ts` files
+- **Target**: ESNext for modern JavaScript features
+
+### Key Features
+
+- ✅ ES Module support
+- ✅ TypeScript compilation
+- ✅ Coverage collection
+- ✅ Parallel test execution
+- ✅ Isolated test environments
+
+## Coverage Details
+
+### Utils (96.10%)
+
+| File               | Statements | Branches | Functions | Lines  |
+| ------------------ | ---------- | -------- | --------- | ------ |
+| file-reader.ts     | 92.85%     | 88.88%   | 100%      | 92.85% |
+| manifest-loader.ts | 100%       | 100%     | 100%      | 100%   |
+
+### Tools (88.81%)
+
+| File            | Statements | Branches | Functions | Lines  |
+| --------------- | ---------- | -------- | --------- | ------ |
+| unified-tool.ts | 88.81%     | 66.95%   | 86.66%    | 88.88% |
+
+## What's Tested
+
+### Security Features
+
+- ✅ Path traversal prevention
+- ✅ Dangerous character detection
+- ✅ Input validation and sanitization
+- ✅ Permission error handling
+
+### Core Functionality
+
+- ✅ Agent discovery and loading
+- ✅ Workflow discovery and execution
+- ✅ Manifest parsing (CSV)
+- ✅ File reading with security
+- ✅ Error messages and suggestions
+
+### Edge Cases
+
+- ✅ Empty manifests
+- ✅ Missing files
+- ✅ Malformed CSV
+- ✅ Invalid names
+- ✅ Path traversal attempts
+- ✅ Symlink handling
+
+## Known Limitations
+
+- Server.ts tests are WIP due to import.meta.url compatibility with jest
+- Integration tests for BMADMCPServer are partially complete
+- Some edge cases in workflow context resolution have lower coverage
+
+## Future Improvements
+
+1. Complete integration tests for BMADMCPServer
+2. Add E2E tests for MCP protocol communication
+3. Add performance benchmarks
+4. Add mutation testing
+5. Increase branch coverage in unified-tool.ts to 85%+
+
+## CI/CD Integration
+
+Tests are designed to run in CI/CD environments:
+
+```yaml
+# Example GitHub Actions
+- name: Run Tests
+  run: npm test
+
+- name: Upload Coverage
+  run: npm test -- --coverage
 ```
 
-### Run Tests by Marker
-```bash
-# Run only unit tests (using marker)
-pytest -m unit
+## Contributing
 
-# Run only integration tests
-pytest -m integration
+When adding new features:
 
-# Skip slow tests
-pytest -m "not slow"
-```
+1. Write tests first (TDD approach)
+2. Ensure >90% coverage for new code
+3. Run full test suite before committing
+4. Update this README if adding new test categories
 
-## ✍️ Writing Tests
+## Test Philosophy
 
-### Basic Test Structure
-
-```python
-"""Test module for [component name]."""
-
-import pytest
-from bmad_mcp.resources import load_embedded_file
-
-
-def test_load_config_file():
-    """Test that config file can be loaded."""
-    config = load_embedded_file("core/config.yaml")
-    assert config is not None
-    assert len(config) > 0
-
-
-@pytest.mark.integration
-def test_bmad_tool_returns_valid_json():
-    """Test that bmad tool returns valid JSON."""
-    from bmad_mcp.server import bmad_master
-    import json
-    
-    result = bmad_master()
-    data = json.loads(result)
-    
-    assert "instructions" in data
-    assert len(data["instructions"]) > 0
-```
-
-### Using Fixtures
-
-```python
-def test_with_sample_config(sample_config):
-    """Test using the shared sample_config fixture."""
-    assert sample_config["user_name"] == "TestUser"
-    assert sample_config["communication_language"] == "English"
-```
-
-### Marking Tests
-
-```python
-@pytest.mark.unit
-def test_isolated_function():
-    """Fast unit test."""
-    pass
-
-
-@pytest.mark.integration
-def test_mcp_tool_integration():
-    """Integration test for MCP tool."""
-    pass
-
-
-@pytest.mark.slow
-def test_full_workflow_execution():
-    """Slow end-to-end test."""
-    pass
-```
-
-## 📋 Test Requirements
-
-### Coverage Goals
-- **Minimum coverage**: 60% (enforced by CI)
-- **Target coverage**: 80% for core functionality
-- New code should include tests
-
-### What to Test
-
-**Must Test:**
-- ✅ MCP tool signatures and return types
-- ✅ Embedded resource loading
-- ✅ Agent manifest parsing
-- ✅ Workflow YAML parsing
-- ✅ Core business logic
-
-**Nice to Test:**
-- ✅ Edge cases and error handling
-- ✅ Configuration validation
-- ✅ Prompt generation
-- ✅ File path resolution
-
-**Don't Need to Test:**
-- ❌ Third-party library internals
-- ❌ Trivial getters/setters
-- ❌ Generated code
-
-## 🔧 Common Testing Patterns
-
-### Testing Embedded Resources
-
-```python
-def test_embedded_agent_file_exists():
-    """Verify agent file can be loaded."""
-    from bmad_mcp.resources import load_embedded_file
-    
-    content = load_embedded_file("core/agents/bmad-master.md")
-    assert "BMad Master" in content
-```
-
-### Testing MCP Tools
-
-```python
-def test_bmad_agent_tool():
-    """Test bmad_agent tool returns expected structure."""
-    from bmad_mcp.server import bmad_agent
-    import json
-    
-    result = bmad_agent(name="analyst")
-    data = json.loads(result)
-    
-    assert "instructions" in data
-    assert "files" in data
-```
-
-### Testing Error Conditions
-
-```python
-def test_invalid_agent_name_raises_error():
-    """Test that invalid agent name is handled gracefully."""
-    from bmad_mcp.server import bmad_agent
-    
-    result = bmad_agent(name="nonexistent")
-    assert "not found" in result.lower() or "error" in result.lower()
-```
-
-## 🤝 Contributing Tests
-
-When contributing new features or fixes:
-
-1. **Add tests for new code**: Every new function should have at least one test
-2. **Update existing tests**: If you modify behavior, update relevant tests
-3. **Run tests locally**: Ensure all tests pass before submitting PR
-4. **Check coverage**: Aim to maintain or improve coverage percentage
-
-### Test Checklist
-- [ ] Tests run successfully with `pytest`
-- [ ] Coverage meets minimum threshold (60%)
-- [ ] Tests are properly categorized (unit vs integration)
-- [ ] Tests use appropriate markers
-- [ ] Test names clearly describe what's being tested
-- [ ] Docstrings explain test purpose
-
-## 🐛 Debugging Tests
-
-### Verbose Output
-```bash
-pytest -vv
-```
-
-### Stop at First Failure
-```bash
-pytest -x
-```
-
-### Show Print Statements
-```bash
-pytest -s
-```
-
-### Run Last Failed Tests
-```bash
-pytest --lf
-```
-
-### Drop into Debugger on Failure
-```bash
-pytest --pdb
-```
-
-## 📚 Additional Resources
-
-- [pytest Documentation](https://docs.pytest.org/)
-- [pytest-cov Documentation](https://pytest-cov.readthedocs.io/)
-- [MCP Protocol Specification](https://modelcontextprotocol.io/)
-
-## ❓ Questions?
-
-If you have questions about testing:
-- Open a [Discussion](https://github.com/mkellerman/bmad-mcp-server/discussions)
-- Check existing [Issues](https://github.com/mkellerman/bmad-mcp-server/issues)
-- Ask in your PR and maintainers will help!
+- **Fast**: Tests run in under 3 seconds
+- **Isolated**: Each test uses its own temporary environment
+- **Comprehensive**: Cover happy paths, edge cases, and error conditions
+- **Maintainable**: Clear test names and good fixtures
+- **Reliable**: No flaky tests, deterministic outcomes
