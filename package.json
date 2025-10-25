@@ -8,12 +8,17 @@
   },
   "scripts": {
     "build": "tsc && chmod +x build/index.js",
+    "prepare": "npm run build",
     "start": "node build/index.js",
     "dev": "tsx src/index.ts",
     "test": "jest",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
+  "files": [
+    "build/",
+    "bmad/"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "csv-parse": "^5.5.6"
