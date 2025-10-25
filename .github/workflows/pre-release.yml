@@ -145,7 +145,7 @@ jobs:
               "servers": {
                 "bmad": {
                   "command": "npx",
-                  "args": ["-y", "git+https://github.com/${{ github.repository }}#${tagName}", "bmad-mcp-server"]
+                  "args": ["-y", "git+https://github.com/${{ github.repository }}#${tagName}"]
                 }
               }
             }
