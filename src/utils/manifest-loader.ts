@@ -100,7 +100,7 @@ export class ManifestLoader {
         columns: true,
         skip_empty_lines: true,
         trim: true,
-      }) as T[];
+      });
 
       // Filter out completely empty rows
       const filtered = records.filter((row) =>
