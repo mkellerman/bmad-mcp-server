@@ -53,11 +53,11 @@ jobs:
         run: |
           TAG_NAME="pr-${{ steps.pr_info.outputs.pr_number }}-${{ steps.pr_info.outputs.short_sha }}"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          
+
           # Delete existing tag if it exists (for synchronize events)
           git tag -d $TAG_NAME 2>/dev/null || true
           git push origin :refs/tags/$TAG_NAME 2>/dev/null || true
-          
+
           # Create new tag
           git tag $TAG_NAME
           git push origin $TAG_NAME
@@ -79,17 +79,17 @@ jobs:
           gh release create ${{ steps.create_tag.outputs.tag_name }} \
             --title "Pre-release: PR #${{ steps.pr_info.outputs.pr_number }} (${{ steps.pr_info.outputs.branch_name }})" \
             --notes "**Pre-release build for testing**
-          
+
           This is an automated pre-release for PR #${{ steps.pr_info.outputs.pr_number }}.
-          
+
           **Branch:** \`${{ steps.pr_info.outputs.branch_name }}\`
           **Commit:** ${{ github.event.pull_request.head.sha }}
           **PR:** ${{ github.event.pull_request.html_url }}
-          
+
           ## Testing this pre-release
-          
+
           Update your MCP configuration to use this pre-release:
-          
+
           \`\`\`json
           {
             \"servers\": {
@@ -100,7 +100,7 @@ jobs:
             }
           }
           \`\`\`
-          
+
           Or for local testing:
           \`\`\`bash
           git fetch origin refs/tags/${{ steps.create_tag.outputs.tag_name }}
@@ -108,7 +108,7 @@ jobs:
           npm install
           npm run build
           \`\`\`
-          
+
           **⚠️ This is a pre-release and will be deleted when the PR is merged or closed.**" \
             --prerelease
 
@@ -119,25 +119,25 @@ jobs:
             const prNumber = ${{ steps.pr_info.outputs.pr_number }};
             const tagName = '${{ steps.create_tag.outputs.tag_name }}';
             const releaseUrl = `https://github.com/${{ github.repository }}/releases/tag/${tagName}`;
-            
+
             // Find existing bot comment
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
             });
-            
+
             const botComment = comments.data.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Pre-release created')
             );
-            
+
             const commentBody = `## 🚀 Pre-release created
-            
+
             A pre-release has been created for testing: [${tagName}](${releaseUrl})
-            
+
             ### Test this PR on another machine:
-            
+
             **Option 1: Using npx (recommended)**
             Update your MCP configuration:
             \`\`\`json
@@ -150,7 +150,7 @@ jobs:
               }
             }
             \`\`\`
-            
+
             **Option 2: Clone and test locally**
             \`\`\`bash
             git clone https://github.com/${{ github.repository }}.git
@@ -159,10 +159,10 @@ jobs:
             npm install
             npm run build
             \`\`\`
-            
+
             ---
             *Pre-release will be automatically cleaned up when PR is merged or closed.*`;
-            
+
             if (botComment) {
               // Update existing comment
               await github.rest.issues.updateComment({

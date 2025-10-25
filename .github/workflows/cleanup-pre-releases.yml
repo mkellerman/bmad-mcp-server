@@ -23,9 +23,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          
+
           echo "Cleaning up pre-releases for PR #$PR_NUMBER"
-          
+
           # Find and delete all releases matching this PR
           gh release list --limit 100 | \
             grep "^pr-${PR_NUMBER}-" | \
@@ -35,5 +35,5 @@ jobs:
               gh release delete "$tag" --yes 2>/dev/null || true
               git push origin ":refs/tags/$tag" 2>/dev/null || true
             done
-          
+
           echo "Cleanup complete"

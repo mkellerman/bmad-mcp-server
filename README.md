@@ -220,7 +220,11 @@ When you open a Pull Request, GitHub Actions automatically creates a pre-release
      "servers": {
        "bmad": {
          "command": "npx",
-         "args": ["-y", "git+https://github.com/mkellerman/bmad-mcp-server#pr-123-abc1234", "bmad-mcp-server"]
+         "args": [
+           "-y",
+           "git+https://github.com/mkellerman/bmad-mcp-server#pr-123-abc1234",
+           "bmad-mcp-server"
+         ]
        }
      }
    }
@@ -229,6 +233,7 @@ When you open a Pull Request, GitHub Actions automatically creates a pre-release
 4. **Pre-release cleanup** - Automatically deleted when PR is merged or closed
 
 **Benefits:**
+
 - Test changes before merging
 - No need to clone locally on every machine
 - Works with any MCP client (VS Code, Claude Desktop, Cursor, etc.)
