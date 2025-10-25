@@ -2,14 +2,7 @@
  * Unit tests for FileReader
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-} from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   FileReader,
   FileReadError,
@@ -50,9 +43,7 @@ describe('FileReader', () => {
     });
 
     it('should warn if BMAD root does not exist', () => {
-      const consoleSpy = vi
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const nonExistentPath = path.join(fixture.tmpDir, 'nonexistent');
       new FileReader(nonExistentPath);
 

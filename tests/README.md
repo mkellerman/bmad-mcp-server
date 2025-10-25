@@ -76,12 +76,12 @@ tests:
     prompt: |
       You have a bmad tool.
       User request: "Load analyst agent"
-    
+
     expectations:
       - type: "contains"
         value: "analyst"
         case_sensitive: false
-      
+
       - type: "response_length"
         min: 100
         max: 5000
@@ -89,12 +89,12 @@ tests:
 
 ### Validation Types
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `contains` | String must be in response | `value: "Mary"` |
-| `not_contains` | String must NOT be in response | `value: "error"` |
-| `regex` | Regex pattern match | `pattern: "\\*\\w+"` |
-| `response_length` | Length within range | `min: 100, max: 5000` |
+| Type              | Description                    | Example               |
+| ----------------- | ------------------------------ | --------------------- |
+| `contains`        | String must be in response     | `value: "Mary"`       |
+| `not_contains`    | String must NOT be in response | `value: "error"`      |
+| `regex`           | Regex pattern match            | `pattern: "\\*\\w+"`  |
+| `response_length` | Length within range            | `min: 100, max: 5000` |
 
 ## Coverage Report
 
@@ -113,6 +113,7 @@ Total                   61.62%      41.20%    71.87%     61.73%
 ## Troubleshooting
 
 **LLM tests fail with proxy error:**
+
 ```bash
 docker ps | grep litellm       # Check if proxy is running
 npm run litellm:docker:logs    # View logs
@@ -123,8 +124,8 @@ npm run litellm:docker:health  # Check health
 Follow the one-time setup steps above to authenticate with GitHub for Copilot access.
 
 **Port 4000 in use:**
+
 ```bash
 lsof -i :4000                  # Find process using port
 npm run litellm:docker:stop    # Stop proxy
 ```
-

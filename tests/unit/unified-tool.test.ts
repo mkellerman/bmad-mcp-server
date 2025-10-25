@@ -2,14 +2,7 @@
  * Unit tests for UnifiedBMADTool
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-} from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
 import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
 import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';

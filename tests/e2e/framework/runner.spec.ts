@@ -80,7 +80,9 @@ for (const suite of testSuites) {
               responseText.length > 100
                 ? responseText.substring(0, 100) + '...'
                 : responseText;
-            console.log(`   ✓ Response (${responseTime}ms): ${responsePreview}`);
+            console.log(
+              `   ✓ Response (${responseTime}ms): ${responsePreview}`,
+            );
 
             // Run all validators
             for (const expectation of testCase.expectations) {

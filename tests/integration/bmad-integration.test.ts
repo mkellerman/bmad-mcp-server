@@ -53,7 +53,7 @@ describe('BMAD MCP Server Integration', () => {
     createWorkflowFile(
       fixture.tmpDir,
       'core/workflows/party-mode/instructions.md',
-      '# Party Mode Instructions\n\nLet\'s party!',
+      "# Party Mode Instructions\n\nLet's party!",
     );
     createWorkflowFile(
       fixture.tmpDir,
@@ -75,7 +75,7 @@ describe('BMAD MCP Server Integration', () => {
     });
 
     server = new BMADMCPServer(fixture.tmpDir, discovery);
-    
+
     const root = discovery.activeLocation.resolvedRoot ?? fixture.tmpDir;
     tool = new UnifiedBMADTool({
       bmadRoot: root,

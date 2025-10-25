@@ -2,14 +2,7 @@
  * Unit tests for ManifestLoader
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-} from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ManifestLoader } from '../../src/utils/manifest-loader.js';
 import {
   createTestFixture,
@@ -119,9 +112,7 @@ another,Another,Another Agent,,another,,,,bmm,another.md`;
         path.join(fixture.tmpDir, 'src', 'bmad', '_cfg', 'agent-manifest.csv'),
       );
 
-      const consoleSpy = vi
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const agents = emptyLoader.loadAgentManifest();
 
       expect(agents).toEqual([]);

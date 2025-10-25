@@ -29,6 +29,7 @@ npm run litellm:docker:start
 ```
 
 This starts a background container that:
+
 - Mounts your `~/.config/litellm` credentials
 - Mounts the test config at `tests/support/litellm-config.yaml`
 - Exposes the API on `http://localhost:4000`
@@ -60,11 +61,13 @@ npm run litellm:docker:stop    # Stop proxy when done
 ## Troubleshooting
 
 **Proxy not healthy:**
+
 ```bash
 npm run litellm:docker:logs    # Check logs
 ```
 
 **Port 4000 in use:**
+
 ```bash
 lsof -i :4000                  # Find process
 npm run litellm:docker:stop    # Stop proxy
@@ -76,6 +79,7 @@ Repeat step 1 to re-authenticate with GitHub.
 ## Configuration
 
 Edit `tests/support/litellm-config.yaml` to:
+
 - Change LLM models
 - Adjust temperature/settings
 - Add additional models
