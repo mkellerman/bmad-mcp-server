@@ -89,6 +89,18 @@ npm run build
 # Run tests
 npm test
 
+# Run E2E tests
+npm run test:e2e
+
+# Start E2E test environment (LiteLLM proxy)
+npm run e2e:start
+
+# Stop E2E test environment
+npm run e2e:stop
+
+# View E2E environment logs
+npm run e2e:logs
+
 # Lint code
 npm run lint
 
