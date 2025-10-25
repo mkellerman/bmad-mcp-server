@@ -9,7 +9,8 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
+  issues: write
 
 jobs:
   pre-release:
@@ -115,24 +116,30 @@ jobs:
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const prNumber = ${{ steps.pr_info.outputs.pr_number }};
             const tagName = '${{ steps.create_tag.outputs.tag_name }}';
             const releaseUrl = `https://github.com/${{ github.repository }}/releases/tag/${tagName}`;
+            const uniqueMarker = '<!-- bmad-pre-release -->';
 
-            // Find existing bot comment
+            // List comments on the PR
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
             });
 
-            const botComment = comments.data.find(comment => 
-              comment.user.type === 'Bot' && 
-              comment.body.includes('Pre-release created')
+            // Only match comments created by GitHub Actions and containing our unique marker
+            const botComment = comments.data.find(comment =>
+              comment.user &&
+              comment.user.type === 'Bot' &&
+              comment.user.login === 'github-actions[bot]' &&
+              comment.body && comment.body.includes(uniqueMarker)
             );
 
-            const commentBody = `## 🚀 Pre-release created
+            const commentBody = `${uniqueMarker}
+            ## 🚀 Pre-release created
 
             A pre-release has been created for testing: [${tagName}](${releaseUrl})
 
@@ -142,10 +149,10 @@ jobs:
             Update your MCP configuration:
             \`\`\`json
             {
-              "servers": {
-                "bmad": {
-                  "command": "npx",
-                  "args": ["-y", "git+https://github.com/${{ github.repository }}#${tagName}"]
+              \"servers\": {
+                \"bmad\": {
+                  \"command\": \"npx\",
+                  \"args\": [\"-y\", \"git+https://github.com/${{ github.repository }}#${tagName}\"]
                 }
               }
             }
