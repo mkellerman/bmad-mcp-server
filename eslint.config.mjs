@@ -29,15 +29,12 @@ export default tseslint.config(
     },
     rules: {
       'no-console': ['warn', { allow: ['error', 'warn'] }],
-      quotes: ['error', 'single', { avoidEscape: true }],
-      semi: ['error', 'always'],
     },
   },
   {
     files: ['src/**/*.ts'],
     extends: [
       ...tseslint.configs.recommendedTypeChecked,
-      ...tseslint.configs.stylisticTypeChecked,
     ],
     languageOptions: {
       parserOptions: {
@@ -50,10 +47,7 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
       'no-console': ['warn', { allow: ['error', 'warn'] }],
-      quotes: ['error', 'single', { avoidEscape: true }],
-      semi: ['error', 'always'],
     },
   },
   {
@@ -71,8 +65,6 @@ export default tseslint.config(
     },
     rules: {
       'no-console': 'off',
-      quotes: ['error', 'single', { avoidEscape: true }],
-      semi: ['error', 'always'],
     },
   },
   {
