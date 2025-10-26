@@ -1,3 +1,10 @@
+## [0.2.2](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.1...v0.2.2) (2025-10-26)
+
+
+### Bug Fixes
+
+* include .releaserc.json in build artifact for release workflow ([16560cd](https://github.com/mkellerman/bmad-mcp-server/commit/16560cd79061039b3f15dfb05626b471ce5312ad))
+
 ## [0.2.1](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.0...v0.2.1) (2025-10-26)
 
 
