@@ -1,3 +1,10 @@
+## [0.2.4](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.3...v0.2.4) (2025-10-26)
+
+
+### Bug Fixes
+
+* normalize manifest paths to be relative to BMAD_ROOT ([8a1dfcb](https://github.com/mkellerman/bmad-mcp-server/commit/8a1dfcbb802d5bfc58202e65c4e5158802e0f141))
+
 ## [0.2.3](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.2...v0.2.3) (2025-10-26)
 
 
