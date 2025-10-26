@@ -108,7 +108,8 @@ export class UnifiedBMADTool {
         else {
             // Fallback: check if packageBmadPath has a _cfg directory
             const packageCfgDir = path.join(discovery.packageBmadPath, '_cfg');
-            if (fs.existsSync(packageCfgDir) && fs.statSync(packageCfgDir).isDirectory()) {
+            if (fs.existsSync(packageCfgDir) &&
+                fs.statSync(packageCfgDir).isDirectory()) {
                 manifestRoot = discovery.packageBmadPath;
                 manifestDir = packageCfgDir;
             }
