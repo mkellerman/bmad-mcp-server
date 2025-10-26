@@ -750,15 +750,33 @@ export class UnifiedBMADTool {
         if (!fullReport) {
             // SUMMARY VIEW (default) - Redesigned for better UX
             // Calculate health score
-            const totalRegistered = stats.registeredAgents + stats.registeredWorkflows + stats.registeredTasks;
-            const totalIssues = stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks +
-                stats.missingAgents + stats.missingWorkflows + stats.missingTasks;
+            const totalRegistered = stats.registeredAgents +
+                stats.registeredWorkflows +
+                stats.registeredTasks;
+            const totalIssues = stats.orphanedAgents +
+                stats.orphanedWorkflows +
+                stats.orphanedTasks +
+                stats.missingAgents +
+                stats.missingWorkflows +
+                stats.missingTasks;
             const healthScore = totalRegistered > 0
                 ? Math.round((totalRegistered / (totalRegistered + totalIssues)) * 100)
                 : 0;
             // Header with health status
-            const healthEmoji = healthScore === 100 ? '💚' : healthScore >= 80 ? '💛' : healthScore >= 50 ? '🧡' : '❤️';
-            const healthText = healthScore === 100 ? 'Excellent' : healthScore >= 80 ? 'Good' : healthScore >= 50 ? 'Fair' : 'Needs Attention';
+            const healthEmoji = healthScore === 100
+                ? '💚'
+                : healthScore >= 80
+                    ? '💛'
+                    : healthScore >= 50
+                        ? '🧡'
+                        : '❤️';
+            const healthText = healthScore === 100
+                ? 'Excellent'
+                : healthScore >= 80
+                    ? 'Good'
+                    : healthScore >= 50
+                        ? 'Fair'
+                        : 'Needs Attention';
             lines.push('┌─ System Health ────────────────────────────────────────────┐');
             lines.push(`│  ${healthEmoji} ${healthText.padEnd(12)} │ Health Score: ${String(healthScore).padStart(3)}% ${this.renderHealthBar(healthScore)}`);
             lines.push('└────────────────────────────────────────────────────────────┘');
@@ -789,7 +807,8 @@ export class UnifiedBMADTool {
             if (hasIssues) {
                 lines.push('⚠️  **Issues Detected**');
                 lines.push('');
-                if (stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks > 0) {
+                if (stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks >
+                    0) {
                     lines.push('   🔸 **Orphaned Files** (exist but not in manifest)');
                     if (stats.orphanedAgents > 0)
                         lines.push(`      • ${stats.orphanedAgents} agent${stats.orphanedAgents > 1 ? 's' : ''}`);
@@ -800,7 +819,8 @@ export class UnifiedBMADTool {
                     lines.push('      💡 Add these to manifest CSV files in `_cfg/`');
                     lines.push('');
                 }
-                if (stats.missingAgents + stats.missingWorkflows + stats.missingTasks > 0) {
+                if (stats.missingAgents + stats.missingWorkflows + stats.missingTasks >
+                    0) {
                     lines.push('   🔸 **Missing Files** (in manifest but not found)');
                     if (stats.missingAgents > 0)
                         lines.push(`      • ${stats.missingAgents} agent${stats.missingAgents > 1 ? 's' : ''}`);
