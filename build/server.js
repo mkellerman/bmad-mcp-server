@@ -401,8 +401,8 @@ export async function main() {
         const packageJson = JSON.parse(packageJsonContent);
         version = packageJson.version ?? 'unknown';
     }
-    catch (error) {
-        console.error('Failed to read package.json:', error);
+    catch {
+        console.error('Failed to read package.json');
         // Silently fall back to 'unknown' if package.json can't be read
     }
     const discovery = resolveBmadPaths({
