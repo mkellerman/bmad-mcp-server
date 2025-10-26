@@ -142,7 +142,11 @@ function enrichCandidate(location: BmadLocationInfo): BmadLocationInfo {
     location.originalPath = path.resolve(location.originalPath);
   }
 
-  if (location.status === 'valid' && location.resolvedRoot && location.manifestDir) {
+  if (
+    location.status === 'valid' &&
+    location.resolvedRoot &&
+    location.manifestDir
+  ) {
     location.details = `Using manifests from ${location.manifestDir}`;
     return location;
   }

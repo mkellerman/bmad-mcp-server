@@ -99,10 +99,27 @@ export class UnifiedBMADTool {
         // Find a location with actual manifests for ManifestLoader
         // Use the first location with manifestDir, or fall back to package
         const manifestLocation = discovery.locations.find((loc) => loc.status === 'valid' && loc.manifestDir);
-        const manifestRoot = manifestLocation?.resolvedRoot ?? discovery.packageBmadPath;
-        this.manifestDir =
-            manifestLocation?.manifestDir ??
-                path.join(discovery.packageBmadPath, '_cfg');
+        let manifestRoot;
+        let manifestDir;
+        if (manifestLocation?.manifestDir) {
+            manifestRoot = manifestLocation.resolvedRoot ?? bmadRoot;
+            manifestDir = manifestLocation.manifestDir;
+        }
+        else {
+            // Fallback: check if packageBmadPath has a _cfg directory
+            const packageCfgDir = path.join(discovery.packageBmadPath, '_cfg');
+            if (fs.existsSync(packageCfgDir) && fs.statSync(packageCfgDir).isDirectory()) {
+                manifestRoot = discovery.packageBmadPath;
+                manifestDir = packageCfgDir;
+            }
+            else {
+                // No manifest directory found - use bmadRoot as fallback
+                // This allows initialization without manifests (empty project scenario)
+                manifestRoot = bmadRoot;
+                manifestDir = path.join(bmadRoot, '_cfg');
+            }
+        }
+        this.manifestDir = manifestDir;
         this.manifestLoader = new ManifestLoader(manifestRoot);
         // Collect all BMAD roots for fallback file loading
         // Priority order: project -> cli -> env -> user -> package

@@ -131,22 +131,26 @@ export class UnifiedBMADTool {
       (loc) => loc.status === 'valid' && loc.manifestDir,
     );
 
-    let manifestRoot: string | undefined;
-    let manifestDir: string | undefined;
+    let manifestRoot: string;
+    let manifestDir: string;
 
-    if (manifestLocation && manifestLocation.manifestDir) {
-      manifestRoot = manifestLocation.resolvedRoot;
+    if (manifestLocation?.manifestDir) {
+      manifestRoot = manifestLocation.resolvedRoot ?? bmadRoot;
       manifestDir = manifestLocation.manifestDir;
     } else {
       // Fallback: check if packageBmadPath has a _cfg directory
       const packageCfgDir = path.join(discovery.packageBmadPath, '_cfg');
-      if (fs.existsSync(packageCfgDir) && fs.statSync(packageCfgDir).isDirectory()) {
+      if (
+        fs.existsSync(packageCfgDir) &&
+        fs.statSync(packageCfgDir).isDirectory()
+      ) {
         manifestRoot = discovery.packageBmadPath;
         manifestDir = packageCfgDir;
       } else {
-        throw new Error(
-          `No valid manifest directory found. Searched locations: ${discovery.locations.map(loc => loc.resolvedRoot ?? loc.originalPath).join(', ')} and fallback package path ${packageCfgDir}`
-        );
+        // No manifest directory found - use bmadRoot as fallback
+        // This allows initialization without manifests (empty project scenario)
+        manifestRoot = bmadRoot;
+        manifestDir = path.join(bmadRoot, '_cfg');
       }
     }
 
