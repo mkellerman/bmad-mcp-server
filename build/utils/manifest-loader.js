@@ -85,8 +85,18 @@ export class ManifestLoader {
                 skip_empty_lines: true,
                 trim: true,
             });
-            // Filter out completely empty rows
-            const filtered = records.filter((row) => Object.values(row).some((value) => String(value).trim() !== ''));
+            // Filter out completely empty rows and normalize paths
+            const filtered = records
+                .filter((row) => Object.values(row).some((value) => String(value).trim() !== ''))
+                .map((row) => {
+                // Normalize any 'path' field by stripping 'bmad/' prefix if present
+                // This ensures paths are relative to BMAD_ROOT
+                const record = row;
+                if (record.path && typeof record.path === 'string') {
+                    record.path = record.path.replace(/^bmad\//, '');
+                }
+                return record;
+            });
             console.error(`Loaded ${filtered.length} entries from ${filename}`);
             return filtered;
         }

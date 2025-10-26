@@ -127,10 +127,17 @@ export class UnifiedBMADTool {
         // Only include locations with manifestDir (actual _cfg directory found)
         // to ensure FileReader can find the actual BMAD assets
         const validRoots = [];
+        console.error(`\nBuilding FileReader fallback chain...`);
+        console.error(`Total discovered locations: ${discovery.locations.length}`);
         // Sort all locations by priority that have manifestDir
         const sortedLocations = [...discovery.locations]
-            .filter((loc) => loc.status === 'valid' && loc.manifestDir)
+            .filter((loc) => {
+            const hasManifestDir = loc.status === 'valid' && loc.manifestDir;
+            console.error(`  - ${loc.displayName}: status=${loc.status}, manifestDir=${loc.manifestDir ? 'yes' : 'no'}, included=${hasManifestDir}`);
+            return hasManifestDir;
+        })
             .sort((a, b) => a.priority - b.priority);
+        console.error(`Locations with manifestDir: ${sortedLocations.length}\n`);
         for (const location of sortedLocations) {
             const root = location.resolvedRoot ?? location.originalPath;
             if (root && !validRoots.includes(root)) {
@@ -510,7 +517,7 @@ export class UnifiedBMADTool {
         }
         // Customization YAML file
         const module = agent.module ?? 'bmm';
-        const customizePath = `bmad/_cfg/agents/${module}-${agentName}.customize.yaml`;
+        const customizePath = `_cfg/agents/${module}-${agentName}.customize.yaml`;
         contentParts.push('## Agent Customization\n');
         contentParts.push(`**File:** \`${customizePath}\`\n`);
         try {
