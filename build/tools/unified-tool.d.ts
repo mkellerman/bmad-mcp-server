@@ -98,6 +98,10 @@ export declare class UnifiedBMADTool {
      * List all available tasks from task manifest.
      */
     private listTasks;
+    /**
+     * Render a visual health bar for the diagnostic summary
+     */
+    private renderHealthBar;
     private discover;
     /**
      * Scan a location for BMAD files and compare with ALL manifests across all locations.
@@ -108,6 +112,10 @@ export declare class UnifiedBMADTool {
      * Format inventory for display.
      */
     private formatInventory;
+    /**
+     * Format inventory for full detailed display with borders.
+     */
+    private formatInventoryFull;
     private init;
     private initHelp;
     private performInitialization;

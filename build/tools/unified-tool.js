@@ -616,10 +616,23 @@ export class UnifiedBMADTool {
             exitCode: 0,
         };
     }
+    /**
+     * Render a visual health bar for the diagnostic summary
+     */
+    renderHealthBar(score) {
+        const barLength = 10;
+        const filled = Math.round((score / 100) * barLength);
+        const empty = barLength - filled;
+        const filledChar = '█';
+        const emptyChar = '░';
+        return `│ ${filledChar.repeat(filled)}${emptyChar.repeat(empty)} │`;
+    }
     discover(fullReport = false) {
         const active = this.discovery.activeLocation;
         const lines = [];
-        lines.push('# BMAD Doctor Report');
+        lines.push('╭─────────────────────────────────────────────────────────────╮');
+        lines.push('│          🏥 BMAD Health Diagnostic                          │');
+        lines.push('╰─────────────────────────────────────────────────────────────╯');
         lines.push('');
         // Scan each valid location in priority order
         const sorted = [...this.discovery.locations]
@@ -735,16 +748,36 @@ export class UnifiedBMADTool {
             }
         }
         if (!fullReport) {
-            // SUMMARY VIEW (default)
-            lines.push('## Summary');
+            // SUMMARY VIEW (default) - Redesigned for better UX
+            // Calculate health score
+            const totalRegistered = stats.registeredAgents + stats.registeredWorkflows + stats.registeredTasks;
+            const totalIssues = stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks +
+                stats.missingAgents + stats.missingWorkflows + stats.missingTasks;
+            const healthScore = totalRegistered > 0
+                ? Math.round((totalRegistered / (totalRegistered + totalIssues)) * 100)
+                : 0;
+            // Header with health status
+            const healthEmoji = healthScore === 100 ? '💚' : healthScore >= 80 ? '💛' : healthScore >= 50 ? '🧡' : '❤️';
+            const healthText = healthScore === 100 ? 'Excellent' : healthScore >= 80 ? 'Good' : healthScore >= 50 ? 'Fair' : 'Needs Attention';
+            lines.push('┌─ System Health ────────────────────────────────────────────┐');
+            lines.push(`│  ${healthEmoji} ${healthText.padEnd(12)} │ Health Score: ${String(healthScore).padStart(3)}% ${this.renderHealthBar(healthScore)}`);
+            lines.push('└────────────────────────────────────────────────────────────┘');
             lines.push('');
-            lines.push(`**Active Location:** ${active.displayName} (Priority ${active.priority})`);
-            lines.push(`**Path:** \`${this.formatLocationPath(active)}\``);
+            // Active Location - simplified and cleaner
+            lines.push('📍 **Active Location**');
+            lines.push(`   ${active.displayName} · Priority ${active.priority}`);
+            const formattedPath = this.formatLocationPath(active);
+            const truncatedPath = formattedPath.length > 50
+                ? '...' + formattedPath.slice(-47)
+                : formattedPath;
+            lines.push(`   \`${truncatedPath}\``);
             lines.push('');
-            lines.push('### Available Resources');
-            lines.push(`- ✅ ${stats.registeredAgents} Agents registered`);
-            lines.push(`- ✅ ${stats.registeredWorkflows} Workflows registered`);
-            lines.push(`- ✅ ${stats.registeredTasks} Tasks registered`);
+            // Resource Summary - visual cards layout
+            lines.push('📦 **Resources Available**');
+            lines.push('');
+            lines.push('   ┌─ Agents ──────┬─ Workflows ───┬─ Tasks ───────┐');
+            lines.push(`   │  ✓ ${String(stats.registeredAgents).padStart(3)} ready  │  ✓ ${String(stats.registeredWorkflows).padStart(3)} ready │  ✓ ${String(stats.registeredTasks).padStart(3)} ready  │`);
+            lines.push('   └───────────────┴───────────────┴───────────────┘');
             lines.push('');
             const hasIssues = stats.orphanedAgents +
                 stats.orphanedWorkflows +
@@ -754,100 +787,117 @@ export class UnifiedBMADTool {
                 stats.missingTasks >
                 0;
             if (hasIssues) {
-                lines.push('### Issues Detected');
-                if (stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks >
-                    0) {
-                    lines.push('**Orphaned Files** (exist but not in manifest):');
+                lines.push('⚠️  **Issues Detected**');
+                lines.push('');
+                if (stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks > 0) {
+                    lines.push('   🔸 **Orphaned Files** (exist but not in manifest)');
                     if (stats.orphanedAgents > 0)
-                        lines.push(`- ⚠️  ${stats.orphanedAgents} agents`);
+                        lines.push(`      • ${stats.orphanedAgents} agent${stats.orphanedAgents > 1 ? 's' : ''}`);
                     if (stats.orphanedWorkflows > 0)
-                        lines.push(`- ⚠️  ${stats.orphanedWorkflows} workflows`);
+                        lines.push(`      • ${stats.orphanedWorkflows} workflow${stats.orphanedWorkflows > 1 ? 's' : ''}`);
                     if (stats.orphanedTasks > 0)
-                        lines.push(`- ⚠️  ${stats.orphanedTasks} tasks`);
+                        lines.push(`      • ${stats.orphanedTasks} task${stats.orphanedTasks > 1 ? 's' : ''}`);
+                    lines.push('      💡 Add these to manifest CSV files in `_cfg/`');
                     lines.push('');
                 }
-                if (stats.missingAgents + stats.missingWorkflows + stats.missingTasks >
-                    0) {
-                    lines.push('**Missing Files** (in manifest but not found):');
+                if (stats.missingAgents + stats.missingWorkflows + stats.missingTasks > 0) {
+                    lines.push('   🔸 **Missing Files** (in manifest but not found)');
                     if (stats.missingAgents > 0)
-                        lines.push(`- ❌ ${stats.missingAgents} agents`);
+                        lines.push(`      • ${stats.missingAgents} agent${stats.missingAgents > 1 ? 's' : ''}`);
                     if (stats.missingWorkflows > 0)
-                        lines.push(`- ❌ ${stats.missingWorkflows} workflows`);
+                        lines.push(`      • ${stats.missingWorkflows} workflow${stats.missingWorkflows > 1 ? 's' : ''}`);
                     if (stats.missingTasks > 0)
-                        lines.push(`- ❌ ${stats.missingTasks} tasks`);
+                        lines.push(`      • ${stats.missingTasks} task${stats.missingTasks > 1 ? 's' : ''}`);
+                    lines.push('      💡 Remove entries from manifest CSV files in `_cfg/`');
                     lines.push('');
                 }
             }
             else {
-                lines.push('### Status');
-                lines.push('✅ No issues detected - all files properly registered');
+                lines.push('✨ **All Clear!**');
+                lines.push('   All files are properly registered and available.');
                 lines.push('');
             }
-            lines.push('### Locations Scanned');
-            for (const location of sorted) {
-                const marker = location === active ? ' ← **ACTIVE**' : '';
-                lines.push(`${location.priority}. ${location.displayName}${marker} - \`${this.formatLocationPath(location)}\``);
+            // Scanned Locations - compact list
+            if (sorted.length > 1) {
+                lines.push('🗂️  **Scanned Locations**');
+                for (const location of sorted) {
+                    const marker = location === active ? '← active' : '';
+                    const priority = `${location.priority}.`;
+                    lines.push(`   ${priority} ${location.displayName} ${marker}`);
+                }
+                lines.push('');
             }
+            lines.push('─────────────────────────────────────────────────────────────');
             lines.push('');
-            lines.push('---');
-            lines.push('');
-            lines.push('*For detailed file-by-file listing, run:* `bmad *doctor --full`');
+            lines.push('💡 *Tip:* Run `bmad *doctor --full` for detailed file-by-file listing');
         }
         else {
-            // FULL DETAILED REPORT
-            lines.push('## Active Location');
-            lines.push(`**${active.displayName}** (Priority ${active.priority})`);
-            lines.push(`- Path: ${this.formatLocationPath(active)}`);
-            lines.push(`- Status: ${this.formatLocationStatus(active)}`);
+            // FULL DETAILED REPORT - Redesigned
+            lines.push('┌─ Active Configuration ─────────────────────────────────────┐');
+            lines.push(`│  Location: ${active.displayName}`);
+            lines.push(`│  Priority: ${active.priority}`);
+            lines.push(`│  Path: ${this.formatLocationPath(active)}`);
+            lines.push(`│  Status: ${this.formatLocationStatus(active)}`);
             if (active.manifestDir) {
-                lines.push(`- Manifest: ${active.manifestDir}`);
+                lines.push(`│  Manifest: ${active.manifestDir}`);
             }
+            lines.push('└────────────────────────────────────────────────────────────┘');
             lines.push('');
-            lines.push('## Detailed Inventory');
+            lines.push('📋 **Detailed Inventory**');
             lines.push('');
             for (const location of sorted) {
-                lines.push(`### ${location.displayName}`);
-                lines.push(`Path: \`${this.formatLocationPath(location)}\``);
+                const isActive = location === active;
+                const marker = isActive ? ' ⚡' : '';
+                lines.push(`╭─ ${location.displayName}${marker} ${'─'.repeat(Math.max(0, 48 - location.displayName.length - marker.length))}╮`);
+                lines.push(`│ 📂 \`${this.formatLocationPath(location)}\``);
                 const inventory = inventories.get(location);
                 if (inventory) {
-                    lines.push('');
-                    lines.push('**Agents:**');
-                    this.formatInventory(lines, inventory.agents, location, 'agent');
-                    lines.push('');
-                    lines.push('**Workflows:**');
-                    this.formatInventory(lines, inventory.workflows, location, 'workflow');
-                    lines.push('');
-                    lines.push('**Tasks:**');
-                    this.formatInventory(lines, inventory.tasks, location, 'task');
+                    lines.push('│');
+                    lines.push('│ 👤 **Agents:**');
+                    this.formatInventoryFull(lines, inventory.agents, location, 'agent');
+                    lines.push('│');
+                    lines.push('│ ⚙️  **Workflows:**');
+                    this.formatInventoryFull(lines, inventory.workflows, location, 'workflow');
+                    lines.push('│');
+                    lines.push('│ 📝 **Tasks:**');
+                    this.formatInventoryFull(lines, inventory.tasks, location, 'task');
                 }
                 else {
-                    lines.push('- ⚠️  Unable to scan location');
+                    lines.push('│   ⚠️  Unable to scan this location');
                 }
+                lines.push('╰' + '─'.repeat(60) + '╯');
                 lines.push('');
             }
-            lines.push('## Resolution Order');
+            lines.push('🔄 **Resolution Priority**');
             lines.push('');
-            lines.push('When loading files, BMAD checks locations in this order:');
+            lines.push('   BMAD checks locations in this order:');
             for (const location of sorted) {
-                const marker = location === active ? ' ← **ACTIVE**' : '';
-                lines.push(`${location.priority}. ${location.displayName}${marker}`);
+                const marker = location === active ? '← active' : '';
+                const status = location.status === 'valid' ? '✓' : '✗';
+                lines.push(`   ${status} ${location.priority}. ${location.displayName} ${marker}`);
             }
             lines.push('');
-            lines.push('## Legend');
-            lines.push('');
-            lines.push('- ✅ **Registered**: File exists and is in manifest (will load)');
-            lines.push('- ⚠️  **Orphaned**: File exists but NOT in manifest (will NOT load)');
-            lines.push('- ❌ **Missing**: In manifest but file missing (will fail to load)');
+            lines.push('┌─ Legend ───────────────────────────────────────────────────┐');
+            lines.push('│  ✅ Registered  → File exists and in manifest (will load)  │');
+            lines.push('│  ⚠️  Orphaned   → File exists but not in manifest          │');
+            lines.push('│  ❌ Missing     → In manifest but file not found           │');
+            lines.push('└────────────────────────────────────────────────────────────┘');
         }
         lines.push('');
-        lines.push('## Next Steps');
-        lines.push('- To initialize a writable BMAD directory: `bmad *init --help`');
-        if (stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks >
-            0) {
-            lines.push('- To add orphaned files to manifest: Update CSV files in `_cfg/`');
-        }
-        if (stats.missingAgents + stats.missingWorkflows + stats.missingTasks > 0) {
-            lines.push('- To remove missing entries: Update CSV files in `_cfg/`');
+        // Next Steps - more actionable and contextual
+        const hasOrphaned = stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks > 0;
+        const hasMissing = stats.missingAgents + stats.missingWorkflows + stats.missingTasks > 0;
+        if (hasOrphaned || hasMissing) {
+            lines.push('🛠️  **Recommended Actions**');
+            lines.push('');
+            if (hasMissing) {
+                lines.push('   1. Fix missing files: Update CSV manifests in `_cfg/`');
+            }
+            if (hasOrphaned) {
+                lines.push('   2. Register orphaned files: Add entries to `_cfg/*.csv`');
+            }
+            lines.push('   3. Initialize new BMAD directory: `bmad *init --help`');
+            lines.push('');
         }
         return {
             success: true,
@@ -1002,6 +1052,60 @@ export class UnifiedBMADTool {
             }
             const prefix = type === 'workflow' ? '*' : '';
             lines.push(`- ${status} \`${prefix}${item.name}\` - ${item.path}`);
+        }
+    }
+    /**
+     * Format inventory for full detailed display with borders.
+     */
+    formatInventoryFull(lines, items, location, type) {
+        if (items.length === 0) {
+            lines.push('│   None found');
+            return;
+        }
+        // Sort: registered first, then orphaned, then missing
+        const sorted = [...items].sort((a, b) => {
+            const aPath = path.join(location.resolvedRoot ?? '', a.path);
+            const bPath = path.join(location.resolvedRoot ?? '', b.path);
+            const aExists = fs.existsSync(aPath);
+            const bExists = fs.existsSync(bPath);
+            // Registered (in manifest + exists)
+            const aRegistered = a.inManifest && aExists;
+            const bRegistered = b.inManifest && bExists;
+            if (aRegistered && !bRegistered)
+                return -1;
+            if (!aRegistered && bRegistered)
+                return 1;
+            // Orphaned (exists but not in manifest)
+            const aOrphaned = !a.inManifest && aExists;
+            const bOrphaned = !b.inManifest && bExists;
+            if (aOrphaned && !bOrphaned)
+                return -1;
+            if (!aOrphaned && bOrphaned)
+                return 1;
+            // Missing (in manifest but doesn't exist)
+            return 0;
+        });
+        for (const item of sorted) {
+            const filePath = path.join(location.resolvedRoot ?? '', item.path);
+            const fileExists = fs.existsSync(filePath);
+            let status;
+            if (item.inManifest && fileExists) {
+                status = '✅';
+            }
+            else if (!item.inManifest && fileExists) {
+                status = '⚠️ ';
+            }
+            else if (item.inManifest && !fileExists) {
+                status = '❌';
+            }
+            else {
+                status = '❓';
+            }
+            const prefix = type === 'workflow' ? '*' : '';
+            const itemName = `${prefix}${item.name}`;
+            // Truncate path if too long for display
+            const displayPath = item.path.length > 40 ? '...' + item.path.slice(-37) : item.path;
+            lines.push(`│   ${status} ${itemName.padEnd(25)} ${displayPath}`);
         }
     }
     init(command) {
