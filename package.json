@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc && node ./scripts/copy-bmad.mjs && chmod +x build/index.js",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "start": "node build/index.js",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
