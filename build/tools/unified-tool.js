@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ManifestLoader } from '../utils/manifest-loader.js';
 import { FileReader } from '../utils/file-reader.js';
+import { FileScanner } from '../utils/file-scanner.js';
 import { detectManifestDirectory, } from '../utils/bmad-path-resolver.js';
 // Validation patterns
 const AGENT_NAME_PATTERN = /^[a-z]+(-[a-z]+)*$/;
@@ -95,24 +96,22 @@ export class UnifiedBMADTool {
         this.userBmadPath = discovery.userBmadPath;
         this.projectRoot = discovery.projectRoot;
         this.bmadRoot = path.resolve(bmadRoot);
-        const manifestDir = discovery.activeLocation.manifestDir;
-        if (!manifestDir) {
-            throw new Error('Active location missing manifest directory.');
-        }
-        this.manifestDir = manifestDir;
-        this.manifestLoader = new ManifestLoader(this.bmadRoot);
+        // Find a location with actual manifests for ManifestLoader
+        // Use the first location with manifestDir, or fall back to package
+        const manifestLocation = discovery.locations.find((loc) => loc.status === 'valid' && loc.manifestDir);
+        const manifestRoot = manifestLocation?.resolvedRoot ?? discovery.packageBmadPath;
+        this.manifestDir =
+            manifestLocation?.manifestDir ??
+                path.join(discovery.packageBmadPath, '_cfg');
+        this.manifestLoader = new ManifestLoader(manifestRoot);
         // Collect all BMAD roots for fallback file loading
         // Priority order: project -> cli -> env -> user -> package
-        // Include ALL locations with resolved paths (even partial/invalid structures)
-        // to allow workspace files to override specific files without needing full BMAD structure
+        // Only include locations with manifestDir (actual _cfg directory found)
+        // to ensure FileReader can find the actual BMAD assets
         const validRoots = [];
-        // Sort all locations by priority that have a resolved path (directory exists)
+        // Sort all locations by priority that have manifestDir
         const sortedLocations = [...discovery.locations]
-            .filter((loc) => {
-            // Include if it has a resolvedRoot (valid or invalid structure)
-            // OR if it has an originalPath that exists (even if marked missing during discovery)
-            return loc.resolvedRoot ?? (loc.originalPath && fs.existsSync(loc.originalPath));
-        })
+            .filter((loc) => loc.status === 'valid' && loc.manifestDir)
             .sort((a, b) => a.priority - b.priority);
         for (const location of sortedLocations) {
             const root = location.resolvedRoot ?? location.originalPath;
@@ -165,9 +164,10 @@ export class UnifiedBMADTool {
             console.error('Discovery command: list-tasks');
             return this.listTasks();
         }
-        else if (normalized === '*discover') {
-            console.error('Discovery command: discover');
-            return this.discover();
+        else if (normalized === '*doctor' || normalized.startsWith('*doctor ')) {
+            console.error('Discovery command: doctor');
+            const fullReport = normalized.includes('--full');
+            return this.discover(fullReport);
         }
         else if (normalized.startsWith('*init')) {
             console.error('Initialization command received');
@@ -616,40 +616,239 @@ export class UnifiedBMADTool {
             exitCode: 0,
         };
     }
-    discover() {
+    discover(fullReport = false) {
         const active = this.discovery.activeLocation;
         const lines = [];
-        lines.push('# BMAD Discovery Report');
+        lines.push('# BMAD Doctor Report');
         lines.push('');
-        lines.push(`Active Location: ${active.displayName}`);
-        lines.push(`- Priority: ${active.priority}`);
-        lines.push(`- Path: ${this.formatLocationPath(active)}`);
-        lines.push(`- Status: ${this.formatLocationStatus(active)}`);
-        const activeStats = this.getLocationStats(active);
-        if (activeStats) {
-            lines.push(`- Catalog: ${activeStats.agents} agents, ` +
-                `${activeStats.workflows} workflows, ${activeStats.tasks} tasks`);
-        }
-        lines.push('');
-        lines.push('Locations (priority order):');
-        const sorted = [...this.discovery.locations].sort((a, b) => a.priority - b.priority);
+        // Scan each valid location in priority order
+        const sorted = [...this.discovery.locations]
+            .filter((loc) => loc.status === 'valid' && loc.resolvedRoot)
+            .sort((a, b) => a.priority - b.priority);
+        // Collect statistics for summary
+        const stats = {
+            totalAgents: 0,
+            totalWorkflows: 0,
+            totalTasks: 0,
+            registeredAgents: 0,
+            registeredWorkflows: 0,
+            registeredTasks: 0,
+            orphanedAgents: 0,
+            orphanedWorkflows: 0,
+            orphanedTasks: 0,
+            missingAgents: 0,
+            missingWorkflows: 0,
+            missingTasks: 0,
+        };
+        // Scan all locations first to gather statistics
+        const inventories = new Map();
+        // Track unique files across all locations to avoid double-counting
+        const seenRegistered = {
+            agents: new Set(),
+            workflows: new Set(),
+            tasks: new Set(),
+        };
+        const seenOrphaned = {
+            agents: new Set(),
+            workflows: new Set(),
+            tasks: new Set(),
+        };
+        const seenMissing = {
+            agents: new Set(),
+            workflows: new Set(),
+            tasks: new Set(),
+        };
         for (const location of sorted) {
-            const marker = location === active ? ' [active]' : '';
-            const status = this.formatLocationStatus(location);
-            const pathLine = this.formatLocationPath(location);
-            const stats = this.getLocationStats(location);
-            let summary = `${location.priority}. ${location.displayName}${marker} - ${status}`;
-            summary += ` - ${pathLine}`;
-            if (stats) {
-                summary += ` - ${stats.agents} agents / ${stats.workflows} workflows / ${stats.tasks} tasks`;
-            }
-            lines.push(summary);
-            if (location.details) {
-                lines.push(`   Notes: ${location.details}`);
+            const inventory = this.scanLocation(location, sorted);
+            if (inventory) {
+                inventories.set(location, inventory);
+                // Count statistics - only count each unique file once
+                for (const agent of inventory.agents) {
+                    const filePath = path.join(location.resolvedRoot ?? '', agent.path);
+                    const fileExists = fs.existsSync(filePath);
+                    if (agent.inManifest && fileExists) {
+                        if (!seenRegistered.agents.has(agent.name)) {
+                            stats.registeredAgents++;
+                            seenRegistered.agents.add(agent.name);
+                        }
+                    }
+                    else if (!agent.inManifest && fileExists) {
+                        if (!seenOrphaned.agents.has(agent.name)) {
+                            stats.orphanedAgents++;
+                            seenOrphaned.agents.add(agent.name);
+                        }
+                    }
+                    else if (agent.inManifest && !fileExists) {
+                        if (!seenMissing.agents.has(agent.name)) {
+                            stats.missingAgents++;
+                            seenMissing.agents.add(agent.name);
+                        }
+                    }
+                }
+                for (const workflow of inventory.workflows) {
+                    const filePath = path.join(location.resolvedRoot ?? '', workflow.path);
+                    const fileExists = fs.existsSync(filePath);
+                    if (workflow.inManifest && fileExists) {
+                        if (!seenRegistered.workflows.has(workflow.name)) {
+                            stats.registeredWorkflows++;
+                            seenRegistered.workflows.add(workflow.name);
+                        }
+                    }
+                    else if (!workflow.inManifest && fileExists) {
+                        if (!seenOrphaned.workflows.has(workflow.name)) {
+                            stats.orphanedWorkflows++;
+                            seenOrphaned.workflows.add(workflow.name);
+                        }
+                    }
+                    else if (workflow.inManifest && !fileExists) {
+                        if (!seenMissing.workflows.has(workflow.name)) {
+                            stats.missingWorkflows++;
+                            seenMissing.workflows.add(workflow.name);
+                        }
+                    }
+                }
+                for (const task of inventory.tasks) {
+                    const filePath = path.join(location.resolvedRoot ?? '', task.path);
+                    const fileExists = fs.existsSync(filePath);
+                    if (task.inManifest && fileExists) {
+                        if (!seenRegistered.tasks.has(task.name)) {
+                            stats.registeredTasks++;
+                            seenRegistered.tasks.add(task.name);
+                        }
+                    }
+                    else if (!task.inManifest && fileExists) {
+                        if (!seenOrphaned.tasks.has(task.name)) {
+                            stats.orphanedTasks++;
+                            seenOrphaned.tasks.add(task.name);
+                        }
+                    }
+                    else if (task.inManifest && !fileExists) {
+                        if (!seenMissing.tasks.has(task.name)) {
+                            stats.missingTasks++;
+                            seenMissing.tasks.add(task.name);
+                        }
+                    }
+                }
+                stats.totalAgents += inventory.agents.length;
+                stats.totalWorkflows += inventory.workflows.length;
+                stats.totalTasks += inventory.tasks.length;
             }
         }
+        if (!fullReport) {
+            // SUMMARY VIEW (default)
+            lines.push('## Summary');
+            lines.push('');
+            lines.push(`**Active Location:** ${active.displayName} (Priority ${active.priority})`);
+            lines.push(`**Path:** \`${this.formatLocationPath(active)}\``);
+            lines.push('');
+            lines.push('### Available Resources');
+            lines.push(`- ✅ ${stats.registeredAgents} Agents registered`);
+            lines.push(`- ✅ ${stats.registeredWorkflows} Workflows registered`);
+            lines.push(`- ✅ ${stats.registeredTasks} Tasks registered`);
+            lines.push('');
+            const hasIssues = stats.orphanedAgents +
+                stats.orphanedWorkflows +
+                stats.orphanedTasks +
+                stats.missingAgents +
+                stats.missingWorkflows +
+                stats.missingTasks >
+                0;
+            if (hasIssues) {
+                lines.push('### Issues Detected');
+                if (stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks >
+                    0) {
+                    lines.push('**Orphaned Files** (exist but not in manifest):');
+                    if (stats.orphanedAgents > 0)
+                        lines.push(`- ⚠️  ${stats.orphanedAgents} agents`);
+                    if (stats.orphanedWorkflows > 0)
+                        lines.push(`- ⚠️  ${stats.orphanedWorkflows} workflows`);
+                    if (stats.orphanedTasks > 0)
+                        lines.push(`- ⚠️  ${stats.orphanedTasks} tasks`);
+                    lines.push('');
+                }
+                if (stats.missingAgents + stats.missingWorkflows + stats.missingTasks >
+                    0) {
+                    lines.push('**Missing Files** (in manifest but not found):');
+                    if (stats.missingAgents > 0)
+                        lines.push(`- ❌ ${stats.missingAgents} agents`);
+                    if (stats.missingWorkflows > 0)
+                        lines.push(`- ❌ ${stats.missingWorkflows} workflows`);
+                    if (stats.missingTasks > 0)
+                        lines.push(`- ❌ ${stats.missingTasks} tasks`);
+                    lines.push('');
+                }
+            }
+            else {
+                lines.push('### Status');
+                lines.push('✅ No issues detected - all files properly registered');
+                lines.push('');
+            }
+            lines.push('### Locations Scanned');
+            for (const location of sorted) {
+                const marker = location === active ? ' ← **ACTIVE**' : '';
+                lines.push(`${location.priority}. ${location.displayName}${marker} - \`${this.formatLocationPath(location)}\``);
+            }
+            lines.push('');
+            lines.push('---');
+            lines.push('');
+            lines.push('*For detailed file-by-file listing, run:* `bmad *doctor --full`');
+        }
+        else {
+            // FULL DETAILED REPORT
+            lines.push('## Active Location');
+            lines.push(`**${active.displayName}** (Priority ${active.priority})`);
+            lines.push(`- Path: ${this.formatLocationPath(active)}`);
+            lines.push(`- Status: ${this.formatLocationStatus(active)}`);
+            if (active.manifestDir) {
+                lines.push(`- Manifest: ${active.manifestDir}`);
+            }
+            lines.push('');
+            lines.push('## Detailed Inventory');
+            lines.push('');
+            for (const location of sorted) {
+                lines.push(`### ${location.displayName}`);
+                lines.push(`Path: \`${this.formatLocationPath(location)}\``);
+                const inventory = inventories.get(location);
+                if (inventory) {
+                    lines.push('');
+                    lines.push('**Agents:**');
+                    this.formatInventory(lines, inventory.agents, location, 'agent');
+                    lines.push('');
+                    lines.push('**Workflows:**');
+                    this.formatInventory(lines, inventory.workflows, location, 'workflow');
+                    lines.push('');
+                    lines.push('**Tasks:**');
+                    this.formatInventory(lines, inventory.tasks, location, 'task');
+                }
+                else {
+                    lines.push('- ⚠️  Unable to scan location');
+                }
+                lines.push('');
+            }
+            lines.push('## Resolution Order');
+            lines.push('');
+            lines.push('When loading files, BMAD checks locations in this order:');
+            for (const location of sorted) {
+                const marker = location === active ? ' ← **ACTIVE**' : '';
+                lines.push(`${location.priority}. ${location.displayName}${marker}`);
+            }
+            lines.push('');
+            lines.push('## Legend');
+            lines.push('');
+            lines.push('- ✅ **Registered**: File exists and is in manifest (will load)');
+            lines.push('- ⚠️  **Orphaned**: File exists but NOT in manifest (will NOT load)');
+            lines.push('- ❌ **Missing**: In manifest but file missing (will fail to load)');
+        }
         lines.push('');
-        lines.push('To initialize a writable BMAD directory, run `bmad *init --help`.');
+        lines.push('## Next Steps');
+        lines.push('- To initialize a writable BMAD directory: `bmad *init --help`');
+        if (stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks >
+            0) {
+            lines.push('- To add orphaned files to manifest: Update CSV files in `_cfg/`');
+        }
+        if (stats.missingAgents + stats.missingWorkflows + stats.missingTasks > 0) {
+            lines.push('- To remove missing entries: Update CSV files in `_cfg/`');
+        }
         return {
             success: true,
             type: 'diagnostic',
@@ -657,9 +856,153 @@ export class UnifiedBMADTool {
             data: {
                 activeLocation: active,
                 locations: sorted,
+                statistics: stats,
             },
             exitCode: 0,
         };
+    }
+    /**
+     * Scan a location for BMAD files and compare with ALL manifests across all locations.
+     * A file is only considered orphaned if it exists but is NOT in any manifest anywhere.
+     */
+    scanLocation(location, allLocations) {
+        if (!location.resolvedRoot) {
+            return undefined;
+        }
+        try {
+            const scanner = new FileScanner(location.resolvedRoot);
+            const scanned = scanner.scan();
+            // Load manifests from ALL locations to check if files are registered anywhere
+            const allAgents = new Set();
+            const allWorkflows = new Set();
+            const allTasks = new Set();
+            for (const loc of allLocations) {
+                if (!loc.resolvedRoot)
+                    continue;
+                try {
+                    const loader = new ManifestLoader(loc.resolvedRoot);
+                    loader.loadAgentManifest().forEach((a) => {
+                        if (a.name)
+                            allAgents.add(a.name);
+                    });
+                    loader.loadWorkflowManifest().forEach((w) => {
+                        if (w.name)
+                            allWorkflows.add(w.name);
+                    });
+                    loader.loadTaskManifest().forEach((t) => {
+                        if (t.name)
+                            allTasks.add(t.name);
+                    });
+                }
+                catch {
+                    // Skip locations with manifest errors
+                }
+            }
+            // Mark files based on whether they're in ANY manifest
+            for (const agent of scanned.agents) {
+                agent.inManifest = allAgents.has(agent.name);
+            }
+            for (const workflow of scanned.workflows) {
+                workflow.inManifest = allWorkflows.has(workflow.name);
+            }
+            for (const task of scanned.tasks) {
+                task.inManifest = allTasks.has(task.name);
+            }
+            // Load THIS location's manifest to find missing files
+            const loader = new ManifestLoader(location.resolvedRoot);
+            const agentManifest = loader.loadAgentManifest();
+            const workflowManifest = loader.loadWorkflowManifest();
+            const taskManifest = loader.loadTaskManifest();
+            // Add manifest entries from THIS location that have no file in THIS location
+            // Add manifest entries that have no file
+            for (const agent of agentManifest) {
+                if (agent.name && !scanned.agents.some((a) => a.name === agent.name)) {
+                    scanned.agents.push({
+                        name: agent.name,
+                        path: agent.path ?? '',
+                        type: 'agent',
+                        inManifest: true,
+                    });
+                }
+            }
+            for (const workflow of workflowManifest) {
+                if (workflow.name &&
+                    !scanned.workflows.some((w) => w.name === workflow.name)) {
+                    scanned.workflows.push({
+                        name: workflow.name,
+                        path: workflow.path ?? '',
+                        type: 'workflow',
+                        inManifest: true,
+                    });
+                }
+            }
+            for (const task of taskManifest) {
+                if (task.name && !scanned.tasks.some((t) => t.name === task.name)) {
+                    scanned.tasks.push({
+                        name: task.name,
+                        path: task.path ?? '',
+                        type: 'task',
+                        inManifest: true,
+                    });
+                }
+            }
+            return scanned;
+        }
+        catch (error) {
+            console.error(`Error scanning ${location.resolvedRoot}:`, error);
+            return undefined;
+        }
+    }
+    /**
+     * Format inventory for display.
+     */
+    formatInventory(lines, items, location, type) {
+        if (items.length === 0) {
+            lines.push('- None found');
+            return;
+        }
+        // Sort: registered first, then orphaned, then missing
+        const sorted = [...items].sort((a, b) => {
+            const aPath = path.join(location.resolvedRoot ?? '', a.path);
+            const bPath = path.join(location.resolvedRoot ?? '', b.path);
+            const aExists = fs.existsSync(aPath);
+            const bExists = fs.existsSync(bPath);
+            // Registered (in manifest + exists)
+            const aRegistered = a.inManifest && aExists;
+            const bRegistered = b.inManifest && bExists;
+            if (aRegistered && !bRegistered)
+                return -1;
+            if (!aRegistered && bRegistered)
+                return 1;
+            // Orphaned (exists but not in manifest)
+            const aOrphaned = !a.inManifest && aExists;
+            const bOrphaned = !b.inManifest && bExists;
+            if (aOrphaned && !bOrphaned)
+                return -1;
+            if (!aOrphaned && bOrphaned)
+                return 1;
+            // Missing (in manifest but doesn't exist)
+            return 0;
+        });
+        for (const item of sorted) {
+            const filePath = path.join(location.resolvedRoot ?? '', item.path);
+            const fileExists = fs.existsSync(filePath);
+            let status;
+            if (item.inManifest && fileExists) {
+                status = '✅';
+            }
+            else if (!item.inManifest && fileExists) {
+                status = '⚠️ ';
+            }
+            else if (item.inManifest && !fileExists) {
+                status = '❌';
+            }
+            else {
+                status = '❓';
+            }
+            const prefix = type === 'workflow' ? '*' : '';
+            lines.push(`- ${status} \`${prefix}${item.name}\` - ${item.path}`);
+        }
     }
     init(command) {
         const rawArgs = command.slice('*init'.length).trim();
@@ -836,7 +1179,7 @@ export class UnifiedBMADTool {
         }
         lines.push('');
         lines.push('After making changes, restart the BMAD MCP server or reconnect your client.');
-        lines.push('Run `bmad *discover` to verify the active location.');
+        lines.push('Run `bmad *doctor` to verify the active location.');
         lines.push('');
         lines.push('Priority order: project -> command argument -> BMAD_ROOT -> user -> package');
         return lines.join('\n');
@@ -890,7 +1233,8 @@ export class UnifiedBMADTool {
             '- `bmad *list-agents` → Show all available agents',
             '- `bmad *list-workflows` → Show all available workflows',
             '- `bmad *list-tasks` → Show all available tasks',
-            '- `bmad *discover` → Inspect available BMAD locations and resolution order',
+            '- `bmad *doctor` → Quick diagnostic summary',
+            '- `bmad *doctor --full` → Detailed file-by-file inventory',
             '- `bmad *init --help` → Initialize writable BMAD templates',
             '- `bmad *help` → Show this help message\n',
             '## Quick Start',

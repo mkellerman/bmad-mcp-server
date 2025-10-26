@@ -99,6 +99,15 @@ export declare class UnifiedBMADTool {
      */
     private listTasks;
     private discover;
+    /**
+     * Scan a location for BMAD files and compare with ALL manifests across all locations.
+     * A file is only considered orphaned if it exists but is NOT in any manifest anywhere.
+     */
+    private scanLocation;
+    /**
+     * Format inventory for display.
+     */
+    private formatInventory;
     private init;
     private initHelp;
     private performInitialization;

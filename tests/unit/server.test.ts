@@ -167,9 +167,11 @@ describe('BMADMCPServer', () => {
       const emptyDir = fixture.tmpDir + '/empty';
       require('fs').mkdirSync(emptyDir, { recursive: true });
 
-      expect(() => {
-        createServer(emptyDir);
-      }).toThrow('BMAD manifest directory not found');
+      // Now that we accept any directory, an empty directory is valid
+      // but won't have manifests, so server initialization should succeed
+      // but manifest loading will be empty
+      const server = createServer(emptyDir);
+      expect(server).toBeDefined();
     });
   });
 

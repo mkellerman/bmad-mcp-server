@@ -35,13 +35,14 @@ describe('ManifestLoader', () => {
       expect(loader).toBeDefined();
     });
 
-    it('should throw error if manifest directory not found', () => {
+    it('should not throw error if manifest directory not found', () => {
       const emptyDir = path.join(fixture.tmpDir, 'empty');
       fs.mkdirSync(emptyDir, { recursive: true });
 
+      // Should not throw - will use directory directly and look for _cfg within it
       expect(() => {
         new ManifestLoader(emptyDir);
-      }).toThrow('BMAD manifest directory not found');
+      }).not.toThrow();
     });
 
     it('should support legacy bmad/_cfg structure', () => {
