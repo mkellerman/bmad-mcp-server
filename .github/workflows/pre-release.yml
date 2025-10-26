@@ -40,7 +40,7 @@ jobs:
         id: pr_info
         run: |
           echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          echo "short_sha=$(echo ${{ github.event.pull_request.head.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})" >> $GITHUB_OUTPUT
           echo "branch_name=${{ github.head_ref }}" >> $GITHUB_OUTPUT
 
       - name: Create pre-release tag
