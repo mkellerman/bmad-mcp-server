@@ -222,7 +222,7 @@ function findManifestDirectory(
   const nestedCfg = path.join(candidateRoot, 'bmad', '_cfg');
   if (fs.existsSync(nestedCfg) && fs.statSync(nestedCfg).isDirectory()) {
     return {
-      resolvedRoot: candidateRoot,
+      resolvedRoot: path.join(candidateRoot, 'bmad'),
       manifestDir: nestedCfg,
     };
   }
@@ -231,7 +231,7 @@ function findManifestDirectory(
   const srcCfg = path.join(candidateRoot, 'src', 'bmad', '_cfg');
   if (fs.existsSync(srcCfg) && fs.statSync(srcCfg).isDirectory()) {
     return {
-      resolvedRoot: path.join(candidateRoot, 'src'),
+      resolvedRoot: path.join(candidateRoot, 'src', 'bmad'),
       manifestDir: srcCfg,
     };
   }
