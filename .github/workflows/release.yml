@@ -45,7 +45,7 @@ jobs:
           path: .
 
       - name: Install dependencies (for semantic-release plugins)
-        run: npm ci --only=production
+        run: npm ci --omit=dev
 
       - name: Release
         env:
