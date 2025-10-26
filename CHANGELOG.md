@@ -1,3 +1,10 @@
+## [0.2.3](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.2...v0.2.3) (2025-10-26)
+
+
+### Bug Fixes
+
+* add js-yaml dependency to package.json ([3dedbff](https://github.com/mkellerman/bmad-mcp-server/commit/3dedbffc21c5b424583e83cce495643c6dbbd8e1))
+
 ## [0.2.2](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.1...v0.2.2) (2025-10-26)
 
 
