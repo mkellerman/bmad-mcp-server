@@ -111,6 +111,7 @@ jobs:
             build/
             package.json
             package-lock.json
+            .releaserc.json
           retention-days: 7
           if-no-files-found: error
 
