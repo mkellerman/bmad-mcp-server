@@ -45,6 +45,8 @@ jobs:
           path: .
 
       - name: Install dependencies (for semantic-release plugins)
+        env:
+          HUSKY: 0
         run: npm ci
 
       - name: Release

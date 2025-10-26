@@ -36,6 +36,8 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        env:
+          HUSKY: 0
         run: npm ci
 
       - name: Run ESLint
@@ -55,6 +57,8 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        env:
+          HUSKY: 0
         run: npm ci
 
       - name: Run tests
@@ -86,6 +90,8 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        env:
+          HUSKY: 0
         run: npm ci
 
       - name: Build package
