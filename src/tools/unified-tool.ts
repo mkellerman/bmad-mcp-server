@@ -145,7 +145,7 @@ export class UnifiedBMADTool {
         manifestDir = packageCfgDir;
       } else {
         throw new Error(
-          `No valid manifest directory found. Searched locations: ${discovery.locations.map(loc => loc.resolvedRoot || loc.originalPath).join(', ')} and fallback package path ${packageCfgDir}`
+          `No valid manifest directory found. Searched locations: ${discovery.locations.map(loc => loc.resolvedRoot ?? loc.originalPath).join(', ')} and fallback package path ${packageCfgDir}`
         );
       }
     }
