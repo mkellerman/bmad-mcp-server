@@ -98,7 +98,24 @@ export declare class UnifiedBMADTool {
      * List all available tasks from task manifest.
      */
     private listTasks;
+    /**
+     * Render a visual health bar for the diagnostic summary
+     */
+    private renderHealthBar;
     private discover;
+    /**
+     * Scan a location for BMAD files and compare with ALL manifests across all locations.
+     * A file is only considered orphaned if it exists but is NOT in any manifest anywhere.
+     */
+    private scanLocation;
+    /**
+     * Format inventory for display.
+     */
+    private formatInventory;
+    /**
+     * Format inventory for full detailed display with borders.
+     */
+    private formatInventoryFull;
     private init;
     private initHelp;
     private performInitialization;

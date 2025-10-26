@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { YAMLTestLoader } from './yaml-loader';
@@ -6,7 +6,7 @@ import { LLMClient } from './llm-client';
 import { ValidatorRegistry } from './validators';
 
 /**
- * Playwright Test Runner for YAML-based LLM tests
+ * Vitest Test Runner for YAML-based LLM tests
  * Dynamically generates tests from YAML files in test-cases directory
  */
 
@@ -18,18 +18,18 @@ const TEST_CASES_DIR = path.join(__dirname, '../test-cases');
 const testSuites = YAMLTestLoader.loadTestDirectory(TEST_CASES_DIR);
 
 if (testSuites.length === 0) {
-  test('No test suites found', () => {
+  it('No test suites found', () => {
     console.warn(`Warning: No YAML test files found in ${TEST_CASES_DIR}`);
   });
 }
 
-// Generate Playwright tests for each suite
+// Generate Vitest tests for each suite
 for (const suite of testSuites) {
-  test.describe(suite.name, () => {
+  describe(suite.name, () => {
     let llmClient: LLMClient;
     let validators: ValidatorRegistry;
 
-    test.beforeAll(async () => {
+    beforeAll(async () => {
       // Initialize LLM client
       llmClient = new LLMClient();
 
@@ -54,52 +54,58 @@ for (const suite of testSuites) {
       console.log(`⚖️  Judge: ${suite.config.judge_model}\n`);
     });
 
-    test.describe(suite.description, () => {
+    describe(suite.description, () => {
       for (const testCase of suite.tests) {
-        test(testCase.name, async () => {
-          // Set test timeout
-          test.setTimeout(suite.config.timeout || 30000);
+        it(
+          testCase.name,
+          async () => {
+            const promptPreview =
+              testCase.prompt.length > 80
+                ? testCase.prompt.substring(0, 80) + '...'
+                : testCase.prompt;
+            console.log(`\n🧪 ${testCase.name}`);
+            console.log(`   ${promptPreview}`);
 
-          const promptPreview =
-            testCase.prompt.length > 80
-              ? testCase.prompt.substring(0, 80) + '...'
-              : testCase.prompt;
-          console.log(`\n🧪 ${testCase.name}`);
-          console.log(`   ${promptPreview}`);
+            // Execute LLM call
+            const startTime = Date.now();
+            const completion = await llmClient.chat(
+              suite.config.llm_model,
+              [{ role: 'user', content: testCase.prompt }],
+              { temperature: suite.config.temperature },
+            );
+            const responseTime = Date.now() - startTime;
 
-          // Execute LLM call
-          const startTime = Date.now();
-          const completion = await llmClient.chat(
-            suite.config.llm_model,
-            [{ role: 'user', content: testCase.prompt }],
-            { temperature: suite.config.temperature },
-          );
-          const responseTime = Date.now() - startTime;
+            const responseText = llmClient.getResponseText(completion);
+            const responsePreview =
+              responseText.length > 100
+                ? responseText.substring(0, 100) + '...'
+                : responseText;
+            console.log(
+              `   ✓ Response (${responseTime}ms): ${responsePreview}`,
+            );
 
-          const responseText = llmClient.getResponseText(completion);
-          const responsePreview =
-            responseText.length > 100
-              ? responseText.substring(0, 100) + '...'
-              : responseText;
-          console.log(`   ✓ Response (${responseTime}ms): ${responsePreview}`);
+            // Run all validators
+            for (const expectation of testCase.expectations) {
+              const result = await validators.validate(
+                responseText,
+                expectation,
+              );
 
-          // Run all validators
-          for (const expectation of testCase.expectations) {
-            const result = await validators.validate(responseText, expectation);
-
-            if (result.pass) {
-              console.log(`   ✓ ${expectation.type}`);
-            } else {
-              console.log(`   ✗ ${expectation.type}: ${result.message}`);
-              if (result.details) {
-                console.log(`     ${JSON.stringify(result.details)}`);
+              if (result.pass) {
+                console.log(`   ✓ ${expectation.type}`);
+              } else {
+                console.log(`   ✗ ${expectation.type}: ${result.message}`);
+                if (result.details) {
+                  console.log(`     ${JSON.stringify(result.details)}`);
+                }
               }
-            }
 
-            // Assert validation passed
-            expect(result.pass, result.message).toBe(true);
-          }
-        });
+              // Assert validation passed
+              expect(result.pass, result.message).toBe(true);
+            }
+          },
+          suite.config.timeout || 30000,
+        );
       }
     });
   });

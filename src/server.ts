@@ -68,10 +68,9 @@ export class BMADMCPServer {
     this.bmadRoot = path.resolve(bmadRoot);
     console.error(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
 
-    const manifestDir = discovery.activeLocation.manifestDir;
-    if (!manifestDir) {
-      throw new Error('Active BMAD location missing manifest directory');
-    }
+    // Manifest directory is optional - default to _cfg if not found
+    const manifestDir =
+      discovery.activeLocation.manifestDir ?? path.join(this.bmadRoot, '_cfg');
 
     this.projectRoot = this.bmadRoot;
     console.error(`Project root: ${this.projectRoot}`);

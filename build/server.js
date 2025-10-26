@@ -53,10 +53,8 @@ export class BMADMCPServer {
         this.discovery = discovery;
         this.bmadRoot = path.resolve(bmadRoot);
         console.error(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
-        const manifestDir = discovery.activeLocation.manifestDir;
-        if (!manifestDir) {
-            throw new Error('Active BMAD location missing manifest directory');
-        }
+        // Manifest directory is optional - default to _cfg if not found
+        const manifestDir = discovery.activeLocation.manifestDir ?? path.join(this.bmadRoot, '_cfg');
         this.projectRoot = this.bmadRoot;
         console.error(`Project root: ${this.projectRoot}`);
         console.error(`Manifest directory: ${manifestDir}`);
@@ -403,7 +401,8 @@ export async function main() {
         const packageJson = JSON.parse(packageJsonContent);
         version = packageJson.version ?? 'unknown';
     }
-    catch {
+    catch (error) {
+        console.error('Failed to read package.json:', error);
         // Silently fall back to 'unknown' if package.json can't be read
     }
     const discovery = resolveBmadPaths({

@@ -2,14 +2,7 @@
  * Unit tests for ManifestLoader
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  jest,
-} from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ManifestLoader } from '../../src/utils/manifest-loader.js';
 import {
   createTestFixture,
@@ -42,13 +35,14 @@ describe('ManifestLoader', () => {
       expect(loader).toBeDefined();
     });
 
-    it('should throw error if manifest directory not found', () => {
+    it('should not throw error if manifest directory not found', () => {
       const emptyDir = path.join(fixture.tmpDir, 'empty');
       fs.mkdirSync(emptyDir, { recursive: true });
 
+      // Should not throw - will use directory directly and look for _cfg within it
       expect(() => {
         new ManifestLoader(emptyDir);
-      }).toThrow('BMAD manifest directory not found');
+      }).not.toThrow();
     });
 
     it('should support legacy bmad/_cfg structure', () => {
@@ -119,9 +113,7 @@ another,Another,Another Agent,,another,,,,bmm,another.md`;
         path.join(fixture.tmpDir, 'src', 'bmad', '_cfg', 'agent-manifest.csv'),
       );
 
-      const consoleSpy = jest
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const agents = emptyLoader.loadAgentManifest();
 
       expect(agents).toEqual([]);
@@ -132,7 +124,7 @@ another,Another,Another Agent,,another,,,,bmm,another.md`;
     });
 
     it('should log number of loaded entries', () => {
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       loader.loadAgentManifest();
@@ -157,7 +149,7 @@ another,Another,Another Agent,,another,,,,bmm,another.md`;
         'utf-8',
       );
 
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       const agents = loader.loadAgentManifest();

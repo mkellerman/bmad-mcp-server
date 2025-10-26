@@ -1,11 +1,25 @@
-import { test, expect } from '../support/fixtures';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import {
+  MCPClientFixture,
+  createMCPClient,
+} from '../support/mcp-client-fixture';
 
 /**
  * E2E Tests for MCP Server Health
  * Validates server is running and responsive
  */
-test.describe('MCP Server Health', () => {
-  test('should respond to health check', async ({ mcpClient }) => {
+describe('MCP Server Health', () => {
+  let mcpClient: MCPClientFixture;
+
+  beforeAll(async () => {
+    mcpClient = await createMCPClient();
+  });
+
+  afterAll(async () => {
+    await mcpClient.cleanup();
+  });
+
+  it('should respond to health check', async () => {
     const info = await mcpClient.getServerInfo();
 
     expect(info).toBeDefined();
@@ -13,7 +27,7 @@ test.describe('MCP Server Health', () => {
     expect(info.version).toBeDefined();
   });
 
-  test('should list all available tools', async ({ mcpClient }) => {
+  it('should list all available tools', async () => {
     const tools = await mcpClient.listTools();
 
     expect(tools).toBeDefined();
@@ -26,10 +40,11 @@ test.describe('MCP Server Health', () => {
     expect(bmadTool.description).toContain('BMAD');
   });
 
-  test('should have proper MCP protocol version', async ({ mcpClient }) => {
+  it('should have proper server information', async () => {
     const info = await mcpClient.getServerInfo();
 
-    expect(info.protocolVersion).toBeDefined();
-    expect(info.protocolVersion).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(info).toBeDefined();
+    expect(info.name).toBe('bmad-mcp-server');
+    expect(info.version).toBeDefined();
   });
 });

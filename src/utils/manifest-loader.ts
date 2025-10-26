@@ -45,9 +45,8 @@ export class ManifestLoader {
       return;
     }
 
-    throw new Error(
-      `BMAD manifest directory not found. Checked ${srcCfg}, ${nestedPath} and ${directPath}`,
-    );
+    // If no _cfg directory found, use the default path (it might not exist yet)
+    this.manifestDir = directPath;
   }
 
   /**
@@ -107,7 +106,7 @@ export class ManifestLoader {
         Object.values(row as Record<string, unknown>).some(
           (value) => String(value).trim() !== '',
         ),
-      );
+      ) as T[];
 
       console.error(`Loaded ${filtered.length} entries from ${filename}`);
       return filtered;

@@ -2,7 +2,7 @@
  * Unit tests for YAML Test Loader
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { YAMLTestLoader } from '../e2e/framework/yaml-loader';
 import * as fs from 'fs';
 import * as path from 'path';

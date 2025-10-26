@@ -37,7 +37,8 @@ export class ManifestLoader {
             this.manifestDir = directPath;
             return;
         }
-        throw new Error(`BMAD manifest directory not found. Checked ${srcCfg}, ${nestedPath} and ${directPath}`);
+        // If no _cfg directory found, use the default path (it might not exist yet)
+        this.manifestDir = directPath;
     }
     /**
      * Load agent-manifest.csv and return list of agent metadata.

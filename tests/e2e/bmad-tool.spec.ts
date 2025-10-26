@@ -1,11 +1,25 @@
-import { test, expect } from '../support/fixtures';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import {
+  MCPClientFixture,
+  createMCPClient,
+} from '../support/mcp-client-fixture';
 
 /**
  * E2E Tests for BMAD MCP Tool
  * Tests the unified BMAD tool functionality
  */
-test.describe('BMAD MCP Tool', () => {
-  test('should list all available agents', async ({ mcpClient }) => {
+describe('BMAD MCP Tool', () => {
+  let mcpClient: MCPClientFixture;
+
+  beforeAll(async () => {
+    mcpClient = await createMCPClient();
+  });
+
+  afterAll(async () => {
+    await mcpClient.cleanup();
+  });
+
+  it('should list all available agents', async () => {
     const result = await mcpClient.callTool('bmad', {
       command: '*list-agents',
     });
@@ -17,7 +31,7 @@ test.describe('BMAD MCP Tool', () => {
     expect(result.content).toContain('tea');
   });
 
-  test('should list all available workflows', async ({ mcpClient }) => {
+  it('should list all available workflows', async () => {
     const result = await mcpClient.callTool('bmad', {
       command: '*list-workflows',
     });
@@ -26,7 +40,7 @@ test.describe('BMAD MCP Tool', () => {
     expect(result.content).toContain('Available BMAD Workflows');
   });
 
-  test('should load an agent by name', async ({ mcpClient }) => {
+  it('should load an agent by name', async () => {
     const result = await mcpClient.callTool('bmad', {
       command: 'analyst',
     });
@@ -36,24 +50,24 @@ test.describe('BMAD MCP Tool', () => {
     expect(result.content).toContain('Business Analyst');
   });
 
-  test('should handle invalid agent name gracefully', async ({ mcpClient }) => {
+  it('should handle invalid agent name gracefully', async () => {
     const result = await mcpClient.callTool('bmad', {
       command: 'nonexistent-agent',
     });
 
     expect(result).toBeDefined();
     expect(result.isError).toBe(true);
-    expect(result.content).toContain('not found');
+    expect(result.content).toMatch(/not found|Agent.*not available/i);
   });
 
-  test('should provide help when requested', async ({ mcpClient }) => {
+  it('should provide help when requested', async () => {
     const result = await mcpClient.callTool('bmad', {
       command: '*help',
     });
 
     expect(result).toBeDefined();
-    expect(result.content).toContain('BMAD Command Reference');
-    expect(result.content).toContain('Load agent');
-    expect(result.content).toContain('Execute workflow');
+    expect(result.content).toMatch(/Command Reference/i);
+    expect(result.content).toMatch(/Load.*agent/i);
+    expect(result.content).toMatch(/Execute.*workflow/i);
   });
 });

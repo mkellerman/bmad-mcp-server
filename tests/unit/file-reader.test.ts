@@ -2,14 +2,7 @@
  * Unit tests for FileReader
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  jest,
-} from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   FileReader,
   FileReadError,
@@ -50,9 +43,7 @@ describe('FileReader', () => {
     });
 
     it('should warn if BMAD root does not exist', () => {
-      const consoleSpy = jest
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const nonExistentPath = path.join(fixture.tmpDir, 'nonexistent');
       new FileReader(nonExistentPath);
 
@@ -110,7 +101,7 @@ describe('FileReader', () => {
     });
 
     it('should log successful reads', () => {
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       const testFile = path.join(fixture.tmpDir, 'src', 'bmad', 'test.txt');

@@ -2,14 +2,7 @@
  * Unit tests for UnifiedBMADTool
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  jest,
-} from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
 import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
 import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
@@ -115,7 +108,7 @@ describe('UnifiedBMADTool', () => {
     });
 
     it('should load manifests on initialization', () => {
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       createUnifiedTool(fixture.tmpDir);
@@ -360,6 +353,57 @@ describe('UnifiedBMADTool', () => {
   });
 
   describe('edge cases', () => {
+    it('should skip invalid BMAD_ROOT and use package defaults', async () => {
+      // Create a separate test environment
+      const testFixture = createTestFixture();
+
+      // Create an invalid BMAD_ROOT (a file, not a directory)
+      const invalidRoot = path.join(testFixture.tmpDir, 'invalid-root.txt');
+      require('fs').writeFileSync(invalidRoot, 'not a directory');
+
+      // Create valid package location with agent
+      const packageBmad = path.join(testFixture.tmpDir, 'package');
+      createBMADStructure(packageBmad);
+      createAgentManifest(packageBmad);
+      createAgentFile(packageBmad, 'core/agents/bmad-master.md', SAMPLE_AGENT);
+
+      // Use a clean working directory without bmad structure
+      const cleanWorkDir = path.join(testFixture.tmpDir, 'work');
+      require('fs').mkdirSync(cleanWorkDir, { recursive: true });
+
+      // Resolve paths with invalid env var
+      const discovery = resolveBmadPaths({
+        cwd: '/nonexistent/path',
+        envVar: invalidRoot,
+        packageRoot: packageBmad,
+        userBmadPath: path.join(testFixture.tmpDir, '.bmad'),
+      });
+
+      // Verify that invalid location is marked correctly
+      const envLocation = discovery.locations.find(
+        (loc) => loc.source === 'env',
+      );
+      expect(envLocation?.status).toBe('invalid');
+
+      // Active location should be package, not env
+      expect(discovery.activeLocation.source).toBe('package');
+
+      // Create tool and verify it can load agents from package
+      const root = discovery.activeLocation.resolvedRoot ?? packageBmad;
+      const testTool = new UnifiedBMADTool({
+        bmadRoot: root,
+        discovery,
+      });
+
+      const result = await testTool.execute('bmad-master');
+
+      // Should successfully load from package, not fail with invalid env path
+      expect(result.success).toBe(true);
+      expect(result.type).toBe('agent');
+
+      testFixture.cleanup();
+    });
+
     it('should handle empty manifest gracefully', async () => {
       // Create a tool with no agents/workflows
       const emptyFixture = createTestFixture();

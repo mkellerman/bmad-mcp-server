@@ -58,7 +58,7 @@ export function resolveBmadPaths(
   ];
   const packageBmadPath =
     packageBmadCandidates.find((candidate) => fs.existsSync(candidate)) ??
-    packageBmadCandidates[0];
+    options.packageRoot; // Fallback to package root itself if no bmad subfolder found
   const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
 
   const candidates: BmadLocationInfo[] = [
@@ -113,18 +113,23 @@ function resolveCandidate(candidate?: string): Partial<BmadLocationInfo> {
     };
   }
 
-  const manifest = findManifestDirectory(resolvedPath);
-  if (!manifest) {
+  const stats = fs.statSync(resolvedPath);
+  if (!stats.isDirectory()) {
     return {
       status: 'invalid',
       resolvedRoot: resolvedPath,
+      originalPath: candidate,
     };
   }
 
+  // Directory exists - determine the manifest directory and BMAD root
+  const manifest = findManifestDirectory(resolvedPath);
+
   return {
     status: 'valid',
-    resolvedRoot: manifest.resolvedRoot,
-    manifestDir: manifest.manifestDir,
+    resolvedRoot: manifest?.resolvedRoot ?? resolvedPath,
+    manifestDir: manifest?.manifestDir,
+    originalPath: candidate,
   };
 }
 
@@ -142,11 +147,16 @@ function enrichCandidate(location: BmadLocationInfo): BmadLocationInfo {
     location.resolvedRoot &&
     location.manifestDir
   ) {
+    location.details = `Using manifests from ${location.manifestDir}`;
+    return location;
+  }
+  if (location.status === 'valid' && location.resolvedRoot) {
+    location.details = 'Using directory directly (no _cfg found)';
     return location;
   }
 
   if (location.status === 'invalid' && location.resolvedRoot) {
-    location.details = `No _cfg manifests found under ${location.resolvedRoot}`;
+    location.details = 'Path exists but is not a directory';
   }
 
   if (location.status === 'missing') {
@@ -175,38 +185,20 @@ function findManifestDirectory(
     return undefined;
   }
 
-  const directCfg = path.join(candidateRoot, '_cfg');
-  if (fs.existsSync(directCfg) && fs.statSync(directCfg).isDirectory()) {
-    return {
-      resolvedRoot: candidateRoot,
-      manifestDir: directCfg,
-    };
-  }
-
-  const nestedCfg = path.join(candidateRoot, 'bmad', '_cfg');
-  if (fs.existsSync(nestedCfg) && fs.statSync(nestedCfg).isDirectory()) {
-    return {
-      resolvedRoot: candidateRoot,
-      manifestDir: nestedCfg,
-    };
-  }
-
-  const srcCfg = path.join(candidateRoot, 'src', 'bmad', '_cfg');
-  if (fs.existsSync(srcCfg) && fs.statSync(srcCfg).isDirectory()) {
-    return {
-      resolvedRoot: path.join(candidateRoot, 'src', 'bmad'),
-      manifestDir: srcCfg,
-    };
-  }
-
+  // Special case: if the path itself is named '_cfg', verify parent is 'bmad'
   if (path.basename(candidateRoot) === '_cfg') {
     const parent = path.dirname(candidateRoot);
-    return {
-      resolvedRoot: parent,
-      manifestDir: candidateRoot,
-    };
+    if (path.basename(parent) === 'bmad') {
+      return {
+        resolvedRoot: parent,
+        manifestDir: candidateRoot,
+      };
+    }
+    // _cfg exists but parent is not 'bmad', invalid structure
+    return undefined;
   }
 
+  // Special case: if the path itself is named 'bmad', look for _cfg inside it
   if (path.basename(candidateRoot) === 'bmad') {
     const innerCfg = path.join(candidateRoot, '_cfg');
     if (fs.existsSync(innerCfg) && fs.statSync(innerCfg).isDirectory()) {
@@ -217,6 +209,38 @@ function findManifestDirectory(
     }
   }
 
+  // Check if this is a bmad root directory (contains _cfg directly)
+  const directCfg = path.join(candidateRoot, '_cfg');
+  if (fs.existsSync(directCfg) && fs.statSync(directCfg).isDirectory()) {
+    // Verify this is actually a bmad folder by checking if parent structure makes sense
+    // or if we're already in a folder named 'bmad'
+    if (path.basename(candidateRoot) === 'bmad') {
+      return {
+        resolvedRoot: candidateRoot,
+        manifestDir: directCfg,
+      };
+    }
+  }
+
+  // Check for bmad/_cfg nested structure (standard case)
+  const nestedCfg = path.join(candidateRoot, 'bmad', '_cfg');
+  if (fs.existsSync(nestedCfg) && fs.statSync(nestedCfg).isDirectory()) {
+    return {
+      resolvedRoot: path.join(candidateRoot, 'bmad'),
+      manifestDir: nestedCfg,
+    };
+  }
+
+  // Check for src/bmad/_cfg nested structure (development case)
+  const srcCfg = path.join(candidateRoot, 'src', 'bmad', '_cfg');
+  if (fs.existsSync(srcCfg) && fs.statSync(srcCfg).isDirectory()) {
+    return {
+      resolvedRoot: path.join(candidateRoot, 'src', 'bmad'),
+      manifestDir: srcCfg,
+    };
+  }
+
+  // No valid bmad structure found
   return undefined;
 }
 

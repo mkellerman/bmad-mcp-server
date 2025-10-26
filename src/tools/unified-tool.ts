@@ -15,6 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ManifestLoader } from '../utils/manifest-loader.js';
 import { FileReader } from '../utils/file-reader.js';
+import { FileScanner } from '../utils/file-scanner.js';
 import type {
   Agent,
   Workflow,
@@ -23,6 +24,7 @@ import type {
   ParsedCommand,
   WorkflowContext,
 } from '../types/index.js';
+import type { ScannedFile } from '../utils/file-scanner.js';
 import {
   detectManifestDirectory,
   type BmadLocationInfo,
@@ -122,13 +124,75 @@ export class UnifiedBMADTool {
     this.projectRoot = discovery.projectRoot;
 
     this.bmadRoot = path.resolve(bmadRoot);
-    const manifestDir = discovery.activeLocation.manifestDir;
-    if (!manifestDir) {
-      throw new Error('Active location missing manifest directory.');
+
+    // Find a location with actual manifests for ManifestLoader
+    // Use the first location with manifestDir, or fall back to package
+    const manifestLocation = discovery.locations.find(
+      (loc) => loc.status === 'valid' && loc.manifestDir,
+    );
+
+    let manifestRoot: string;
+    let manifestDir: string;
+
+    if (manifestLocation?.manifestDir) {
+      manifestRoot = manifestLocation.resolvedRoot ?? bmadRoot;
+      manifestDir = manifestLocation.manifestDir;
+    } else {
+      // Fallback: check if packageBmadPath has a _cfg directory
+      const packageCfgDir = path.join(discovery.packageBmadPath, '_cfg');
+      if (
+        fs.existsSync(packageCfgDir) &&
+        fs.statSync(packageCfgDir).isDirectory()
+      ) {
+        manifestRoot = discovery.packageBmadPath;
+        manifestDir = packageCfgDir;
+      } else {
+        // No manifest directory found - use bmadRoot as fallback
+        // This allows initialization without manifests (empty project scenario)
+        manifestRoot = bmadRoot;
+        manifestDir = path.join(bmadRoot, '_cfg');
+      }
     }
+
     this.manifestDir = manifestDir;
-    this.manifestLoader = new ManifestLoader(this.bmadRoot);
-    this.fileReader = new FileReader(this.bmadRoot);
+    this.manifestLoader = new ManifestLoader(manifestRoot);
+
+    // Collect all BMAD roots for fallback file loading
+    // Priority order: project -> cli -> env -> user -> package
+    // Only include locations with manifestDir (actual _cfg directory found)
+    // to ensure FileReader can find the actual BMAD assets
+    const validRoots: string[] = [];
+
+    // Sort all locations by priority that have manifestDir
+    const sortedLocations = [...discovery.locations]
+      .filter((loc) => loc.status === 'valid' && loc.manifestDir)
+      .sort((a, b) => a.priority - b.priority);
+
+    for (const location of sortedLocations) {
+      const root = location.resolvedRoot ?? location.originalPath;
+      if (root && !validRoots.includes(root)) {
+        validRoots.push(root);
+      }
+    }
+
+    // Always add package location as final fallback (if not already included)
+    if (!validRoots.includes(discovery.packageBmadPath)) {
+      validRoots.push(discovery.packageBmadPath);
+    }
+
+    console.error(
+      `FileReader fallback chain (${validRoots.length} locations):`,
+    );
+    validRoots.forEach((root, idx) => {
+      const location = discovery.locations.find(
+        (loc) => loc.resolvedRoot === root || loc.originalPath === root,
+      );
+      const source = location?.displayName ?? 'Package';
+      const status = location ? ` [${location.status}]` : '';
+      console.error(`  ${idx + 1}. ${source}${status}: ${root}`);
+    });
+
+    this.fileReader = new FileReader(validRoots);
 
     // Load manifests on init for validation
     this.agents = this.manifestLoader.loadAgentManifest();
@@ -166,9 +230,10 @@ export class UnifiedBMADTool {
     } else if (normalized === '*list-tasks') {
       console.error('Discovery command: list-tasks');
       return this.listTasks();
-    } else if (normalized === '*discover') {
-      console.error('Discovery command: discover');
-      return this.discover();
+    } else if (normalized === '*doctor' || normalized.startsWith('*doctor ')) {
+      console.error('Discovery command: doctor');
+      const fullReport = normalized.includes('--full');
+      return this.discover(fullReport);
     } else if (normalized.startsWith('*init')) {
       console.error('Initialization command received');
       return this.init(normalized);
@@ -708,52 +773,423 @@ export class UnifiedBMADTool {
     };
   }
 
-  private discover(): BMADToolResult {
+  /**
+   * Render a visual health bar for the diagnostic summary
+   */
+  private renderHealthBar(score: number): string {
+    const barLength = 10;
+    const filled = Math.round((score / 100) * barLength);
+    const empty = barLength - filled;
+
+    const filledChar = '█';
+    const emptyChar = '░';
+
+    return `│ ${filledChar.repeat(filled)}${emptyChar.repeat(empty)} │`;
+  }
+
+  private discover(fullReport = false): BMADToolResult {
     const active = this.discovery.activeLocation;
     const lines: string[] = [];
 
-    lines.push('# BMAD Discovery Report');
+    lines.push(
+      '╭─────────────────────────────────────────────────────────────╮',
+    );
+    lines.push(
+      '│          🏥 BMAD Health Diagnostic                          │',
+    );
+    lines.push(
+      '╰─────────────────────────────────────────────────────────────╯',
+    );
     lines.push('');
-    lines.push(`Active Location: ${active.displayName}`);
-    lines.push(`- Priority: ${active.priority}`);
-    lines.push(`- Path: ${this.formatLocationPath(active)}`);
-    lines.push(`- Status: ${this.formatLocationStatus(active)}`);
 
-    const activeStats = this.getLocationStats(active);
-    if (activeStats) {
+    // Scan each valid location in priority order
+    const sorted = [...this.discovery.locations]
+      .filter((loc) => loc.status === 'valid' && loc.resolvedRoot)
+      .sort((a, b) => a.priority - b.priority);
+
+    // Collect statistics for summary
+    const stats = {
+      totalAgents: 0,
+      totalWorkflows: 0,
+      totalTasks: 0,
+      registeredAgents: 0,
+      registeredWorkflows: 0,
+      registeredTasks: 0,
+      orphanedAgents: 0,
+      orphanedWorkflows: 0,
+      orphanedTasks: 0,
+      missingAgents: 0,
+      missingWorkflows: 0,
+      missingTasks: 0,
+    };
+
+    // Scan all locations first to gather statistics
+    const inventories = new Map<
+      BmadLocationInfo,
+      {
+        agents: ScannedFile[];
+        workflows: ScannedFile[];
+        tasks: ScannedFile[];
+      }
+    >();
+
+    // Track unique files across all locations to avoid double-counting
+    const seenRegistered = {
+      agents: new Set<string>(),
+      workflows: new Set<string>(),
+      tasks: new Set<string>(),
+    };
+    const seenOrphaned = {
+      agents: new Set<string>(),
+      workflows: new Set<string>(),
+      tasks: new Set<string>(),
+    };
+    const seenMissing = {
+      agents: new Set<string>(),
+      workflows: new Set<string>(),
+      tasks: new Set<string>(),
+    };
+
+    for (const location of sorted) {
+      const inventory = this.scanLocation(location, sorted);
+      if (inventory) {
+        inventories.set(location, inventory);
+
+        // Count statistics - only count each unique file once
+        for (const agent of inventory.agents) {
+          const filePath = path.join(location.resolvedRoot ?? '', agent.path);
+          const fileExists = fs.existsSync(filePath);
+
+          if (agent.inManifest && fileExists) {
+            if (!seenRegistered.agents.has(agent.name)) {
+              stats.registeredAgents++;
+              seenRegistered.agents.add(agent.name);
+            }
+          } else if (!agent.inManifest && fileExists) {
+            if (!seenOrphaned.agents.has(agent.name)) {
+              stats.orphanedAgents++;
+              seenOrphaned.agents.add(agent.name);
+            }
+          } else if (agent.inManifest && !fileExists) {
+            if (!seenMissing.agents.has(agent.name)) {
+              stats.missingAgents++;
+              seenMissing.agents.add(agent.name);
+            }
+          }
+        }
+
+        for (const workflow of inventory.workflows) {
+          const filePath = path.join(
+            location.resolvedRoot ?? '',
+            workflow.path,
+          );
+          const fileExists = fs.existsSync(filePath);
+
+          if (workflow.inManifest && fileExists) {
+            if (!seenRegistered.workflows.has(workflow.name)) {
+              stats.registeredWorkflows++;
+              seenRegistered.workflows.add(workflow.name);
+            }
+          } else if (!workflow.inManifest && fileExists) {
+            if (!seenOrphaned.workflows.has(workflow.name)) {
+              stats.orphanedWorkflows++;
+              seenOrphaned.workflows.add(workflow.name);
+            }
+          } else if (workflow.inManifest && !fileExists) {
+            if (!seenMissing.workflows.has(workflow.name)) {
+              stats.missingWorkflows++;
+              seenMissing.workflows.add(workflow.name);
+            }
+          }
+        }
+
+        for (const task of inventory.tasks) {
+          const filePath = path.join(location.resolvedRoot ?? '', task.path);
+          const fileExists = fs.existsSync(filePath);
+
+          if (task.inManifest && fileExists) {
+            if (!seenRegistered.tasks.has(task.name)) {
+              stats.registeredTasks++;
+              seenRegistered.tasks.add(task.name);
+            }
+          } else if (!task.inManifest && fileExists) {
+            if (!seenOrphaned.tasks.has(task.name)) {
+              stats.orphanedTasks++;
+              seenOrphaned.tasks.add(task.name);
+            }
+          } else if (task.inManifest && !fileExists) {
+            if (!seenMissing.tasks.has(task.name)) {
+              stats.missingTasks++;
+              seenMissing.tasks.add(task.name);
+            }
+          }
+        }
+
+        stats.totalAgents += inventory.agents.length;
+        stats.totalWorkflows += inventory.workflows.length;
+        stats.totalTasks += inventory.tasks.length;
+      }
+    }
+
+    if (!fullReport) {
+      // SUMMARY VIEW (default) - Redesigned for better UX
+
+      // Calculate health score
+      const totalRegistered =
+        stats.registeredAgents +
+        stats.registeredWorkflows +
+        stats.registeredTasks;
+      const totalIssues =
+        stats.orphanedAgents +
+        stats.orphanedWorkflows +
+        stats.orphanedTasks +
+        stats.missingAgents +
+        stats.missingWorkflows +
+        stats.missingTasks;
+      const healthScore =
+        totalRegistered > 0
+          ? Math.round(
+              (totalRegistered / (totalRegistered + totalIssues)) * 100,
+            )
+          : 0;
+
+      // Header with health status
+      const healthEmoji =
+        healthScore === 100
+          ? '💚'
+          : healthScore >= 80
+            ? '💛'
+            : healthScore >= 50
+              ? '🧡'
+              : '❤️';
+      const healthText =
+        healthScore === 100
+          ? 'Excellent'
+          : healthScore >= 80
+            ? 'Good'
+            : healthScore >= 50
+              ? 'Fair'
+              : 'Needs Attention';
+
       lines.push(
-        `- Catalog: ${activeStats.agents} agents, ` +
-          `${activeStats.workflows} workflows, ${activeStats.tasks} tasks`,
+        '┌─ System Health ────────────────────────────────────────────┐',
+      );
+      lines.push(
+        `│  ${healthEmoji} ${healthText.padEnd(12)} │ Health Score: ${String(healthScore).padStart(3)}% ${this.renderHealthBar(healthScore)}`,
+      );
+      lines.push(
+        '└────────────────────────────────────────────────────────────┘',
+      );
+      lines.push('');
+
+      // Active Location - simplified and cleaner
+      lines.push('📍 **Active Location**');
+      lines.push(`   ${active.displayName} · Priority ${active.priority}`);
+      const formattedPath = this.formatLocationPath(active);
+      const truncatedPath =
+        formattedPath.length > 50
+          ? '...' + formattedPath.slice(-47)
+          : formattedPath;
+      lines.push(`   \`${truncatedPath}\``);
+      lines.push('');
+
+      // Resource Summary - visual cards layout
+      lines.push('📦 **Resources Available**');
+      lines.push('');
+      lines.push('   ┌─ Agents ──────┬─ Workflows ───┬─ Tasks ───────┐');
+      lines.push(
+        `   │  ✓ ${String(stats.registeredAgents).padStart(3)} ready  │  ✓ ${String(stats.registeredWorkflows).padStart(3)} ready │  ✓ ${String(stats.registeredTasks).padStart(3)} ready  │`,
+      );
+      lines.push('   └───────────────┴───────────────┴───────────────┘');
+      lines.push('');
+
+      const hasIssues =
+        stats.orphanedAgents +
+          stats.orphanedWorkflows +
+          stats.orphanedTasks +
+          stats.missingAgents +
+          stats.missingWorkflows +
+          stats.missingTasks >
+        0;
+
+      if (hasIssues) {
+        lines.push('⚠️  **Issues Detected**');
+        lines.push('');
+
+        if (
+          stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks >
+          0
+        ) {
+          lines.push('   🔸 **Orphaned Files** (exist but not in manifest)');
+          if (stats.orphanedAgents > 0)
+            lines.push(
+              `      • ${stats.orphanedAgents} agent${stats.orphanedAgents > 1 ? 's' : ''}`,
+            );
+          if (stats.orphanedWorkflows > 0)
+            lines.push(
+              `      • ${stats.orphanedWorkflows} workflow${stats.orphanedWorkflows > 1 ? 's' : ''}`,
+            );
+          if (stats.orphanedTasks > 0)
+            lines.push(
+              `      • ${stats.orphanedTasks} task${stats.orphanedTasks > 1 ? 's' : ''}`,
+            );
+          lines.push('      💡 Add these to manifest CSV files in `_cfg/`');
+          lines.push('');
+        }
+
+        if (
+          stats.missingAgents + stats.missingWorkflows + stats.missingTasks >
+          0
+        ) {
+          lines.push('   🔸 **Missing Files** (in manifest but not found)');
+          if (stats.missingAgents > 0)
+            lines.push(
+              `      • ${stats.missingAgents} agent${stats.missingAgents > 1 ? 's' : ''}`,
+            );
+          if (stats.missingWorkflows > 0)
+            lines.push(
+              `      • ${stats.missingWorkflows} workflow${stats.missingWorkflows > 1 ? 's' : ''}`,
+            );
+          if (stats.missingTasks > 0)
+            lines.push(
+              `      • ${stats.missingTasks} task${stats.missingTasks > 1 ? 's' : ''}`,
+            );
+          lines.push(
+            '      💡 Remove entries from manifest CSV files in `_cfg/`',
+          );
+          lines.push('');
+        }
+      } else {
+        lines.push('✨ **All Clear!**');
+        lines.push('   All files are properly registered and available.');
+        lines.push('');
+      }
+
+      // Scanned Locations - compact list
+      if (sorted.length > 1) {
+        lines.push('🗂️  **Scanned Locations**');
+        for (const location of sorted) {
+          const marker = location === active ? '← active' : '';
+          const priority = `${location.priority}.`;
+          lines.push(`   ${priority} ${location.displayName} ${marker}`);
+        }
+        lines.push('');
+      }
+
+      lines.push(
+        '─────────────────────────────────────────────────────────────',
+      );
+      lines.push('');
+      lines.push(
+        '💡 *Tip:* Run `bmad *doctor --full` for detailed file-by-file listing',
+      );
+    } else {
+      // FULL DETAILED REPORT - Redesigned
+      lines.push(
+        '┌─ Active Configuration ─────────────────────────────────────┐',
+      );
+      lines.push(`│  Location: ${active.displayName}`);
+      lines.push(`│  Priority: ${active.priority}`);
+      lines.push(`│  Path: ${this.formatLocationPath(active)}`);
+      lines.push(`│  Status: ${this.formatLocationStatus(active)}`);
+      if (active.manifestDir) {
+        lines.push(`│  Manifest: ${active.manifestDir}`);
+      }
+      lines.push(
+        '└────────────────────────────────────────────────────────────┘',
+      );
+      lines.push('');
+
+      lines.push('📋 **Detailed Inventory**');
+      lines.push('');
+
+      for (const location of sorted) {
+        const isActive = location === active;
+        const marker = isActive ? ' ⚡' : '';
+
+        lines.push(
+          `╭─ ${location.displayName}${marker} ${'─'.repeat(Math.max(0, 48 - location.displayName.length - marker.length))}╮`,
+        );
+        lines.push(`│ 📂 \`${this.formatLocationPath(location)}\``);
+
+        const inventory = inventories.get(location);
+
+        if (inventory) {
+          lines.push('│');
+          lines.push('│ 👤 **Agents:**');
+          this.formatInventoryFull(lines, inventory.agents, location, 'agent');
+
+          lines.push('│');
+          lines.push('│ ⚙️  **Workflows:**');
+          this.formatInventoryFull(
+            lines,
+            inventory.workflows,
+            location,
+            'workflow',
+          );
+
+          lines.push('│');
+          lines.push('│ 📝 **Tasks:**');
+          this.formatInventoryFull(lines, inventory.tasks, location, 'task');
+        } else {
+          lines.push('│   ⚠️  Unable to scan this location');
+        }
+
+        lines.push('╰' + '─'.repeat(60) + '╯');
+        lines.push('');
+      }
+
+      lines.push('🔄 **Resolution Priority**');
+      lines.push('');
+      lines.push('   BMAD checks locations in this order:');
+      for (const location of sorted) {
+        const marker = location === active ? '← active' : '';
+        const status = location.status === 'valid' ? '✓' : '✗';
+        lines.push(
+          `   ${status} ${location.priority}. ${location.displayName} ${marker}`,
+        );
+      }
+
+      lines.push('');
+      lines.push(
+        '┌─ Legend ───────────────────────────────────────────────────┐',
+      );
+      lines.push(
+        '│  ✅ Registered  → File exists and in manifest (will load)  │',
+      );
+      lines.push(
+        '│  ⚠️  Orphaned   → File exists but not in manifest          │',
+      );
+      lines.push(
+        '│  ❌ Missing     → In manifest but file not found           │',
+      );
+      lines.push(
+        '└────────────────────────────────────────────────────────────┘',
       );
     }
 
     lines.push('');
-    lines.push('Locations (priority order):');
 
-    const sorted = [...this.discovery.locations].sort(
-      (a, b) => a.priority - b.priority,
-    );
+    // Next Steps - more actionable and contextual
+    const hasOrphaned =
+      stats.orphanedAgents + stats.orphanedWorkflows + stats.orphanedTasks > 0;
+    const hasMissing =
+      stats.missingAgents + stats.missingWorkflows + stats.missingTasks > 0;
 
-    for (const location of sorted) {
-      const marker = location === active ? ' [active]' : '';
-      const status = this.formatLocationStatus(location);
-      const pathLine = this.formatLocationPath(location);
-      const stats = this.getLocationStats(location);
-      let summary = `${location.priority}. ${location.displayName}${marker} - ${status}`;
-      summary += ` - ${pathLine}`;
-      if (stats) {
-        summary += ` - ${stats.agents} agents / ${stats.workflows} workflows / ${stats.tasks} tasks`;
+    if (hasOrphaned || hasMissing) {
+      lines.push('🛠️  **Recommended Actions**');
+      lines.push('');
+      if (hasMissing) {
+        lines.push('   1. Fix missing files: Update CSV manifests in `_cfg/`');
       }
-      lines.push(summary);
-      if (location.details) {
-        lines.push(`   Notes: ${location.details}`);
+      if (hasOrphaned) {
+        lines.push(
+          '   2. Register orphaned files: Add entries to `_cfg/*.csv`',
+        );
       }
+      lines.push('   3. Initialize new BMAD directory: `bmad *init --help`');
+      lines.push('');
     }
-
-    lines.push('');
-    lines.push(
-      'To initialize a writable BMAD directory, run `bmad *init --help`.',
-    );
 
     return {
       success: true,
@@ -762,9 +1198,240 @@ export class UnifiedBMADTool {
       data: {
         activeLocation: active,
         locations: sorted,
+        statistics: stats,
       },
       exitCode: 0,
     };
+  }
+
+  /**
+   * Scan a location for BMAD files and compare with ALL manifests across all locations.
+   * A file is only considered orphaned if it exists but is NOT in any manifest anywhere.
+   */
+  private scanLocation(
+    location: BmadLocationInfo,
+    allLocations: BmadLocationInfo[],
+  ):
+    | {
+        agents: ScannedFile[];
+        workflows: ScannedFile[];
+        tasks: ScannedFile[];
+      }
+    | undefined {
+    if (!location.resolvedRoot) {
+      return undefined;
+    }
+
+    try {
+      const scanner = new FileScanner(location.resolvedRoot);
+      const scanned = scanner.scan();
+
+      // Load manifests from ALL locations to check if files are registered anywhere
+      const allAgents = new Set<string>();
+      const allWorkflows = new Set<string>();
+      const allTasks = new Set<string>();
+
+      for (const loc of allLocations) {
+        if (!loc.resolvedRoot) continue;
+        try {
+          const loader = new ManifestLoader(loc.resolvedRoot);
+          loader.loadAgentManifest().forEach((a) => {
+            if (a.name) allAgents.add(a.name);
+          });
+          loader.loadWorkflowManifest().forEach((w) => {
+            if (w.name) allWorkflows.add(w.name);
+          });
+          loader.loadTaskManifest().forEach((t) => {
+            if (t.name) allTasks.add(t.name);
+          });
+        } catch {
+          // Skip locations with manifest errors
+        }
+      }
+
+      // Mark files based on whether they're in ANY manifest
+      for (const agent of scanned.agents) {
+        agent.inManifest = allAgents.has(agent.name);
+      }
+
+      for (const workflow of scanned.workflows) {
+        workflow.inManifest = allWorkflows.has(workflow.name);
+      }
+
+      for (const task of scanned.tasks) {
+        task.inManifest = allTasks.has(task.name);
+      }
+
+      // Load THIS location's manifest to find missing files
+      const loader = new ManifestLoader(location.resolvedRoot);
+      const agentManifest = loader.loadAgentManifest();
+      const workflowManifest = loader.loadWorkflowManifest();
+      const taskManifest = loader.loadTaskManifest();
+
+      // Add manifest entries from THIS location that have no file in THIS location
+
+      // Add manifest entries that have no file
+      for (const agent of agentManifest) {
+        if (agent.name && !scanned.agents.some((a) => a.name === agent.name)) {
+          scanned.agents.push({
+            name: agent.name,
+            path: agent.path ?? '',
+            type: 'agent',
+            inManifest: true,
+          });
+        }
+      }
+
+      for (const workflow of workflowManifest) {
+        if (
+          workflow.name &&
+          !scanned.workflows.some((w) => w.name === workflow.name)
+        ) {
+          scanned.workflows.push({
+            name: workflow.name,
+            path: workflow.path ?? '',
+            type: 'workflow',
+            inManifest: true,
+          });
+        }
+      }
+
+      for (const task of taskManifest) {
+        if (task.name && !scanned.tasks.some((t) => t.name === task.name)) {
+          scanned.tasks.push({
+            name: task.name,
+            path: task.path ?? '',
+            type: 'task',
+            inManifest: true,
+          });
+        }
+      }
+
+      return scanned;
+    } catch (error) {
+      console.error(`Error scanning ${location.resolvedRoot}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Format inventory for display.
+   */
+  private formatInventory(
+    lines: string[],
+    items: ScannedFile[],
+    location: BmadLocationInfo,
+    type: 'agent' | 'workflow' | 'task',
+  ): void {
+    if (items.length === 0) {
+      lines.push('- None found');
+      return;
+    }
+
+    // Sort: registered first, then orphaned, then missing
+    const sorted = [...items].sort((a, b) => {
+      const aPath = path.join(location.resolvedRoot ?? '', a.path);
+      const bPath = path.join(location.resolvedRoot ?? '', b.path);
+      const aExists = fs.existsSync(aPath);
+      const bExists = fs.existsSync(bPath);
+
+      // Registered (in manifest + exists)
+      const aRegistered = a.inManifest && aExists;
+      const bRegistered = b.inManifest && bExists;
+      if (aRegistered && !bRegistered) return -1;
+      if (!aRegistered && bRegistered) return 1;
+
+      // Orphaned (exists but not in manifest)
+      const aOrphaned = !a.inManifest && aExists;
+      const bOrphaned = !b.inManifest && bExists;
+      if (aOrphaned && !bOrphaned) return -1;
+      if (!aOrphaned && bOrphaned) return 1;
+
+      // Missing (in manifest but doesn't exist)
+      return 0;
+    });
+
+    for (const item of sorted) {
+      const filePath = path.join(location.resolvedRoot ?? '', item.path);
+      const fileExists = fs.existsSync(filePath);
+      let status: string;
+
+      if (item.inManifest && fileExists) {
+        status = '✅';
+      } else if (!item.inManifest && fileExists) {
+        status = '⚠️ ';
+      } else if (item.inManifest && !fileExists) {
+        status = '❌';
+      } else {
+        status = '❓';
+      }
+
+      const prefix = type === 'workflow' ? '*' : '';
+      lines.push(`- ${status} \`${prefix}${item.name}\` - ${item.path}`);
+    }
+  }
+
+  /**
+   * Format inventory for full detailed display with borders.
+   */
+  private formatInventoryFull(
+    lines: string[],
+    items: ScannedFile[],
+    location: BmadLocationInfo,
+    type: 'agent' | 'workflow' | 'task',
+  ): void {
+    if (items.length === 0) {
+      lines.push('│   None found');
+      return;
+    }
+
+    // Sort: registered first, then orphaned, then missing
+    const sorted = [...items].sort((a, b) => {
+      const aPath = path.join(location.resolvedRoot ?? '', a.path);
+      const bPath = path.join(location.resolvedRoot ?? '', b.path);
+      const aExists = fs.existsSync(aPath);
+      const bExists = fs.existsSync(bPath);
+
+      // Registered (in manifest + exists)
+      const aRegistered = a.inManifest && aExists;
+      const bRegistered = b.inManifest && bExists;
+      if (aRegistered && !bRegistered) return -1;
+      if (!aRegistered && bRegistered) return 1;
+
+      // Orphaned (exists but not in manifest)
+      const aOrphaned = !a.inManifest && aExists;
+      const bOrphaned = !b.inManifest && bExists;
+      if (aOrphaned && !bOrphaned) return -1;
+      if (!aOrphaned && bOrphaned) return 1;
+
+      // Missing (in manifest but doesn't exist)
+      return 0;
+    });
+
+    for (const item of sorted) {
+      const filePath = path.join(location.resolvedRoot ?? '', item.path);
+      const fileExists = fs.existsSync(filePath);
+      let status: string;
+
+      if (item.inManifest && fileExists) {
+        status = '✅';
+      } else if (!item.inManifest && fileExists) {
+        status = '⚠️ ';
+      } else if (item.inManifest && !fileExists) {
+        status = '❌';
+      } else {
+        status = '❓';
+      }
+
+      const prefix = type === 'workflow' ? '*' : '';
+      const itemName = `${prefix}${item.name}`;
+
+      // Truncate path if too long for display
+      const displayPath =
+        item.path.length > 40 ? '...' + item.path.slice(-37) : item.path;
+
+      lines.push(`│   ${status} ${itemName.padEnd(25)} ${displayPath}`);
+    }
   }
 
   private init(command: string): BMADToolResult {
@@ -991,7 +1658,7 @@ export class UnifiedBMADTool {
     lines.push(
       'After making changes, restart the BMAD MCP server or reconnect your client.',
     );
-    lines.push('Run `bmad *discover` to verify the active location.');
+    lines.push('Run `bmad *doctor` to verify the active location.');
     lines.push('');
     lines.push(
       'Priority order: project -> command argument -> BMAD_ROOT -> user -> package',
@@ -1057,7 +1724,8 @@ export class UnifiedBMADTool {
       '- `bmad *list-agents` → Show all available agents',
       '- `bmad *list-workflows` → Show all available workflows',
       '- `bmad *list-tasks` → Show all available tasks',
-      '- `bmad *discover` → Inspect available BMAD locations and resolution order',
+      '- `bmad *doctor` → Quick diagnostic summary',
+      '- `bmad *doctor --full` → Detailed file-by-file inventory',
       '- `bmad *init --help` → Initialize writable BMAD templates',
       '- `bmad *help` → Show this help message\n',
       '## Quick Start',
