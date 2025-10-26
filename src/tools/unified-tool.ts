@@ -164,9 +164,7 @@ export class UnifiedBMADTool {
     const validRoots: string[] = [];
 
     console.error(`\nBuilding FileReader fallback chain...`);
-    console.error(
-      `Total discovered locations: ${discovery.locations.length}`,
-    );
+    console.error(`Total discovered locations: ${discovery.locations.length}`);
 
     // Sort all locations by priority that have manifestDir
     const sortedLocations = [...discovery.locations]
@@ -179,9 +177,7 @@ export class UnifiedBMADTool {
       })
       .sort((a, b) => a.priority - b.priority);
 
-    console.error(
-      `Locations with manifestDir: ${sortedLocations.length}\n`,
-    );
+    console.error(`Locations with manifestDir: ${sortedLocations.length}\n`);
 
     for (const location of sortedLocations) {
       const root = location.resolvedRoot ?? location.originalPath;

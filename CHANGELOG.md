@@ -7,24 +7,21 @@
 
 ## [0.2.3](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.2...v0.2.3) (2025-10-26)
 
-
 ### Bug Fixes
 
-* add js-yaml dependency to package.json ([3dedbff](https://github.com/mkellerman/bmad-mcp-server/commit/3dedbffc21c5b424583e83cce495643c6dbbd8e1))
+- add js-yaml dependency to package.json ([3dedbff](https://github.com/mkellerman/bmad-mcp-server/commit/3dedbffc21c5b424583e83cce495643c6dbbd8e1))
 
 ## [0.2.2](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.1...v0.2.2) (2025-10-26)
 
-
 ### Bug Fixes
 
-* include .releaserc.json in build artifact for release workflow ([16560cd](https://github.com/mkellerman/bmad-mcp-server/commit/16560cd79061039b3f15dfb05626b471ce5312ad))
+- include .releaserc.json in build artifact for release workflow ([16560cd](https://github.com/mkellerman/bmad-mcp-server/commit/16560cd79061039b3f15dfb05626b471ce5312ad))
 
 ## [0.2.1](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.0...v0.2.1) (2025-10-26)
 
-
 ### Bug Fixes
 
-* disable GitHub plugin success comments to prevent issue lookup errors ([693d464](https://github.com/mkellerman/bmad-mcp-server/commit/693d4648c897f4003d9b235f3a74d41d4fd6b74f))
+- disable GitHub plugin success comments to prevent issue lookup errors ([693d464](https://github.com/mkellerman/bmad-mcp-server/commit/693d4648c897f4003d9b235f3a74d41d4fd6b74f))
 
 # [0.2.0](https://github.com/mkellerman/bmad-mcp-server/compare/v0.1.1...v0.2.0) (2025-10-26)
 

@@ -33,9 +33,7 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.ts'],
-    extends: [
-      ...tseslint.configs.recommendedTypeChecked,
-    ],
+    extends: [...tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {
         project: './tsconfig.json',

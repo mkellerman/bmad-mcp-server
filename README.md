@@ -1,407 +1,244 @@
-# BMAD MCP Server (Node.js)
+# 🚀 BMAD MCP Server
 
-Access the complete BMAD methodology through any AI assistant via the Model Context Protocol.
+> **💡 Built on the BMAD Method**  
+> This MCP server brings the power of the [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) to any AI assistant. All methodology, workflows, and best practices are credited to the original BMAD Method project. This server simply makes it accessible through the Model Context Protocol.
 
-## What is BMAD?
+**Use BMAD in any project, instantly**
 
-BMAD (Business Methodology for Agile Development) provides 11 specialist AI agents and 36+ automated workflows to accelerate software development, from requirements analysis to deployment.
+Load the complete BMAD methodology into your AI assistant with zero setup. No copying files, no project-specific installations - just configure once and access 11 specialist agents and 36+ workflows across all your projects.
 
-## Prerequisites
+## Why Use the MCP Server?
 
-- Node.js 18 or higher
-- npm or yarn
+**Without the MCP Server:**
 
-## Installation
+- ❌ Copy BMAD files to every project
+- ❌ Keep methodology in sync across projects
+- ❌ Manually load agents and workflows
+- ❌ Reconfigure for each new workspace
 
-### Quick Start (No Clone Required)
+**With the MCP Server:**
 
-Use directly from GitHub via `npx` - no installation needed!
+- ✅ **Configure once, use everywhere** - One setup for all your projects
+- ✅ **Always up to date** - Update once, not per-project
+- ✅ **Instant access** - Load agents and workflows with simple commands
+- ✅ **Works anywhere** - VS Code, Claude Desktop, Cursor, any MCP-compatible client
+- ✅ **Zero maintenance** - No files to manage in your projects
 
-### Local Development
+## ⚡ Quick Start
 
-```bash
-git clone https://github.com/mkellerman/bmad-mcp-server.git
-cd bmad-mcp-server
-npm install
-npm run build
-```
+**Get started in 3 steps:**
 
-## Configuration
-
-The BMAD MCP server locates BMAD templates using this priority order:
-
-1. **Local project** – `./bmad` inside the current workspace
-2. **Command-line argument** – `node build/index.js /path/to/bmad`
-3. **Environment variable** – `BMAD_ROOT=/path/to/bmad`
-4. **User defaults** – `~/.bmad` (create with `bmad *init --user`)
-5. **Package defaults** – read-only templates bundled with the server
-
-Use `bmad *discover` to inspect which location is active, and `bmad *init --help` to copy templates into a writable directory.
-
-### GitHub Copilot (VS Code)
-
-**Scenario 1: Remote installation (npx) - Workspace has `bmad/` folder**
-
-The server will automatically find the `bmad/` folder in your current workspace:
-
-```json
-{
-  "servers": {
-    "bmad": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "git+https://github.com/mkellerman/bmad-mcp-server#v2-node",
-        "bmad-mcp-server"
-      ]
-    }
-  }
-}
-```
-
-**Scenario 2: Local installation - Working in the bmad-mcp-server repo**
-
-When the MCP server repo is your workspace, the built-in `bmad/` directory is detected automatically. `BMAD_ROOT` is optional:
-
-```json
-{
-  "servers": {
-    "bmad": {
-      "command": "node",
-      "args": ["${workspaceFolder}/build/index.js"],
-      "env": {
-        "BMAD_ROOT": "${workspaceFolder}"
-      }
-    }
-  }
-}
-```
-
-**Scenario 3: Local installation - Workspace elsewhere**
-
-Point the locally-installed server to a different workspace:
-
-```json
-{
-  "servers": {
-    "bmad": {
-      "command": "node",
-      "args": ["/path/to/bmad-mcp-server/build/index.js"],
-      "env": {
-        "BMAD_ROOT": "${workspaceFolder}"
-      }
-    }
-  }
-}
-```
-
-### Claude Desktop / Cursor
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-**Remote installation (npx) - Recommended**
-
-```json
-{
-  "mcpServers": {
-    "bmad": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "git+https://github.com/mkellerman/bmad-mcp-server#v2-node",
-        "bmad-mcp-server"
-      ],
-      "env": {
-        "BMAD_ROOT": "/absolute/path/to/your/project"
-      }
-    }
-  }
-}
-```
-
-**Local installation**
-
-```json
-{
-  "mcpServers": {
-    "bmad": {
-      "command": "node",
-      "args": ["/absolute/path/to/bmad-mcp-server/build/index.js"],
-      "env": {
-        "BMAD_ROOT": "/absolute/path/to/your/project"
-      }
-    }
-  }
-}
-```
-
-**Note**: Claude Desktop's working directory may be undefined (like `/` on macOS), so always use:
-
-- Absolute paths for the server command
-- `BMAD_ROOT` or a project-level `bmad/` directory to specify your BMAD location
-
-### Initialize Templates (optional)
-
-Run the MCP server and execute one of the following commands:
-
-- `bmad *init --project` → Copy templates into your current workspace (`./bmad`)
-- `bmad *init --user` → Copy templates into `~/.bmad` for reuse across projects
-- `bmad *init <path>` → Copy templates into a shared or custom location
-
-After initialization, restart your MCP client or reconnect the server, then run `bmad *discover` to verify the active location.
-
-## Development
-
-```bash
-npm install              # Install dependencies
-npm run dev              # Run in development mode (tsx)
-npm run build            # Build for production
-npm test                 # Run tests (131 passing)
-npm run test:coverage    # With coverage report
-npm run lint:fix         # Auto-fix linting
-npm run format           # Format code
-```
-
-See `tests/README.md` for comprehensive testing documentation including LLM-powered E2E tests.
-
-### Pre-commit Hooks
-
-Husky runs linting and formatting automatically before each commit. Run manually with `npm run precommit`.
-
-## Contributor Guide
-
-See `AGENTS.md` for coding style, testing practices, PR requirements, and a concise Architecture Overview of the MCP server and unified tool.
-
-## Versioning & Release Process
-
-This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH):
-
-- **MAJOR**: Breaking changes (e.g., 1.0.0 → 2.0.0)
-- **MINOR**: New features, backward compatible (e.g., 0.1.0 → 0.2.0)
-- **PATCH**: Bug fixes, backward compatible (e.g., 0.1.0 → 0.1.1)
-
-### Testing Changes with Pre-releases
-
-**Automatic PR Pre-releases:**
-
-When you open a Pull Request, GitHub Actions automatically creates a pre-release that you can test on another machine:
-
-1. **Open a PR** - A pre-release is automatically created with tag `pr-{number}-{sha}`
-2. **Check the PR comments** - The bot will post installation instructions
-3. **Test on another machine** using npx:
+1. **Add to your AI client** (VS Code, Claude Desktop, or Cursor)
 
    ```json
    {
      "servers": {
        "bmad": {
          "command": "npx",
-         "args": [
-           "-y",
-           "git+https://github.com/mkellerman/bmad-mcp-server#pr-123-abc1234"
-         ]
+         "args": ["-y", "bmad-mcp-server"]
        }
      }
    }
    ```
 
-4. **Pre-release cleanup** - Automatically deleted when PR is merged or closed
+2. **Restart your AI client**
 
-**Benefits:**
-
-- Test changes before merging
-- No need to clone locally on every machine
-- Works with any MCP client (VS Code, Claude Desktop, Cursor, etc.)
-- Clean automatic cleanup
-
-### Creating a Release
-
-1. **Update version** using npm's built-in commands:
-
-   ```bash
-   # For a patch release (0.1.0 → 0.1.1)
-   npm version patch
-
-   # For a minor release (0.1.0 → 0.2.0)
-   npm version minor
-
-   # For a major release (0.1.0 → 1.0.0)
-   npm version major
+3. **Say hello to your new team!**
+   ```
+   bmad *list-agents
    ```
 
-   This automatically:
-   - Updates `version` in `package.json` and `package-lock.json`
-   - Creates a git commit with message "v0.1.1"
-   - Creates a git tag "v0.1.1"
+📖 **Detailed setup:** [Installation Guide](./docs/installation.md)
 
-2. **Push the tag to GitHub**:
+## 📂 How BMAD Files Are Located
 
-   ```bash
-   git push origin v2-node --follow-tags
-   ```
+The server searches for BMAD files in this order (first match wins):
 
-3. **Create a GitHub Release**:
-   - Go to [GitHub Releases](https://github.com/mkellerman/bmad-mcp-server/releases)
-   - Click "Draft a new release"
-   - Select the tag you just pushed (e.g., `v0.1.1`)
-   - Add release title and notes (describe changes, bug fixes, new features)
-   - Click "Publish release"
+| Priority | Location         | Description           | Use Case                        |
+| -------- | ---------------- | --------------------- | ------------------------------- |
+| 1        | `./bmad`         | Local project folder  | Project-specific customizations |
+| 2        | CLI argument     | Path passed to server | Development/testing             |
+| 3        | `BMAD_ROOT` env  | Environment variable  | Point to specific project       |
+| 4        | `~/.bmad`        | User home directory   | Shared across all projects      |
+| 5        | Package defaults | Built-in files        | No setup needed                 |
 
-4. **Automated Publishing**:
-   - GitHub Actions will automatically run the `release.yml` workflow
-   - It will:
-     - Run linting checks
-     - Run unit tests
-     - Build the package
-     - Publish to npm with provenance (requires `NPM_TOKEN` secret)
+💡 **Tip:** Run `bmad *discover` to see which location is active.
 
-### Pre-Release Checklist
+📖 **Configuration examples:** See [Installation Guide](./docs/installation.md) for detailed setup scenarios.
 
-Before creating a release, ensure:
+## 🎯 What Can BMAD Do?
 
-- [ ] All tests pass: `npm test`
-- [ ] Linting passes: `npm run lint`
-- [ ] Build succeeds: `npm run build`
-- [ ] Update CHANGELOG.md (if applicable)
-- [ ] Commit all changes
-- [ ] Pull latest from main/v2-node branch
+### Meet Your Team
 
-### NPM Token Setup
-
-To enable automated npm publishing:
-
-1. Generate an npm token:
-   - Log in to [npmjs.com](https://www.npmjs.com/)
-   - Go to Account Settings → Access Tokens
-   - Generate a new "Automation" token
-
-2. Add to GitHub Secrets:
-   - Go to repository Settings → Secrets and variables → Actions
-   - Click "New repository secret"
-   - Name: `NPM_TOKEN`
-   - Value: your npm token
-   - Click "Add secret"
-
-### Manual Publishing (if needed)
-
-If automated publishing fails or you need to publish manually:
+Load any specialist with a simple command:
 
 ```bash
-# Ensure you're logged in to npm
-npm login
-
-# Build the package
-npm run build
-
-# Publish
-npm publish --access public
+bmad analyst      # Mary - Strategic Business Analyst
+bmad architect    # Winston - Solution Architect
+bmad dev          # Amelia - Senior Implementation Engineer
+bmad ux-expert    # Sally - UX/UI Specialist
+bmad tea          # Murat - Master Test Architect
+bmad pm           # John - Product Manager
+bmad sm           # Bob - Scrum Master
 ```
 
-## Quick Start
+Each agent brings:
+
+- **Unique expertise** and decision-making approach
+- **Distinct personality** and communication style
+- **Specialized workflows** tailored to their role
+- **Consistent methodology** across all interactions
+
+### Run Powerful Workflows
+
+Execute complex, multi-step processes with a single command:
 
 ```bash
-# Get help
-bmad *help
-
-# See what's available
-bmad *list-agents
-bmad *list-workflows
-
-# Load an agent
-bmad analyst      # Business Analyst
-bmad dev          # Senior Developer
-bmad tea          # Test Architect
-
-# Run a workflow
-bmad *party-mode      # Multi-agent discussion
-bmad *brainstorming   # Creative ideation
+bmad *party-mode       # Multi-agent brainstorming session
+bmad *workflow-status  # Check project status and get recommendations
+bmad *atdd            # Generate acceptance tests before coding
+bmad *ux-spec         # Create comprehensive UX specifications
 ```
 
-## Commands
+See all workflows:
 
-| Command                | Purpose                    | Example            |
-| ---------------------- | -------------------------- | ------------------ |
-| `bmad`                 | Load bmad-master (default) | `bmad`             |
-| `bmad <agent>`         | Load specialist agent      | `bmad analyst`     |
-| `bmad *<workflow>`     | Execute workflow           | `bmad *party-mode` |
-| `bmad *list-agents`    | Show all agents            | -                  |
-| `bmad *list-workflows` | Show all workflows         | -                  |
-| `bmad *help`           | Show command reference     | -                  |
+```bash
+bmad *list-workflows   # Browse 36+ available workflows
+```
 
-## Available Agents
+## 🌟 Real-World Examples
 
-- **bmad-master** - Orchestrator and methodology expert
-- **analyst** (Mary) - Strategic Business Analyst
-- **architect** (Winston) - Solution Architect
-- **dev** (Olivia) - Senior Developer
-- **tea** (Murat) - Master Test Architect
-- **pm** (John) - Product Manager
-- **sm** (Sarah) - Scrum Master
-- **ux-expert** (Alex) - UX/UI Specialist
-- Plus 3 more specialized agents
+**Scenario: Starting a new feature**
 
-## Popular Workflows
+```bash
+# Get requirements analysis
+# Mary helps gather and structure requirements
+bmad analyst
 
-- `*party-mode` - Multi-agent group discussions
-- `*brainstorming` - Facilitated creative ideation
-- `*framework` - Initialize test framework
-- `*atdd` - Generate E2E tests before implementation
-- `*workflow-status` - Check workflow status
-- Plus 31 more workflows
+# Design the architecture
+# Winston designs the technical approach
+bmad architect
 
-## Project Structure
+# Create UX specifications
+# Sally crafts the user experience
+bmad ux-expert
+
+# Implement with best practices
+# Amelia builds it following the design
+bmad dev
+
+# Ensure quality
+# Murat creates comprehensive tests
+bmad tea
+```
+
+**Scenario: Stuck on a complex problem**
+
+```bash
+bmad *party-mode
+# Brings all agents together for a collaborative discussion
+# Each contributes their unique perspective
+# Get solutions you wouldn't have thought of alone
+```
+
+## 💡 Key Features
+
+- **🎭 Role-Based Agents** - Each agent stays in character with consistent expertise
+- **🔄 Automated Workflows** - Complex multi-step processes simplified
+- **📚 Built-in Best Practices** - Software methodology baked into every interaction
+- **🎨 Customizable** - Extend with your own agents and workflows
+- **🔒 Local-First** - Your code and data stay on your machine
+- **⚡ Instant Access** - No API keys, no accounts, just install and use
+
+## 📚 Documentation
+
+- **[Installation Guide](./docs/installation.md)** - Complete setup instructions for all platforms
+- **[Development Guide](./docs/development.md)** - Contributing and local development
+- **[Troubleshooting](./docs/troubleshooting.md)** - Solutions to common issues
+- **[Release Process](./docs/release-process.md)** - Versioning and publishing guide
+
+## 🛠️ All Available Agents
+
+| Agent | Name             | Role                              | Load with                    |
+| ----- | ---------------- | --------------------------------- | ---------------------------- |
+| 🧙    | BMad Master      | Orchestrator & Methodology Expert | `bmad` or `bmad bmad-master` |
+| 📊    | Mary             | Strategic Business Analyst        | `bmad analyst`               |
+| 🏗️    | Winston          | System Architect                  | `bmad architect`             |
+| 💻    | Amelia           | Senior Implementation Engineer    | `bmad dev`                   |
+| 🎨    | Sally            | UX/UI Specialist                  | `bmad ux-expert`             |
+| 🧪    | Murat            | Master Test Architect             | `bmad tea`                   |
+| 📋    | John             | Product Manager                   | `bmad pm`                    |
+| 🔄    | Bob              | Scrum Master                      | `bmad sm`                    |
+| 🎮    | Cloud Dragonborn | Game Systems Architect            | `bmad game-architect`        |
+| 🎲    | Samus Shepard    | Lead Game Designer                | `bmad game-designer`         |
+| 🕹️    | Link Freeman     | Senior Game Developer             | `bmad game-dev`              |
+
+## 🔧 Commands Reference
+
+| Command                | Purpose                      | Example            |
+| ---------------------- | ---------------------------- | ------------------ |
+| `bmad`                 | Load default orchestrator    | `bmad`             |
+| `bmad <agent>`         | Load specialist agent        | `bmad analyst`     |
+| `bmad *<workflow>`     | Execute workflow             | `bmad *party-mode` |
+| `bmad *list-agents`    | Show all available agents    | -                  |
+| `bmad *list-workflows` | Show all available workflows | -                  |
+| `bmad *list-tasks`     | Show all available tasks     | -                  |
+| `bmad *help`           | Show command reference       | -                  |
+
+## 🚦 For Contributors
+
+Want to help make BMAD even better?
+
+```bash
+git clone https://github.com/mkellerman/bmad-mcp-server.git
+cd bmad-mcp-server
+npm install
+npm test          # Run 131 tests
+npm run dev       # Start in development mode
+```
+
+See our **[Development Guide](./docs/development.md)** for:
+
+- Architecture overview
+- Coding standards
+- Testing guidelines
+- PR requirements
+
+## 🎓 Learn More
+
+**What is the Model Context Protocol (MCP)?**
+MCP is a standard protocol that lets AI assistants connect to external tools and data sources. BMAD uses MCP to bring a complete software development methodology directly into your AI conversations.
+
+**What makes BMAD different?**
+
+- **Role consistency**: Agents maintain their expertise and personality
+- **Workflow automation**: Complex processes become single commands
+- **Methodology-driven**: Best practices built into every interaction
+- **Framework agnostic**: Works with any AI client that supports MCP
+
+## 📦 Project Structure
 
 ```
 bmad-mcp-server/
-├── bmad/                     # BMAD methodology files (agents, workflows)
-│   ├── _cfg/                 # Configuration and manifests
-│   │   ├── agent-manifest.csv
-│   │   ├── workflow-manifest.csv
-│   │   ├── task-manifest.csv
-│   │   └── agents/           # Agent customization files
-│   ├── core/                 # Core BMAD agents and workflows
-│   ├── bmm/                  # BMM module agents and workflows
-│   └── docs/                 # BMAD documentation
 ├── src/
-│   ├── index.ts              # Entry point
-│   ├── server.ts             # MCP server implementation
-│   ├── types/
-│   │   └── index.ts          # TypeScript type definitions
-│   ├── tools/
-│   │   ├── index.ts          # Tools module exports
-│   │   └── unified-tool.ts   # Unified BMAD tool implementation
-│   ├── utils/
-│   │   ├── manifest-loader.ts # CSV manifest parser
-│   │   └── file-reader.ts     # Secure file reader
-│   └── prompts/
-│       └── index.ts          # Prompt definitions (placeholder)
-├── build/                    # Compiled JavaScript (generated)
-├── tests/                    # Test files
-├── package.json
-├── tsconfig.json
-└── README.md
+│   ├── server.ts              # MCP server implementation
+│   ├── tools/unified-tool.ts  # Command routing and execution
+│   └── bmad/                  # Methodology files
+│       ├── _cfg/              # Agent/workflow manifests
+│       ├── core/              # Core agents & workflows
+│       └── bmm/               # Extended methodology module
+├── docs/                      # Documentation
+└── tests/                     # Comprehensive test suite
 ```
 
-## Troubleshooting
-
-**Server not found?**
-
-- Restart your AI host after configuration
-- Use absolute path in config
-- Ensure Node.js 18+ is installed
-- Check that build/ directory exists (run `npm run build`)
-
-**Build errors?**
-
-- Run `npm install` to ensure all dependencies are installed
-- Check Node.js version with `node --version`
-- Try deleting `node_modules` and `build` folders, then run `npm install && npm run build`
-
-**Import errors?**
-
-- Ensure `type: "module"` is in package.json
-- Check that all imports use `.js` extensions
-- Verify tsconfig.json has `"module": "ESNext"`
-
-## License
+## 📄 License
 
 ISC
+
+## 🌟 Star Us!
+
+If BMAD is helping you build better software, give us a star! It helps others discover the project.
+
+---
+
+**Ready to transform your AI assistant?** [Get started now →](./docs/installation.md)
