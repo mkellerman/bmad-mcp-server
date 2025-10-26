@@ -130,12 +130,29 @@ export class UnifiedBMADTool {
     const manifestLocation = discovery.locations.find(
       (loc) => loc.status === 'valid' && loc.manifestDir,
     );
-    const manifestRoot =
-      manifestLocation?.resolvedRoot ?? discovery.packageBmadPath;
 
-    this.manifestDir =
-      manifestLocation?.manifestDir ??
-      path.join(discovery.packageBmadPath, '_cfg');
+    let manifestRoot: string | undefined;
+    let manifestDir: string | undefined;
+
+    if (manifestLocation && manifestLocation.manifestDir) {
+      manifestRoot = manifestLocation.resolvedRoot;
+      manifestDir = manifestLocation.manifestDir;
+    } else {
+      // Fallback: check if packageBmadPath has a _cfg directory
+      const packageCfgDir = path.join(discovery.packageBmadPath, '_cfg');
+      if (fs.existsSync(packageCfgDir) && fs.statSync(packageCfgDir).isDirectory()) {
+        manifestRoot = discovery.packageBmadPath;
+        manifestDir = packageCfgDir;
+      } else {
+        throw new Error(
+          `No valid manifest directory found. Searched locations: ` +
+          discovery.locations.map(loc => loc.resolvedRoot || loc.originalPath).join(', ') +
+          ` and fallback package path ${packageCfgDir}`
+        );
+      }
+    }
+
+    this.manifestDir = manifestDir;
     this.manifestLoader = new ManifestLoader(manifestRoot);
 
     // Collect all BMAD roots for fallback file loading
