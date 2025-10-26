@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.0...v0.2.1) (2025-10-26)
+
+
+### Bug Fixes
+
+* disable GitHub plugin success comments to prevent issue lookup errors ([693d464](https://github.com/mkellerman/bmad-mcp-server/commit/693d4648c897f4003d9b235f3a74d41d4fd6b74f))
+
 # [0.2.0](https://github.com/mkellerman/bmad-mcp-server/compare/v0.1.1...v0.2.0) (2025-10-26)
 
 ### Bug Fixes
