@@ -1,0 +1,24 @@
+# BMAD Init - System Initialization Workflow
+name: "bmad-init"
+description: "BMAD system initialization and maintenance workflow for agent manifest generation and system configuration"
+author: "BMad"
+
+# Critical variables
+config_source: "{project-root}/bmad/_cfg/manifest.yaml"
+date: system-generated
+
+# This is an action workflow - no template output
+template: false
+instructions: "{project-root}/src/core/workflows/bmad-init/instructions.md"
+
+# Sub-components
+party_update_instructions: "{project-root}/src/core/workflows/bmad-init/party-update/instructions.md"
+
+# No specific output file - this workflow performs various system actions
+default_output_file: null
+
+# Required tools for execution
+required_tools:
+  - file_operations
+  - llm_analysis
+  - xml_generation
