@@ -106,10 +106,7 @@ export class UnifiedBMADTool {
 
     if (normalized.startsWith('*init')) {
       logger.info('Initialization command received');
-      return initHandler(normalized, {
-        projectRoot: this.projectRoot,
-        userBmadPath: this.userBmadPath,
-      });
+      return initHandler();
     }
 
     // Listing commands (handled before general parsing)

@@ -27,10 +27,7 @@ import {
 } from './utils/bmad-path-resolver.js';
 import { UnifiedBMADTool, getHelpResult } from './tools/index.js';
 import { MasterManifestService } from './services/master-manifest-service.js';
-import {
-  convertAgents,
-  convertWorkflows,
-} from './utils/master-manifest-adapter.js';
+import { convertAgents } from './utils/master-manifest-adapter.js';
 import logger from './utils/logger.js';
 
 // Compute __dirname - use import.meta.url when available (production)
@@ -225,12 +222,8 @@ export class BMADMCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, () => {
       logger.info('list_tools called - returning unified bmad tool');
 
-      // Get workflows from master manifest for help text generation
-      const masterData = this.masterService.get();
-      const workflows = convertWorkflows(masterData.workflows);
-
       // Generate help content with available agents and workflows
-      const help = getHelpResult(this.bmadRoot, this.agents, workflows);
+      const help = getHelpResult();
 
       const tools: Tool[] = [
         {
