@@ -6,6 +6,8 @@ export function getHelpResult() {
   lines.push('  - bmad <agent>');
   lines.push('  - bmad *<workflow>');
   lines.push('  - bmad *doctor');
-  lines.push('  - bmad *list-agents | *list-workflows | *list-tasks | *list-modules');
+  lines.push(
+    '  - bmad *list-agents | *list-workflows | *list-tasks | *list-modules',
+  );
   return { content: lines.join('\n') };
 }

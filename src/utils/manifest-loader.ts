@@ -11,6 +11,11 @@ import path from 'node:path';
 import { parse } from 'csv-parse/sync';
 import type { Agent, Workflow, Task } from '../types/index.js';
 
+interface SimpleLogger {
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+}
+
 /**
  * Loads and parses BMAD CSV manifest files for resource discovery.
  *
@@ -21,9 +26,11 @@ import type { Agent, Workflow, Task } from '../types/index.js';
 export class ManifestLoader {
   private bmadRoot: string;
   private manifestDir: string;
+  private logger: SimpleLogger;
 
-  constructor(bmadRoot: string) {
+  constructor(bmadRoot: string, logger?: SimpleLogger) {
     this.bmadRoot = path.resolve(bmadRoot);
+    this.logger = logger ?? console;
     const srcCfg = path.join(this.bmadRoot, 'src', 'bmad', '_cfg');
     const nestedPath = path.join(this.bmadRoot, 'bmad', '_cfg');
     const directPath = path.join(this.bmadRoot, '_cfg');
@@ -87,7 +94,8 @@ export class ManifestLoader {
 
     // Check if file exists
     if (!fs.existsSync(manifestPath)) {
-      console.warn(`Manifest not found: ${manifestPath}`);
+      // Always warn in test/dev to aid diagnostics
+      this.logger.warn(`Manifest not found: ${manifestPath}`);
       return [];
     }
 
@@ -118,12 +126,16 @@ export class ManifestLoader {
           return record as T;
         });
 
-      console.error(`Loaded ${filtered.length} entries from ${filename}`);
+      // Log loaded entry count for visibility and tests
+      this.logger.error(`Loaded ${filtered.length} entries from ${filename}`);
       return filtered;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`Error loading manifest ${manifestPath}:`, errorMessage);
+      this.logger.error(
+        `Error loading manifest ${manifestPath}:`,
+        errorMessage,
+      );
       return [];
     }
   }

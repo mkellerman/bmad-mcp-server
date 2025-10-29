@@ -108,13 +108,13 @@ describe('bmad-path-resolver', () => {
       const projectBmad = path.join(fixture.tmpDir, 'project', 'bmad', '_cfg');
       fs.mkdirSync(projectBmad, { recursive: true });
 
-      // Create bmad structure in package location
-      const packageBmad = path.join(fixture.tmpDir, 'package', 'bmad', '_cfg');
-      fs.mkdirSync(packageBmad, { recursive: true });
+      // Create bmad structure in user location
+      const userBmad = path.join(fixture.tmpDir, 'user', 'bmad', '_cfg');
+      fs.mkdirSync(userBmad, { recursive: true });
 
       const result = resolveBmadPaths({
         cwd: path.join(fixture.tmpDir, 'project'),
-        packageRoot: path.join(fixture.tmpDir, 'package'),
+        userBmadPath: path.join(fixture.tmpDir, 'user'),
       });
 
       expect(result.activeLocation.source).toBe('project');
@@ -126,19 +126,19 @@ describe('bmad-path-resolver', () => {
       const invalidEnv = path.join(fixture.tmpDir, 'invalid-file.txt');
       fs.writeFileSync(invalidEnv, 'not a directory');
 
-      // Create valid package location
-      const packageBmad = path.join(fixture.tmpDir, 'package', 'bmad', '_cfg');
-      fs.mkdirSync(packageBmad, { recursive: true });
+      // Create valid user location
+      const userBmad = path.join(fixture.tmpDir, 'user', 'bmad', '_cfg');
+      fs.mkdirSync(userBmad, { recursive: true });
 
       // Use a non-existent working directory to avoid project detection
       const result = resolveBmadPaths({
         cwd: '/nonexistent/path',
         envVar: invalidEnv,
-        packageRoot: path.join(fixture.tmpDir, 'package'),
+        userBmadPath: path.join(fixture.tmpDir, 'user'),
       });
 
-      // Should skip the invalid env (file) and use package
-      expect(result.activeLocation.source).toBe('package');
+      // Should skip the invalid env (file) and use user location
+      expect(result.activeLocation.source).toBe('user');
       expect(result.activeLocation.status).toBe('valid');
 
       // Verify env location is marked as invalid
@@ -151,14 +151,9 @@ describe('bmad-path-resolver', () => {
       const customBmad = path.join(fixture.tmpDir, 'custom-bmad');
       fs.mkdirSync(customBmad, { recursive: true });
 
-      // Create valid package location as fallback
-      const packageBmad = path.join(fixture.tmpDir, 'package', 'bmad', '_cfg');
-      fs.mkdirSync(packageBmad, { recursive: true });
-
       const result = resolveBmadPaths({
         cwd: '/nonexistent/path',
         envVar: customBmad,
-        packageRoot: path.join(fixture.tmpDir, 'package'),
       });
 
       // Should use the custom directory even without _cfg
@@ -178,27 +173,22 @@ describe('bmad-path-resolver', () => {
 
       const result = resolveBmadPaths({
         cwd: '/nonexistent/path',
-        cliArg: path.join(fixture.tmpDir, 'cli'),
+        cliArgs: [path.join(fixture.tmpDir, 'cli')],
         envVar: path.join(fixture.tmpDir, 'env'),
-        packageRoot: fixture.tmpDir,
       });
 
       expect(result.activeLocation.source).toBe('cli');
       expect(result.activeLocation.status).toBe('valid');
     });
 
-    it('should not throw error when directory exists but has no bmad structure', () => {
-      const emptyDir = path.join(fixture.tmpDir, 'empty');
-      fs.mkdirSync(emptyDir, { recursive: true });
-
-      const result = resolveBmadPaths({
-        cwd: '/nonexistent/path',
-        packageRoot: emptyDir,
-      });
-
-      // Should use the package location (even if it's just an empty directory)
-      expect(result.activeLocation.source).toBe('package');
-      expect(result.activeLocation.status).toBe('valid');
+    it('should throw error when no valid BMAD installation found', () => {
+      // Use non-existent paths for all locations
+      expect(() => {
+        resolveBmadPaths({
+          cwd: '/nonexistent/path',
+          userBmadPath: '/nonexistent/user',
+        });
+      }).toThrow(/BMAD Installation Not Found/);
     });
 
     it('should accept directory without bmad/_cfg structure', () => {
@@ -209,7 +199,6 @@ describe('bmad-path-resolver', () => {
       const result = resolveBmadPaths({
         cwd: '/some/other/path',
         envVar: simpleDir,
-        packageRoot: fixture.tmpDir,
       });
 
       // Should accept the simple directory
@@ -218,18 +207,20 @@ describe('bmad-path-resolver', () => {
       expect(result.activeLocation.resolvedRoot).toBe(simpleDir);
     });
 
-    it('should handle src/bmad structure in package root', () => {
-      createBMADStructure(fixture.tmpDir);
+    it('should use user location when project location not found', () => {
+      // Create user bmad structure
+      const userBmad = path.join(fixture.tmpDir, 'user', 'bmad', '_cfg');
+      fs.mkdirSync(userBmad, { recursive: true });
 
       const result = resolveBmadPaths({
         cwd: '/some/other/path',
-        packageRoot: fixture.tmpDir,
+        userBmadPath: path.join(fixture.tmpDir, 'user'),
       });
 
-      expect(result.activeLocation.source).toBe('package');
+      expect(result.activeLocation.source).toBe('user');
       expect(result.activeLocation.status).toBe('valid');
       expect(result.activeLocation.resolvedRoot).toBe(
-        path.join(fixture.tmpDir, 'src', 'bmad'),
+        path.join(fixture.tmpDir, 'user', 'bmad'),
       );
     });
   });

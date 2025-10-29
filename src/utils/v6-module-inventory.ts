@@ -2,11 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
 import { ManifestLoader } from './manifest-loader.js';
-import type {
-  BmadOrigin,
-  MasterRecord,
-  V6ModuleInfo,
-} from '../types/index.js';
+import type { BmadOrigin, MasterRecord, V6ModuleInfo } from '../types/index.js';
 import { detectV6, detectV6Filesystem } from './version-detector.js';
 
 // Exclusions for agent file detection (case-insensitive basenames)
@@ -21,7 +17,10 @@ function readYaml<T = unknown>(filePath: string): T | undefined {
   }
 }
 
-function listFilesRecursive(dir: string, predicate: (p: string) => boolean): string[] {
+function listFilesRecursive(
+  dir: string,
+  predicate: (p: string) => boolean,
+): string[] {
   const results: string[] = [];
   const stack: string[] = [dir];
   while (stack.length) {
@@ -89,13 +88,22 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
   }
 
   // Load manifest CSV files only if manifest exists
-  const quiet: { warn: (...args: unknown[]) => void; error: (...args: unknown[]) => void } = {
+  const quiet: {
+    warn: (...args: unknown[]) => void;
+    error: (...args: unknown[]) => void;
+  } = {
     warn: () => {},
     error: () => {},
   };
-  const agentsCsv = hasManifest ? new ManifestLoader(origin.root, quiet).loadAgentManifest() : [];
-  const workflowsCsv = hasManifest ? new ManifestLoader(origin.root, quiet).loadWorkflowManifest() : [];
-  const tasksCsv = hasManifest ? new ManifestLoader(origin.root, quiet).loadTaskManifest() : [];
+  const agentsCsv = hasManifest
+    ? new ManifestLoader(origin.root, quiet).loadAgentManifest()
+    : [];
+  const workflowsCsv = hasManifest
+    ? new ManifestLoader(origin.root, quiet).loadWorkflowManifest()
+    : [];
+  const tasksCsv = hasManifest
+    ? new ManifestLoader(origin.root, quiet).loadTaskManifest()
+    : [];
 
   const modules: V6ModuleInfo[] = [];
   const agentRecords: MasterRecord[] = [];
@@ -107,14 +115,19 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
     const modulePath = path.join(origin.root, moduleName);
     const configPath = path.join(modulePath, 'config.yaml');
     const configExists = fs.existsSync(configPath);
-    const config = configExists ? readYaml<Record<string, any>>(configPath) : undefined;
+    const config = configExists
+      ? readYaml<Record<string, any>>(configPath)
+      : undefined;
     const moduleInfo: V6ModuleInfo = {
       name: moduleName,
       path: modulePath,
       configPath,
       configValid: Boolean(configExists),
-      errors: configExists ? [] : ["Missing config.yaml"],
-      moduleVersion: (config && (config.version || config.moduleVersion)) || mod.version || 'v6.x',
+      errors: configExists ? [] : ['Missing config.yaml'],
+      moduleVersion:
+        (config && (config.version || config.moduleVersion)) ||
+        mod.version ||
+        'v6.x',
       bmadVersion: detected.installationVersion || 'v6.x',
       origin,
     };
@@ -124,15 +137,19 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
     const modAgentsCsv = agentsCsv
       .filter((a) => a.module === moduleName)
       .filter((row) => {
-        const p = typeof (row as any).path === 'string' ? ((row as any).path as string) : '';
+        const p =
+          typeof (row as any).path === 'string'
+            ? ((row as any).path as string)
+            : '';
         const base = path.basename(p).toLowerCase();
         return !EXCLUDED_AGENT_FILES.includes(base);
       });
     const modWorkflowsCsv = workflowsCsv.filter((w) => w.module === moduleName);
     const modTasksCsv = tasksCsv.filter((t) => t.module === moduleName);
 
-    const csvAgentPaths = new Set(modAgentsCsv.map((a) => a.path));
-    const csvAgentKeys = new Set(modAgentsCsv.map((a) => `${moduleName}:${a.name}`));
+    const csvAgentKeys = new Set(
+      modAgentsCsv.map((a) => `${moduleName}:${a.name}`),
+    );
     const csvWorkflowPaths = new Set(modWorkflowsCsv.map((w) => w.path));
     const csvTaskPaths = new Set(modTasksCsv.map((t) => t.path ?? ''));
 
@@ -161,7 +178,9 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
     }
     for (const row of modTasksCsv) {
       const moduleRelativePath = row.path ?? '';
-      const absolutePath = moduleRelativePath ? path.join(origin.root, moduleRelativePath) : '';
+      const absolutePath = moduleRelativePath
+        ? path.join(origin.root, moduleRelativePath)
+        : '';
       const exists = moduleRelativePath ? fs.existsSync(absolutePath) : false;
       const rec: MasterRecord = {
         kind: 'task',
@@ -173,7 +192,9 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
         name: row.name,
         displayName: row.description,
         description: row.description,
-        bmadRelativePath: moduleRelativePath ? path.join('bmad', moduleRelativePath) : '',
+        bmadRelativePath: moduleRelativePath
+          ? path.join('bmad', moduleRelativePath)
+          : '',
         moduleRelativePath,
         absolutePath,
         exists,
@@ -183,9 +204,15 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
     }
 
     // FS scan
-    const agentFiles = listFilesRecursive(path.join(modulePath, 'agents'), (p) => p.endsWith('.md'));
+    const agentFiles = listFilesRecursive(
+      path.join(modulePath, 'agents'),
+      (p) => p.endsWith('.md'),
+    );
     const workflowFiles = listWorkflowFiles(path.join(modulePath, 'workflows'));
-    const taskFiles = listFilesRecursive(path.join(modulePath, 'tasks'), (p) => p.endsWith('.md') || p.endsWith('.xml'));
+    const taskFiles = listFilesRecursive(
+      path.join(modulePath, 'tasks'),
+      (p) => p.endsWith('.md') || p.endsWith('.xml'),
+    );
 
     // Agents from manifest (priority source - always include)
     for (const row of modAgentsCsv) {
@@ -299,5 +326,10 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
     }
   }
 
-  return { modules, agents: agentRecords, workflows: workflowRecords, tasks: taskRecords };
+  return {
+    modules,
+    agents: agentRecords,
+    workflows: workflowRecords,
+    tasks: taskRecords,
+  };
 }

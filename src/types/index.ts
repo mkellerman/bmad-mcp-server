@@ -50,9 +50,24 @@ export interface Task {
 /**
  * Result of input validation
  */
+export enum ErrorCode {
+  TOO_MANY_ARGUMENTS = 'TOO_MANY_ARGUMENTS',
+  INVALID_ASTERISK_COUNT = 'INVALID_ASTERISK_COUNT',
+  MISSING_WORKFLOW_NAME = 'MISSING_WORKFLOW_NAME',
+  MISSING_ASTERISK = 'MISSING_ASTERISK',
+  INVALID_CHARACTERS = 'INVALID_CHARACTERS',
+  NON_ASCII_CHARACTERS = 'NON_ASCII_CHARACTERS',
+  NAME_TOO_SHORT = 'NAME_TOO_SHORT',
+  NAME_TOO_LONG = 'NAME_TOO_LONG',
+  INVALID_NAME_FORMAT = 'INVALID_NAME_FORMAT',
+  UNKNOWN_WORKFLOW = 'UNKNOWN_WORKFLOW',
+  CASE_MISMATCH = 'CASE_MISMATCH',
+  UNKNOWN_AGENT = 'UNKNOWN_AGENT',
+}
+
 export interface ValidationResult {
   valid: boolean;
-  errorCode?: string;
+  errorCode?: ErrorCode | string;
   errorMessage?: string;
   suggestions?: string[];
   exitCode: number;
@@ -96,6 +111,58 @@ export interface WorkflowContext {
   agentManifestPath: string;
   agentManifestData: Agent[];
   agentCount: number;
+}
+
+/**
+ * BMAD v6 Master Manifest Types
+ */
+export type BmadOriginSource = 'project' | 'cli' | 'env' | 'user' | 'package';
+
+export interface BmadOrigin {
+  kind: BmadOriginSource;
+  displayName: string;
+  root: string; // absolute path to bmad root (the 'bmad' folder)
+  manifestDir: string; // absolute path to bmad/_cfg
+  priority: number;
+}
+
+export interface V6ModuleInfo {
+  name: string;
+  path: string; // absolute path to module directory
+  configPath: string; // absolute path to module/config.yaml
+  configValid: boolean;
+  errors: string[];
+  moduleVersion?: string;
+  bmadVersion?: string;
+  origin: BmadOrigin;
+}
+
+export type MasterKind = 'agent' | 'workflow' | 'task';
+
+export interface MasterRecordBase {
+  kind: MasterKind;
+  source: 'manifest' | 'filesystem';
+  origin: BmadOrigin;
+  moduleName: string;
+  moduleVersion?: string;
+  bmadVersion?: string;
+  name?: string;
+  displayName?: string;
+  description?: string;
+  bmadRelativePath: string; // e.g., bmad/bmm/agents/analyst.md
+  moduleRelativePath: string; // e.g., bmm/agents/analyst.md
+  absolutePath: string;
+  exists: boolean; // for csv source this can be false (no-file-found)
+  status: 'verified' | 'not-in-manifest' | 'no-file-found';
+}
+
+export type MasterRecord = MasterRecordBase;
+
+export interface MasterManifests {
+  agents: MasterRecord[];
+  workflows: MasterRecord[];
+  tasks: MasterRecord[];
+  modules: V6ModuleInfo[];
 }
 
 /**

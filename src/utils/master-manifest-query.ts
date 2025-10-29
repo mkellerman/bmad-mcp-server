@@ -40,7 +40,7 @@ import logger from './logger.js';
  */
 export function findAgentByName(
   manifest: MasterManifests,
-  name: string
+  name: string,
 ): MasterRecord | undefined {
   // Parse the name (may include module qualifier)
   const parsed = parseQualifiedName(name);
@@ -49,15 +49,19 @@ export function findAgentByName(
 
   // Step 1: Filter by name and exists=true
   let candidates = manifest.agents.filter(
-    a => a.name === parsed.name && a.exists === true
+    (a) => a.name === parsed.name && a.exists === true,
   );
 
-  logger.info(`   Found ${candidates.length} candidates for name "${parsed.name}"`);
+  logger.info(
+    `   Found ${candidates.length} candidates for name "${parsed.name}"`,
+  );
 
   // Step 2: If module specified, filter by module
   if (parsed.module) {
-    candidates = candidates.filter(a => a.moduleName === parsed.module);
-    logger.info(`   After module filter "${parsed.module}": ${candidates.length} candidates`);
+    candidates = candidates.filter((a) => a.moduleName === parsed.module);
+    logger.info(
+      `   After module filter "${parsed.module}": ${candidates.length} candidates`,
+    );
   }
 
   // Step 3: No matches found
@@ -74,7 +78,7 @@ export function findAgentByName(
 
   logger.info(
     `   ✅ Selected: "${selected.name}" from module "${selected.moduleName}" ` +
-    `at ${selected.origin.displayName} (${selected.origin.kind}, priority=${selected.origin.priority})`
+      `at ${selected.origin.displayName} (${selected.origin.kind}, priority=${selected.origin.priority})`,
   );
 
   return selected;
@@ -95,7 +99,7 @@ export function findAgentByName(
  */
 export function findWorkflowByName(
   manifest: MasterManifests,
-  name: string
+  name: string,
 ): MasterRecord | undefined {
   // Parse the name (may include module qualifier)
   const parsed = parseQualifiedName(name);
@@ -104,15 +108,19 @@ export function findWorkflowByName(
 
   // Step 1: Filter by name and exists=true
   let candidates = manifest.workflows.filter(
-    w => w.name === parsed.name && w.exists === true
+    (w) => w.name === parsed.name && w.exists === true,
   );
 
-  logger.info(`   Found ${candidates.length} candidates for name "${parsed.name}"`);
+  logger.info(
+    `   Found ${candidates.length} candidates for name "${parsed.name}"`,
+  );
 
   // Step 2: If module specified, filter by module
   if (parsed.module) {
-    candidates = candidates.filter(w => w.moduleName === parsed.module);
-    logger.info(`   After module filter "${parsed.module}": ${candidates.length} candidates`);
+    candidates = candidates.filter((w) => w.moduleName === parsed.module);
+    logger.info(
+      `   After module filter "${parsed.module}": ${candidates.length} candidates`,
+    );
   }
 
   // Step 3: No matches found
@@ -129,7 +137,7 @@ export function findWorkflowByName(
 
   logger.info(
     `   ✅ Selected: "${selected.name}" from module "${selected.moduleName}" ` +
-    `at ${selected.origin.displayName} (${selected.origin.kind}, priority=${selected.origin.priority})`
+      `at ${selected.origin.displayName} (${selected.origin.kind}, priority=${selected.origin.priority})`,
   );
 
   return selected;
@@ -146,7 +154,7 @@ export function findWorkflowByName(
  */
 export function findTaskByName(
   manifest: MasterManifests,
-  name: string
+  name: string,
 ): MasterRecord | undefined {
   // Parse the name (may include module qualifier)
   const parsed = parseQualifiedName(name);
@@ -155,15 +163,19 @@ export function findTaskByName(
 
   // Step 1: Filter by name and exists=true
   let candidates = manifest.tasks.filter(
-    t => t.name === parsed.name && t.exists === true
+    (t) => t.name === parsed.name && t.exists === true,
   );
 
-  logger.info(`   Found ${candidates.length} candidates for name "${parsed.name}"`);
+  logger.info(
+    `   Found ${candidates.length} candidates for name "${parsed.name}"`,
+  );
 
   // Step 2: If module specified, filter by module
   if (parsed.module) {
-    candidates = candidates.filter(t => t.moduleName === parsed.module);
-    logger.info(`   After module filter "${parsed.module}": ${candidates.length} candidates`);
+    candidates = candidates.filter((t) => t.moduleName === parsed.module);
+    logger.info(
+      `   After module filter "${parsed.module}": ${candidates.length} candidates`,
+    );
   }
 
   // Step 3: No matches found
@@ -180,7 +192,7 @@ export function findTaskByName(
 
   logger.info(
     `   ✅ Selected: "${selected.name}" from module "${selected.moduleName}" ` +
-    `at ${selected.origin.displayName} (${selected.origin.kind}, priority=${selected.origin.priority})`
+      `at ${selected.origin.displayName} (${selected.origin.kind}, priority=${selected.origin.priority})`,
   );
 
   return selected;
@@ -196,7 +208,7 @@ export function findTaskByName(
  * @returns Array of existing agent records
  */
 export function getAllAgents(manifest: MasterManifests): MasterRecord[] {
-  return manifest.agents.filter(a => a.exists === true);
+  return manifest.agents.filter((a) => a.exists === true);
 }
 
 /**
@@ -209,7 +221,7 @@ export function getAllAgents(manifest: MasterManifests): MasterRecord[] {
  * @returns Array of existing workflow records
  */
 export function getAllWorkflows(manifest: MasterManifests): MasterRecord[] {
-  return manifest.workflows.filter(w => w.exists === true);
+  return manifest.workflows.filter((w) => w.exists === true);
 }
 
 /**
@@ -222,7 +234,7 @@ export function getAllWorkflows(manifest: MasterManifests): MasterRecord[] {
  * @returns Array of existing task records
  */
 export function getAllTasks(manifest: MasterManifests): MasterRecord[] {
-  return manifest.tasks.filter(t => t.exists === true);
+  return manifest.tasks.filter((t) => t.exists === true);
 }
 
 /**
@@ -236,7 +248,7 @@ export function getAllTasks(manifest: MasterManifests): MasterRecord[] {
  */
 export function getUniqueAgentNames(manifest: MasterManifests): string[] {
   const agents = getAllAgents(manifest);
-  const names = agents.map(a => a.name || '').filter(n => n !== '');
+  const names = agents.map((a) => a.name || '').filter((n) => n !== '');
   return Array.from(new Set(names));
 }
 
@@ -251,7 +263,7 @@ export function getUniqueAgentNames(manifest: MasterManifests): string[] {
  */
 export function getUniqueWorkflowNames(manifest: MasterManifests): string[] {
   const workflows = getAllWorkflows(manifest);
-  const names = workflows.map(w => w.name || '').filter(n => n !== '');
+  const names = workflows.map((w) => w.name || '').filter((n) => n !== '');
   return Array.from(new Set(names));
 }
 
@@ -266,7 +278,7 @@ export function getUniqueWorkflowNames(manifest: MasterManifests): string[] {
  */
 export function getUniqueTaskNames(manifest: MasterManifests): string[] {
   const tasks = getAllTasks(manifest);
-  const names = tasks.map(t => t.name || '').filter(n => n !== '');
+  const names = tasks.map((t) => t.name || '').filter((n) => n !== '');
   return Array.from(new Set(names));
 }
 
@@ -304,13 +316,15 @@ export function getUniqueTaskNames(manifest: MasterManifests): string[] {
  */
 export function resolveFilePath(
   manifest: MasterManifests,
-  requestedPath: string
+  requestedPath: string,
 ): string | undefined {
   // Parse the path to extract module and file path
   const parsed = parseBmadPath(requestedPath);
 
   logger.info(`🔍 Resolving file path: "${requestedPath}"`);
-  logger.info(`   Parsed: module="${parsed.module ?? 'ANY'}", filePath="${parsed.filePath}", format=${parsed.format}`);
+  logger.info(
+    `   Parsed: module="${parsed.module ?? 'ANY'}", filePath="${parsed.filePath}", format=${parsed.format}`,
+  );
 
   // Collect all records from all resource types (agents, workflows, tasks)
   const allRecords: MasterRecord[] = [
@@ -320,12 +334,13 @@ export function resolveFilePath(
   ];
 
   // Step 1: Filter by file path match and exists=true
-  let candidates = allRecords.filter(record => {
+  let candidates = allRecords.filter((record) => {
     if (!record.exists) return false;
 
     // Check if the record's path ends with the requested file path
     // This handles both moduleRelativePath and bmadRelativePath
-    const recordPath = record.moduleRelativePath || record.bmadRelativePath || '';
+    const recordPath =
+      record.moduleRelativePath || record.bmadRelativePath || '';
     const normalized = normalizePath(parsed.filePath);
 
     return recordPath.endsWith(normalized) || recordPath === parsed.filePath;
@@ -335,8 +350,10 @@ export function resolveFilePath(
 
   // Step 2: If module specified, filter by module
   if (parsed.module) {
-    candidates = candidates.filter(r => r.moduleName === parsed.module);
-    logger.info(`   After module filter "${parsed.module}": ${candidates.length} candidates`);
+    candidates = candidates.filter((r) => r.moduleName === parsed.module);
+    logger.info(
+      `   After module filter "${parsed.module}": ${candidates.length} candidates`,
+    );
   }
 
   // Step 3: No matches found
@@ -353,7 +370,7 @@ export function resolveFilePath(
 
   logger.info(
     `   ✅ Selected: "${selected.absolutePath}" from module "${selected.moduleName}" ` +
-    `at ${selected.origin.displayName} (priority=${selected.origin.priority})`
+      `at ${selected.origin.displayName} (priority=${selected.origin.priority})`,
   );
 
   return selected.absolutePath;

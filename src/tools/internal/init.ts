@@ -16,9 +16,9 @@ function performInitialization(): BMADToolResult {
     success: false,
     type: 'init',
     exitCode: 1,
-    error: 'BMAD initialization is not supported via MCP server. Please use: npx bmad-method install',
+    error:
+      'BMAD initialization is not supported via MCP server. Please use: npx bmad-method install',
   };
 }
 
 export default handleInit;
-

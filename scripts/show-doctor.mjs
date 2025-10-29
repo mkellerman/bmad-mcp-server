@@ -52,7 +52,10 @@ async function main() {
     userBmadPath: path.join(__dirname, '.bmad'),
   });
 
-  const root = discovery.activeLocation.resolvedRoot ?? discovery.activeLocation.originalPath ?? __dirname;
+  const root =
+    discovery.activeLocation.resolvedRoot ??
+    discovery.activeLocation.originalPath ??
+    __dirname;
 
   const masterManifestService = new MasterManifestService(discovery);
   masterManifestService.generate();

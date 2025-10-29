@@ -9,4 +9,3 @@ export function formatMissingWorkflowNameError(): string {
 export function formatMissingAsteriskError(name: string): string {
   return `Did you mean '*${name}'? Workflows require an asterisk.`;
 }
-

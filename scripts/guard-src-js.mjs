@@ -28,10 +28,11 @@ try {
 }
 
 if (files.length > 0) {
-  console.error('Error: JavaScript files found under src/ (TypeScript sources only)');
+  console.error(
+    'Error: JavaScript files found under src/ (TypeScript sources only)',
+  );
   for (const f of files) console.error(` - ${path.relative(process.cwd(), f)}`);
   console.error('\nRemove these files or move generated output to build/.');
   process.exit(1);
 }
 process.exit(0);
-

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export type BmadLocationSource = 'project' | 'cli' | 'env' | 'user' | 'package';
+export type BmadLocationSource = 'project' | 'cli' | 'env' | 'user';
 
 export interface BmadLocationInfo {
   source: BmadLocationSource;
@@ -18,27 +18,18 @@ export interface BmadLocationInfo {
 export interface BmadPathResolution {
   activeLocation: BmadLocationInfo;
   locations: BmadLocationInfo[];
-  packageRoot: string;
-  packageBmadPath: string;
   userBmadPath: string;
   projectRoot: string;
 }
 
 export interface ResolveBmadPathsOptions {
   cwd: string;
-  cliArg?: string;
+  cliArgs?: string[];
   envVar?: string;
-  packageRoot: string;
   userBmadPath?: string;
 }
 
-const PRIORITY_ORDER: BmadLocationSource[] = [
-  'project',
-  'cli',
-  'env',
-  'user',
-  'package',
-];
+const PRIORITY_ORDER: BmadLocationSource[] = ['project', 'cli', 'env', 'user'];
 
 export interface ManifestInfo {
   resolvedRoot: string;
@@ -51,45 +42,82 @@ export interface ManifestInfo {
 export function resolveBmadPaths(
   options: ResolveBmadPathsOptions,
 ): BmadPathResolution {
-  const packageBmadCandidates = [
-    path.join(options.packageRoot, 'build', 'bmad'),
-    path.join(options.packageRoot, 'src', 'bmad'),
-    path.join(options.packageRoot, 'bmad'),
-  ];
-  const packageBmadPath =
-    packageBmadCandidates.find((candidate) => fs.existsSync(candidate)) ??
-    options.packageRoot; // Fallback to package root itself if no bmad subfolder found
   const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
 
   const candidates: BmadLocationInfo[] = [
     buildCandidate('project', 'Local project', options.cwd),
-    buildCandidate('cli', 'Command argument', options.cliArg),
     buildCandidate('env', 'BMAD_ROOT environment variable', options.envVar),
     buildCandidate('user', 'User defaults (~/.bmad)', userBmadPath),
-    buildCandidate('package', 'Package defaults', packageBmadPath),
   ];
 
-  const activeLocation = candidates
-    .filter((location) => location.status === 'valid')
+  // Add all CLI arguments as candidates with priority based on order
+  if (options.cliArgs && options.cliArgs.length > 0) {
+    options.cliArgs.forEach((cliArg, index) => {
+      const candidate = buildCandidate(
+        'cli',
+        `CLI argument #${index + 1}`,
+        cliArg,
+      );
+      // Insert CLI candidates at the beginning (highest priority)
+      candidates.splice(index + 1, 0, candidate);
+    });
+  }
+
+  // Prefer locations that have a detected manifest directory (_cfg)
+  let activeLocation = candidates
+    .filter((location) => location.status === 'valid' && location.manifestDir)
     .sort((a, b) => a.priority - b.priority)[0];
 
+  // Fallback: if none have manifests, prefer explicit inputs (CLI/ENV),
+  // otherwise use the first valid directory by default priority.
   if (!activeLocation) {
-    throw new Error(
-      'BMAD manifest directory not found. Checked locations:\n' +
-        candidates
-          .map(
-            (location) =>
-              `- ${location.displayName}: ${location.originalPath ?? '<none>'} (${location.status})`,
-          )
-          .join('\n'),
+    const explicit = candidates.find(
+      (location) =>
+        location.status === 'valid' &&
+        (location.source === 'cli' || location.source === 'env'),
     );
+    if (explicit) {
+      activeLocation = explicit;
+    } else {
+      activeLocation = candidates
+        .filter((location) => location.status === 'valid')
+        .sort((a, b) => a.priority - b.priority)[0];
+    }
+  }
+
+  if (!activeLocation) {
+    const errorMessage = [
+      '╭─────────────────────────────────────────────────────────────╮',
+      '│ ⚠️  BMAD Installation Not Found                             │',
+      '├─────────────────────────────────────────────────────────────┤',
+      '│                                                             │',
+      '│ The BMAD MCP server requires a BMAD installation.          │',
+      '│ Versions v4, v5, and v6 are supported.                     │',
+      '│                                                             │',
+      '│ 📦 Install BMAD:                                            │',
+      '│    npx bmad-method install                                 │',
+      '│                                                             │',
+      '│ 🔧 Or specify a custom location:                           │',
+      '│    export BMAD_ROOT=/path/to/bmad                          │',
+      '│                                                             │',
+      '│ 📖 Learn more:                                              │',
+      '│    https://github.com/bmadcode/bmad                        │',
+      '│                                                             │',
+      '│ Checked locations:                                          │',
+      ...candidates.map(
+        (location) =>
+          `│   - ${location.displayName.padEnd(35)} (${location.status.padEnd(10)})│`,
+      ),
+      '│                                                             │',
+      '╰─────────────────────────────────────────────────────────────╯',
+    ].join('\n');
+
+    throw new Error(errorMessage);
   }
 
   return {
     activeLocation,
     locations: candidates,
-    packageRoot: options.packageRoot,
-    packageBmadPath,
     userBmadPath,
     projectRoot: options.cwd,
   };

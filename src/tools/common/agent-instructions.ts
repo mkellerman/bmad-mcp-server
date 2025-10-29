@@ -7,4 +7,3 @@ export function getAgentInstructions(): string {
     '3. Follow activation rules and command handling as defined in the agent XML/markdown',
   ].join('\n');
 }
-

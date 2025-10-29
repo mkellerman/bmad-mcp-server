@@ -8,7 +8,10 @@ import {
   formatMissingAsteriskError,
 } from './formatters.js';
 
-export function parseCommand(command: string, workflows: Workflow[]): ParsedCommand {
+export function parseCommand(
+  command: string,
+  workflows: Workflow[],
+): ParsedCommand {
   const securityValidation = checkSecurity(command);
   if (!securityValidation.valid) {
     return { type: 'error', validation: securityValidation };
@@ -69,4 +72,3 @@ export function parseCommand(command: string, workflows: Workflow[]): ParsedComm
   }
   return { type: 'agent', name: agentName };
 }
-

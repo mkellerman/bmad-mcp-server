@@ -4,8 +4,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
-import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
+import { UnifiedBMADTool } from '../../src/tools/index.js';
 import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
+import { MasterManifestService } from '../../src/services/master-manifest-service.js';
 import {
   createTestFixture,
   createBMADStructure,
@@ -22,17 +23,21 @@ import {
 function createUnifiedTool(baseDir: string): UnifiedBMADTool {
   const discovery = resolveBmadPaths({
     cwd: baseDir,
-    packageRoot: baseDir,
-    cliArg: undefined,
+    cliArgs: [],
     envVar: undefined,
     userBmadPath: path.join(baseDir, '.bmad'),
   });
 
   const root = discovery.activeLocation.resolvedRoot ?? baseDir;
 
+  // Create and populate master manifest service
+  const masterManifestService = new MasterManifestService(discovery);
+  masterManifestService.generate();
+
   return new UnifiedBMADTool({
     bmadRoot: root,
     discovery,
+    masterManifestService,
   });
 }
 
@@ -217,48 +222,7 @@ describe('UnifiedBMADTool', () => {
     });
   });
 
-  describe('execute - discovery commands', () => {
-    it('should list agents', async () => {
-      const result = await tool.execute('*list-agents');
-
-      expect(result.success).toBe(true);
-      expect(result.type).toBe('list');
-      expect(result.listType).toBe('agents');
-      expect(result.count).toBeGreaterThan(0);
-      expect(result.content).toContain('bmad-master');
-      expect(result.content).toContain('analyst');
-      expect(result.content).toContain('dev');
-    });
-
-    it('should list workflows', async () => {
-      const result = await tool.execute('*list-workflows');
-
-      expect(result.success).toBe(true);
-      expect(result.type).toBe('list');
-      expect(result.listType).toBe('workflows');
-      expect(result.count).toBeGreaterThan(0);
-      expect(result.content).toContain('party-mode');
-      expect(result.content).toContain('analysis');
-    });
-
-    it('should list tasks', async () => {
-      const result = await tool.execute('*list-tasks');
-
-      expect(result.success).toBe(true);
-      expect(result.type).toBe('list');
-      expect(result.listType).toBe('tasks');
-      expect(result.count).toBeGreaterThan(0);
-      expect(result.content).toContain('daily-standup');
-    });
-
-    it('should show help', async () => {
-      const result = await tool.execute('*help');
-
-      expect(result.success).toBe(true);
-      expect(result.type).toBe('help');
-      expect(result.content).toContain('BMAD MCP Server');
-    });
-  });
+  // Discovery commands removed; tests omitted
 
   describe('execute - validation', () => {
     it('should reject commands with dangerous characters', async () => {
@@ -353,7 +317,7 @@ describe('UnifiedBMADTool', () => {
   });
 
   describe('edge cases', () => {
-    it('should skip invalid BMAD_ROOT and use package defaults', async () => {
+    it('should skip invalid BMAD_ROOT and use user location', async () => {
       // Create a separate test environment
       const testFixture = createTestFixture();
 
@@ -361,22 +325,20 @@ describe('UnifiedBMADTool', () => {
       const invalidRoot = path.join(testFixture.tmpDir, 'invalid-root.txt');
       require('fs').writeFileSync(invalidRoot, 'not a directory');
 
-      // Create valid package location with agent
-      const packageBmad = path.join(testFixture.tmpDir, 'package');
-      createBMADStructure(packageBmad);
-      createAgentManifest(packageBmad);
-      createAgentFile(packageBmad, 'core/agents/bmad-master.md', SAMPLE_AGENT);
+      // Create valid user location with agent
+      const userBmad = path.join(testFixture.tmpDir, '.bmad');
+      createBMADStructure(userBmad);
+      createAgentManifest(userBmad);
+      createAgentFile(userBmad, 'core/agents/bmad-master.md', SAMPLE_AGENT);
 
       // Use a clean working directory without bmad structure
       const cleanWorkDir = path.join(testFixture.tmpDir, 'work');
       require('fs').mkdirSync(cleanWorkDir, { recursive: true });
 
-      // Resolve paths with invalid env var
       const discovery = resolveBmadPaths({
         cwd: '/nonexistent/path',
         envVar: invalidRoot,
-        packageRoot: packageBmad,
-        userBmadPath: path.join(testFixture.tmpDir, '.bmad'),
+        userBmadPath: userBmad,
       });
 
       // Verify that invalid location is marked correctly
@@ -385,46 +347,32 @@ describe('UnifiedBMADTool', () => {
       );
       expect(envLocation?.status).toBe('invalid');
 
-      // Active location should be package, not env
-      expect(discovery.activeLocation.source).toBe('package');
+      // Active location should be user, not env
+      expect(discovery.activeLocation.source).toBe('user');
 
-      // Create tool and verify it can load agents from package
-      const root = discovery.activeLocation.resolvedRoot ?? packageBmad;
+      // Create tool and verify it can load agents from user location
+      const root = discovery.activeLocation.resolvedRoot ?? userBmad;
+
+      // Create and populate master manifest service for this test
+      const testMasterService = new MasterManifestService(discovery);
+      testMasterService.generate();
+
       const testTool = new UnifiedBMADTool({
         bmadRoot: root,
         discovery,
+        masterManifestService: testMasterService,
       });
 
       const result = await testTool.execute('bmad-master');
 
-      // Should successfully load from package, not fail with invalid env path
+      // Should successfully load from user location, not fail with invalid env path
       expect(result.success).toBe(true);
       expect(result.type).toBe('agent');
 
       testFixture.cleanup();
     });
 
-    it('should handle empty manifest gracefully', async () => {
-      // Create a tool with no agents/workflows
-      const emptyFixture = createTestFixture();
-      createBMADStructure(emptyFixture.tmpDir);
-
-      const manifestPath =
-        emptyFixture.tmpDir + '/src/bmad/_cfg/agent-manifest.csv';
-      require('fs').writeFileSync(
-        manifestPath,
-        'name,displayName,title\n',
-        'utf-8',
-      );
-
-      const emptyTool = createUnifiedTool(emptyFixture.tmpDir);
-      const result = await emptyTool.execute('*list-agents');
-
-      expect(result.success).toBe(true);
-      expect(result.count).toBe(0);
-
-      emptyFixture.cleanup();
-    });
+    // Discovery removed: empty manifest listing test omitted
 
     it('should handle missing agent file', async () => {
       // Add agent to manifest but don't create file

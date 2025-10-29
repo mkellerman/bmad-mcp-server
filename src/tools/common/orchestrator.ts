@@ -14,7 +14,10 @@ import type {
 import type { BmadPathResolution } from '../../utils/bmad-path-resolver.js';
 import { FileReader } from '../../utils/file-reader.js';
 import { MasterManifestService } from '../../services/master-manifest-service.js';
-import { convertAgents, convertWorkflows } from '../../utils/master-manifest-adapter.js';
+import {
+  convertAgents,
+  convertWorkflows,
+} from '../../utils/master-manifest-adapter.js';
 
 import { loadAgent as loadAgentPayload } from './agent-loader.js';
 import { executeWorkflow as executeWorkflowPayload } from './workflow-executor.js';
@@ -57,7 +60,8 @@ export class UnifiedBMADTool {
     this.projectRoot = discovery.projectRoot;
     this.bmadRoot = path.resolve(bmadRoot);
 
-    const debug = process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true';
+    const debug =
+      process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true';
 
     // Initialize FileReader with master manifest for module-aware path resolution
     // The master manifest is the source of truth for all file paths
@@ -79,7 +83,7 @@ export class UnifiedBMADTool {
 
     logger.info(
       `UnifiedBMADTool initialized with ${this.agents.length} agents ` +
-      `and ${this.workflows.length} workflows from master manifest`,
+        `and ${this.workflows.length} workflows from master manifest`,
     );
   }
 
@@ -238,8 +242,9 @@ export class UnifiedBMADTool {
   private buildWorkflowContext(): WorkflowContext {
     // Build workflow context with agent data from master manifest
     // Note: agentManifestPath is legacy - workflows should use agentManifestData
-    const manifestDir = this.discovery.activeLocation.manifestDir ||
-                        path.join(this.bmadRoot, '_cfg');
+    const manifestDir =
+      this.discovery.activeLocation.manifestDir ||
+      path.join(this.bmadRoot, '_cfg');
 
     return {
       bmadServerRoot: this.bmadRoot,
@@ -251,4 +256,3 @@ export class UnifiedBMADTool {
     };
   }
 }
-

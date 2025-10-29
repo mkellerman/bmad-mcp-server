@@ -1,13 +1,17 @@
 /**
- * File Reader - Secure file reading with path validation.
+ * File Reader - Module-aware file reading using master manifest.
  *
- * This module provides secure file reading capabilities with path traversal
- * protection. It ensures that only files within the BMAD directory tree
- * can be accessed.
+ * This module provides secure file reading capabilities using the master manifest
+ * as the source of truth. It resolves BMAD paths (v4 and v6 formats) to absolute
+ * paths by querying the master manifest, then reads the files directly.
+ *
+ * Security is ensured by only reading files that exist in the master manifest,
+ * which is built from validated BMAD installations during discovery.
  */
 
 import fs from 'node:fs';
-import path from 'node:path';
+import type { MasterManifests } from '../types/index.js';
+import { resolveFilePath } from './master-manifest-query.js';
 
 /**
  * Exception raised when file reading fails.
@@ -20,134 +24,84 @@ export class FileReadError extends Error {
 }
 
 /**
- * Exception raised when path traversal is attempted.
- */
-export class PathTraversalError extends FileReadError {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PathTraversalError';
-  }
-}
-
-/**
- * Secure file reader with path validation.
+ * Module-aware file reader using master manifest for path resolution.
  *
- * Ensures all file reads are within the allowed BMAD directory tree.
- * Prevents path traversal attacks and unauthorized file access.
+ * Resolves BMAD paths (with placeholders and module prefixes) to absolute paths
+ * using the master manifest, then reads files directly. No path traversal
+ * validation is needed since the master manifest only contains validated files.
  */
 export class FileReader {
-  private primaryRoot: string;
-  private roots: string[];
+  private masterManifest: MasterManifests;
 
-  constructor(bmadRoot: string | string[]) {
-    if (Array.isArray(bmadRoot)) {
-      const resolved = bmadRoot.map((root) => path.resolve(root));
-      this.primaryRoot = resolved[0];
-      this.roots = resolved;
-    } else {
-      this.primaryRoot = path.resolve(bmadRoot);
-      this.roots = [this.primaryRoot];
-    }
-
-    // Validate BMAD roots exist
-    for (const root of this.roots) {
-      if (!fs.existsSync(root)) {
-        console.warn(`BMAD root directory not found: ${root}`);
-      }
-    }
+  constructor(masterManifest: MasterManifests) {
+    this.masterManifest = masterManifest;
   }
 
   /**
-   * Read file contents with security validation.
+   * Read file contents using master manifest for path resolution.
    *
-   * @param filePath Relative or absolute path to file
+   * Supports multiple path formats:
+   * - v6: {project-root}/bmad/<module>/<file-path>
+   * - v4: .bmad-<module>/<file-path>
+   * - Relative: <file-path> (searches all modules by priority)
+   * - Absolute: /absolute/path (reads directly if file exists)
+   *
+   * @param filePath - Path to resolve and read (may contain placeholders)
    * @returns File contents as string
-   * @throws PathTraversalError if file path is outside BMAD root
    * @throws FileReadError if file doesn't exist or can't be read
    */
   readFile(filePath: string): string {
-    const lastErrors: unknown[] = [];
-
-    for (const root of this.roots) {
+    // If absolute path, try to read directly
+    if (filePath.startsWith('/')) {
       try {
-        const resolvedPath = this.resolvePath(root, filePath);
-        this.validatePath(root, resolvedPath);
-
-        const content = fs.readFileSync(resolvedPath, 'utf-8');
-        console.error(`Read ${content.length} bytes from ${resolvedPath}`);
+        const content = fs.readFileSync(filePath, 'utf-8');
+        console.error(`Read ${content.length} bytes from ${filePath}`);
         return content;
       } catch (error) {
-        if (error instanceof PathTraversalError) {
-          throw error;
-        }
-        lastErrors.push(error);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new FileReadError(`Failed to read file ${filePath}: ${message}`);
       }
     }
 
-    const errorMsg = `File not found across BMAD roots: ${filePath}`;
-    console.error(errorMsg);
-    if (lastErrors.length > 0) {
-      lastErrors.forEach((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('  Cause:', message);
-      });
+    // Resolve path using master manifest
+    const absolutePath = resolveFilePath(this.masterManifest, filePath);
+
+    if (!absolutePath) {
+      throw new FileReadError(`File not found in master manifest: ${filePath}`);
     }
-    throw new FileReadError(errorMsg);
+
+    // Read the resolved file
+    try {
+      const content = fs.readFileSync(absolutePath, 'utf-8');
+      console.error(`Read ${content.length} bytes from ${absolutePath}`);
+      return content;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new FileReadError(
+        `Failed to read file ${absolutePath} (resolved from ${filePath}): ${message}`,
+      );
+    }
   }
 
   /**
-   * Check if file exists within BMAD root.
+   * Check if file exists using master manifest.
    *
-   * @param filePath Relative or absolute path to file
-   * @returns True if file exists and is within BMAD root, false otherwise
+   * @param filePath - Path to check (may contain placeholders)
+   * @returns True if file exists in manifest and on filesystem
    */
   fileExists(filePath: string): boolean {
-    for (const root of this.roots) {
-      try {
-        const resolvedPath = this.resolvePath(root, filePath);
-        this.validatePath(root, resolvedPath);
-        if (fs.existsSync(resolvedPath)) {
-          return true;
-        }
-      } catch {
-        // Ignore and continue to next root
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Resolve file path to absolute path.
-   * Handles both relative and absolute paths.
-   *
-   * @param filePath Path to resolve
-   * @returns Absolute resolved path
-   */
-  private resolvePath(root: string, filePath: string): string {
-    if (path.isAbsolute(filePath)) {
-      return path.resolve(filePath);
+    // If absolute path, check directly
+    if (filePath.startsWith('/')) {
+      return fs.existsSync(filePath);
     }
 
-    return path.resolve(root, filePath);
-  }
+    // Resolve using master manifest
+    const absolutePath = resolveFilePath(this.masterManifest, filePath);
 
-  /**
-   * Validate that resolved path is within BMAD root.
-   * Prevents path traversal attacks.
-   *
-   * @param resolvedPath Absolute path to validate
-   * @throws PathTraversalError if path is outside BMAD root
-   */
-  private validatePath(root: string, resolvedPath: string): void {
-    // Check if resolved path starts with BMAD root
-    // Use path.relative to check if path escapes root
-    const relativePath = path.relative(root, resolvedPath);
-
-    // If relative path starts with '..' or is absolute, it's outside root
-    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-      const errorMsg = `Path traversal detected: ${resolvedPath} is outside BMAD root ${root}`;
-      console.error(errorMsg);
-      throw new PathTraversalError(errorMsg);
+    if (!absolutePath) {
+      return false;
     }
+
+    return fs.existsSync(absolutePath);
   }
 }

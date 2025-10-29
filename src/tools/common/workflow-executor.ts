@@ -1,5 +1,9 @@
 import path from 'node:path';
-import type { Workflow, BMADToolResult, WorkflowContext } from '../../types/index.js';
+import type {
+  Workflow,
+  BMADToolResult,
+  WorkflowContext,
+} from '../../types/index.js';
 import { FileReader } from '../../utils/file-reader.js';
 import { parseQualifiedName } from '../../utils/name-parser.js';
 
@@ -21,10 +25,12 @@ export function executeWorkflow({
 
   // Find workflow in manifest using parsed name and optional module
   let wf: Workflow | undefined;
-  
+
   if (parsed.module) {
     // Module-qualified: match both module and name
-    wf = workflows.find((w) => w.module === parsed.module && w.name === parsed.name);
+    wf = workflows.find(
+      (w) => w.module === parsed.module && w.name === parsed.name,
+    );
   } else {
     // Simple name: match just the name (first match by priority)
     wf = workflows.find((w) => w.name === parsed.name);
@@ -61,4 +67,3 @@ export function executeWorkflow({
     exitCode: 0,
   };
 }
-

@@ -21,12 +21,17 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import type { Agent } from './types/index.js';
-import { ManifestLoader } from './utils/manifest-loader.js';
 import {
   resolveBmadPaths,
   type BmadPathResolution,
 } from './utils/bmad-path-resolver.js';
-import { UnifiedBMADTool } from './tools/unified-tool.js';
+import { UnifiedBMADTool, getHelpResult } from './tools/index.js';
+import { MasterManifestService } from './services/master-manifest-service.js';
+import {
+  convertAgents,
+  convertWorkflows,
+} from './utils/master-manifest-adapter.js';
+import logger from './utils/logger.js';
 
 // Compute __dirname - use import.meta.url when available (production)
 // Fall back to build directory for test environments
@@ -58,38 +63,47 @@ const __dirname = getDirname();
 export class BMADMCPServer {
   private bmadRoot: string;
   private projectRoot: string;
-  private manifestLoader: ManifestLoader;
   private unifiedTool: UnifiedBMADTool;
+  private masterService: MasterManifestService;
   private agents: Agent[];
   private server: Server;
   private discovery: BmadPathResolution;
+
   constructor(bmadRoot: string, discovery: BmadPathResolution) {
     this.discovery = discovery;
     this.bmadRoot = path.resolve(bmadRoot);
-    console.error(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
-
-    // Manifest directory is optional - default to _cfg if not found
-    const manifestDir =
-      discovery.activeLocation.manifestDir ?? path.join(this.bmadRoot, '_cfg');
+    logger.info(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
 
     this.projectRoot = this.bmadRoot;
-    console.error(`Project root: ${this.projectRoot}`);
-    console.error(`Manifest directory: ${manifestDir}`);
+    logger.info(`Project root: ${this.projectRoot}`);
 
-    // Initialize components
-    this.manifestLoader = new ManifestLoader(this.projectRoot);
+    // Build master manifest at startup
+    // This inventories all BMAD resources from all discovered locations
+    logger.info('Building master manifest...');
+    this.masterService = new MasterManifestService(discovery);
+    this.masterService.generate();
+
+    // Convert master manifest agents to legacy Agent interface
+    // This enables backward compatibility with existing code
+    const masterData = this.masterService.get();
+    this.agents = convertAgents(masterData.agents);
+
+    logger.info(
+      `Loaded ${this.agents.length} agents from master manifest ` +
+        `(${masterData.agents.length} total records, ` +
+        `${this.agents.length} existing files)`,
+    );
+
+    // Initialize unified tool with master manifest service
     this.unifiedTool = new UnifiedBMADTool({
       bmadRoot: this.projectRoot,
       discovery,
+      masterManifestService: this.masterService,
     });
 
-    // Load manifests for prompts
-    this.agents = this.manifestLoader.loadAgentManifest();
+    logger.info('BMAD MCP Server initialized successfully');
 
-    console.error(`Loaded ${this.agents.length} agents from manifest`);
-    console.error('BMAD MCP Server initialized successfully');
-
-    // Create MCP server
+    // Create MCP server with protocol handlers
     this.server = new Server(
       {
         name: 'bmad-mcp-server',
@@ -112,7 +126,7 @@ export class BMADMCPServer {
   private setupHandlers(): void {
     // List available prompts (BMAD agents)
     this.server.setRequestHandler(ListPromptsRequestSchema, () => {
-      console.error(
+      logger.info(
         `list_prompts called - returning ${this.agents.length} agents`,
       );
 
@@ -140,7 +154,7 @@ export class BMADMCPServer {
     // Get a specific prompt (BMAD agent)
     this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
       const name = request.params.name;
-      console.error(`get_prompt called for: ${name}`);
+      logger.info(`get_prompt called for: ${name}`);
 
       // Normalize agent name (handle both "analyst" and "bmad-analyst")
       const agentNameStripped = name.replace('bmad-', '');
@@ -160,7 +174,7 @@ export class BMADMCPServer {
       if (!agent || !agentName) {
         // Agent not found
         const errorMsg = `Agent '${name}' not found. Available agents: ${this.agents.map((a) => a.name).join(', ')}`;
-        console.warn(errorMsg);
+        logger.warn(errorMsg);
         return {
           description: 'Error: Agent not found',
           messages: [
@@ -209,69 +223,26 @@ export class BMADMCPServer {
 
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, () => {
-      console.error('list_tools called - returning unified bmad tool');
+      logger.info('list_tools called - returning unified bmad tool');
+
+      // Get workflows from master manifest for help text generation
+      const masterData = this.masterService.get();
+      const workflows = convertWorkflows(masterData.workflows);
+
+      // Generate help content with available agents and workflows
+      const help = getHelpResult(this.bmadRoot, this.agents, workflows);
 
       const tools: Tool[] = [
         {
           name: 'bmad',
-          description: `Unified BMAD tool with instruction-based routing.
-
-**Command Patterns:**
-
-1. Load default agent (bmad-master):
-   - Input: "" (empty string)
-   - Example: bmad
-
-2. Load specific agent:
-   - Input: "<agent-name>"
-   - Example: "analyst" loads the Business Analyst agent
-   - Example: "architect" loads the Architect agent
-   - Available agents: analyst, architect, dev, pm, sm, tea, ux-expert, bmad-master, game-architect, game-designer, game-dev
-
-3. Execute workflow:
-   - Input: "*<workflow-name>" (note the asterisk prefix)
-   - Example: "*party-mode" executes the party-mode workflow
-   - Example: "*brainstorm-project" executes brainstorming workflow
-   - The asterisk (*) is REQUIRED for workflows
-
-4. Discovery commands (built-in):
-   - Input: "*list-agents" → Show all available BMAD agents
-   - Input: "*list-workflows" → Show all available workflows
-   - Input: "*list-tasks" → Show all available tasks
-   - Input: "*help" → Show command reference and usage guide
-
-**Naming Rules:**
-- Agent names: lowercase letters and hyphens only (e.g., "analyst", "bmad-master")
-- Workflow names: lowercase letters, numbers, and hyphens (e.g., "party-mode", "dev-story")
-- Names must be 2-50 characters
-- Case-sensitive matching
-
-**Important:**
-- To execute a workflow, you MUST prefix the name with an asterisk (*)
-- Without the asterisk, the tool will try to load an agent with that name
-- Use only ONE argument at a time
-- Discovery commands are built-in and work independently
-
-**Examples:**
-- bmad → Load bmad-master (default orchestrator)
-- bmad analyst → Load Mary the Business Analyst
-- bmad *party-mode → Execute party-mode workflow
-- bmad *list-agents → See all available agents
-- bmad *list-workflows → See all workflows you can run
-- bmad *help → Show complete command reference
-
-**Error Handling:**
-The tool provides helpful suggestions if you:
-- Misspell an agent or workflow name (fuzzy matching)
-- Forget the asterisk for a workflow
-- Use invalid characters or formatting`,
+          description: help.content ?? 'Unified BMAD tool',
           inputSchema: {
             type: 'object',
             properties: {
               command: {
                 type: 'string',
                 description:
-                  "Command to execute: empty string for default, 'agent-name' for agents, '*workflow-name' for workflows",
+                  "Command to execute: empty string for default, 'agent-name' or 'module/agent-name' for agents, '*workflow-name' or '*module/workflow-name' for workflows",
               },
             },
             required: ['command'],
@@ -285,7 +256,9 @@ The tool provides helpful suggestions if you:
     // Call a tool
     this.server.setRequestHandler(CallToolRequestSchema, (request) => {
       const { name, arguments: args } = request.params;
-      console.error(`call_tool called: ${name} with args:`, args);
+      logger.info(
+        `call_tool called: ${name} with args: ${JSON.stringify(args)}`,
+      );
 
       if (name !== 'bmad') {
         return {
@@ -300,7 +273,7 @@ The tool provides helpful suggestions if you:
       }
 
       const command = (args?.command as string) ?? '';
-      console.error(`Executing bmad tool with command: '${command}'`);
+      logger.info(`Executing bmad tool with command: '${command}'`);
 
       // Execute through unified tool
       const result = this.unifiedTool.execute(command);
@@ -308,7 +281,7 @@ The tool provides helpful suggestions if you:
       // Check if error occurred
       if (!result.success) {
         const errorText = result.error ?? 'Unknown error occurred';
-        console.error(`BMAD tool error: ${errorText}`);
+        logger.error(`BMAD tool error: ${errorText}`);
 
         return {
           content: [
@@ -452,7 +425,12 @@ Begin workflow execution now.`);
 export async function main(): Promise<void> {
   const packageRoot = path.resolve(__dirname, '..');
   const cwd = process.cwd();
-  const cliArg = process.argv.length > 2 ? process.argv[2] : undefined;
+  // Support multiple paths as CLI arguments (argv[2], argv[3], ...)
+  // Filter out commands (starting with * or --) to only keep paths
+  const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
+  const cliArgs = allArgs.filter(
+    (arg) => !arg.startsWith('*') && !arg.startsWith('--'),
+  );
   const envVar = process.env.BMAD_ROOT;
   const userBmadPath = path.join(os.homedir(), '.bmad');
 
@@ -470,20 +448,60 @@ export async function main(): Promise<void> {
 
   const discovery = resolveBmadPaths({
     cwd,
-    cliArg,
+    cliArgs,
     envVar,
-    packageRoot,
     userBmadPath,
   });
 
-  const activeRoot = discovery.activeLocation.resolvedRoot;
-
-  if (!activeRoot) {
-    throw new Error('Unable to determine active BMAD root');
-  }
-
   console.error(`BMAD MCP Server v${version}`);
   console.error('Starting BMAD MCP Server...');
+
+  // Validate locations and show warnings (only for explicitly provided paths)
+  // Only warn about CLI args and ENV vars, not defaults (project, user)
+  const invalidLocations = discovery.locations.filter(
+    (loc) =>
+      loc.status !== 'valid' &&
+      loc.originalPath !== undefined &&
+      (loc.source === 'cli' || loc.source === 'env'),
+  );
+  if (invalidLocations.length > 0) {
+    for (const loc of invalidLocations) {
+      if (loc.status === 'not-found') {
+        console.error(
+          `⚠️  BMAD path not found: ${loc.originalPath} (${loc.displayName})`,
+        );
+      } else if (loc.status === 'missing') {
+        console.error(
+          `⚠️  BMAD path exists but missing required files: ${loc.originalPath} (${loc.displayName})`,
+        );
+        console.error(
+          `   Expected: _cfg/manifest.yaml (v6) or install-manifest.yaml (v4)`,
+        );
+      } else if (loc.status === 'invalid') {
+        console.error(
+          `⚠️  BMAD path is invalid: ${loc.originalPath} (${loc.displayName})`,
+        );
+        if (loc.details) console.error(`   ${loc.details}`);
+      }
+    }
+  }
+
+  const activeRoot = discovery.activeLocation.resolvedRoot;
+
+  if (!activeRoot || discovery.activeLocation.status !== 'valid') {
+    console.error(`\n❌ No valid BMAD installation found!`);
+    console.error(`\nTo fix this, ensure your BMAD path contains either:`);
+    console.error(`  • v6: A 'bmad/_cfg/manifest.yaml' file`);
+    console.error(`  • v4: An 'install-manifest.yaml' file`);
+    console.error(`\nTried locations:`);
+    discovery.locations.forEach((loc) => {
+      console.error(
+        `  ${loc.status === 'valid' ? '✓' : '✗'} ${loc.displayName}: ${loc.originalPath || '(not provided)'}`,
+      );
+    });
+    throw new Error('Unable to determine valid BMAD root');
+  }
+
   console.error(
     `Active BMAD location (${discovery.activeLocation.displayName}): ${activeRoot}`,
   );

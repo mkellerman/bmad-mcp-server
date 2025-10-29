@@ -22,10 +22,12 @@ export function loadAgent({
 
   // Find agent in manifest using parsed name and optional module
   let agent: Agent | undefined;
-  
+
   if (parsed.module) {
     // Module-qualified: match both module and name
-    agent = agents.find((a) => a.module === parsed.module && a.name === parsed.name);
+    agent = agents.find(
+      (a) => a.module === parsed.module && a.name === parsed.name,
+    );
   } else {
     // Simple name: match just the name (first match by priority)
     agent = agents.find((a) => a.name === parsed.name);
@@ -73,4 +75,3 @@ export function loadAgent({
     exitCode: 0,
   };
 }
-

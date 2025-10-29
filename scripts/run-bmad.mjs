@@ -29,37 +29,60 @@ async function main() {
   if (!cmd) {
     console.error('Usage: npm run bmad -- "<command>" [path1] [path2] ...');
     console.error('Examples:');
-    console.error('  npm run bmad -- "*doctor --reload" ./tests/support/fixtures/bmad_samples/6.0.0-alpha.0/bmad');
-    console.error('  npm run bmad -- "*list-agents" /path/to/bmad1 /path/to/bmad2');
-    console.error('  npm run bmad -- "*export-master-manifest" /path/to/bmad1 /path/to/bmad2');
+    console.error(
+      '  npm run bmad -- "*doctor --reload" ./tests/support/fixtures/bmad_samples/6.0.0-alpha.0/bmad',
+    );
+    console.error(
+      '  npm run bmad -- "*list-agents" /path/to/bmad1 /path/to/bmad2',
+    );
+    console.error(
+      '  npm run bmad -- "*export-master-manifest" /path/to/bmad1 /path/to/bmad2',
+    );
     process.exit(2);
   }
 
   // Lazy-import compiled build modules
   const { UnifiedBMADTool } = await import('../build/tools/index.js');
-  const { resolveBmadPaths } = await import('../build/utils/bmad-path-resolver.js');
-  const { MasterManifestService } = await import('../build/services/master-manifest-service.js');
+  const { resolveBmadPaths } = await import(
+    '../build/utils/bmad-path-resolver.js'
+  );
+  const { MasterManifestService } = await import(
+    '../build/services/master-manifest-service.js'
+  );
 
   const projectRoot = process.cwd();
 
-  const discovery = resolveBmadPaths({ cwd: projectRoot, cliArgs: args.paths, envVar: process.env.BMAD_ROOT });
+  const discovery = resolveBmadPaths({
+    cwd: projectRoot,
+    cliArgs: args.paths,
+    envVar: process.env.BMAD_ROOT,
+  });
 
   // Validate locations and show warnings (only for explicitly provided paths)
   // Only warn about CLI args and ENV vars, not defaults (project, user)
-  const invalidLocations = discovery.locations.filter(loc =>
-    loc.status !== 'valid' &&
-    loc.originalPath !== undefined &&
-    (loc.source === 'cli' || loc.source === 'env')
+  const invalidLocations = discovery.locations.filter(
+    (loc) =>
+      loc.status !== 'valid' &&
+      loc.originalPath !== undefined &&
+      (loc.source === 'cli' || loc.source === 'env'),
   );
   if (invalidLocations.length > 0) {
     for (const loc of invalidLocations) {
       if (loc.status === 'not-found') {
-        console.error(`⚠️  BMAD path not found: ${loc.originalPath} (${loc.displayName})`);
+        console.error(
+          `⚠️  BMAD path not found: ${loc.originalPath} (${loc.displayName})`,
+        );
       } else if (loc.status === 'missing') {
-        console.error(`⚠️  BMAD path exists but missing required files: ${loc.originalPath} (${loc.displayName})`);
-        console.error(`   Expected: _cfg/manifest.yaml (v6) or install-manifest.yaml (v4)`);
+        console.error(
+          `⚠️  BMAD path exists but missing required files: ${loc.originalPath} (${loc.displayName})`,
+        );
+        console.error(
+          `   Expected: _cfg/manifest.yaml (v6) or install-manifest.yaml (v4)`,
+        );
       } else if (loc.status === 'invalid') {
-        console.error(`⚠️  BMAD path is invalid: ${loc.originalPath} (${loc.displayName})`);
+        console.error(
+          `⚠️  BMAD path is invalid: ${loc.originalPath} (${loc.displayName})`,
+        );
         if (loc.details) console.error(`   ${loc.details}`);
       }
     }
@@ -72,8 +95,10 @@ async function main() {
     console.error(`  • v6: A 'bmad/_cfg/manifest.yaml' file`);
     console.error(`  • v4: An 'install-manifest.yaml' file`);
     console.error(`\nTried locations:`);
-    discovery.locations.forEach(loc => {
-      console.error(`  ${loc.status === 'valid' ? '✓' : '✗'} ${loc.displayName}: ${loc.originalPath || '(not provided)'}`);
+    discovery.locations.forEach((loc) => {
+      console.error(
+        `  ${loc.status === 'valid' ? '✓' : '✗'} ${loc.displayName}: ${loc.originalPath || '(not provided)'}`,
+      );
     });
     process.exit(1);
   }
@@ -82,8 +107,13 @@ async function main() {
   const master = svc.generate();
 
   // Show info about what was loaded
-  if (master.modules.length === 0 && discovery.activeLocation.status === 'valid') {
-    console.error(`⚠️  Warning: No modules found in ${discovery.activeLocation.resolvedRoot}`);
+  if (
+    master.modules.length === 0 &&
+    discovery.activeLocation.status === 'valid'
+  ) {
+    console.error(
+      `⚠️  Warning: No modules found in ${discovery.activeLocation.resolvedRoot}`,
+    );
   }
 
   // Silence noisy logs from loaders for CLI UX
@@ -93,7 +123,11 @@ async function main() {
   console.warn = () => {};
 
   const bmadRoot = discovery.activeLocation.resolvedRoot || process.cwd();
-  const tool = new UnifiedBMADTool({ bmadRoot, discovery, masterManifestService: svc });
+  const tool = new UnifiedBMADTool({
+    bmadRoot,
+    discovery,
+    masterManifestService: svc,
+  });
   const result = await tool.execute([cmd, ...rest].join(' ').trim());
 
   console.error = origErr;
@@ -116,4 +150,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

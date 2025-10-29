@@ -101,7 +101,10 @@ ides:
       fs.mkdirSync(cfgDir, { recursive: true });
 
       const agentManifestPath = path.join(cfgDir, 'agent-manifest.csv');
-      fs.writeFileSync(agentManifestPath, 'name,displayName,description,module,path\n');
+      fs.writeFileSync(
+        agentManifestPath,
+        'name,displayName,description,module,path\n',
+      );
 
       // Act
       const result = detectBmadSource(bmadRoot);
@@ -118,7 +121,10 @@ ides:
 
       const agentManifestPath = path.join(cfgDir, 'agent-manifest.csv');
       const workflowManifestPath = path.join(cfgDir, 'workflow-manifest.csv');
-      fs.writeFileSync(agentManifestPath, 'name,displayName,description,module,path\n');
+      fs.writeFileSync(
+        agentManifestPath,
+        'name,displayName,description,module,path\n',
+      );
       fs.writeFileSync(workflowManifestPath, 'name,description,module,path\n');
 
       // Act
@@ -181,7 +187,9 @@ files: []
       expect(result.type).toBe('v4');
       expect(result.version).toBe('4.44.1');
       expect(result.path).toBe(bmadRoot);
-      expect(result.manifestPath).toBe(path.join(bmadRoot, 'install-manifest.yaml'));
+      expect(result.manifestPath).toBe(
+        path.join(bmadRoot, 'install-manifest.yaml'),
+      );
     });
 
     it('should detect expansion packs from v4 manifest', () => {
@@ -452,7 +460,11 @@ ides:
       const result = detectBmadSource(bmadRoot);
 
       // Assert
-      expect(result.configuredIdes).toEqual(['claude-code', 'cursor', 'vscode']);
+      expect(result.configuredIdes).toEqual([
+        'claude-code',
+        'cursor',
+        'vscode',
+      ]);
     });
   });
 
@@ -471,7 +483,10 @@ ides:
 
       // Skip if sample doesn't exist
       if (!fs.existsSync(v6SamplePath)) {
-        console.warn('Skipping real sample test - path not found:', v6SamplePath);
+        console.warn(
+          'Skipping real sample test - path not found:',
+          v6SamplePath,
+        );
         return;
       }
 
@@ -500,7 +515,10 @@ ides:
 
       // Skip if sample doesn't exist
       if (!fs.existsSync(v4SamplePath)) {
-        console.warn('Skipping real sample test - path not found:', v4SamplePath);
+        console.warn(
+          'Skipping real sample test - path not found:',
+          v4SamplePath,
+        );
         return;
       }
 
