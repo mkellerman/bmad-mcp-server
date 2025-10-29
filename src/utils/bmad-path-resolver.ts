@@ -1,10 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {
-  findBmadRootsRecursive,
-  sortBmadRoots,
-} from './bmad-root-finder.js';
+import { findBmadRootsRecursive, sortBmadRoots } from './bmad-root-finder.js';
 
 export type BmadLocationSource = 'project' | 'cli' | 'env' | 'user';
 

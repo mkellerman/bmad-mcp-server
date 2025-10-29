@@ -12,7 +12,10 @@ describe('Master Manifest Snapshot Test', () => {
   let generatedManifest: MasterManifests;
   let expectedManifest: MasterManifests;
   const bmadSamplePath = path.resolve(process.cwd(), '.bmad');
-  const expectedManifestPath = path.join(bmadSamplePath, 'master-manifest.json');
+  const expectedManifestPath = path.join(
+    bmadSamplePath,
+    'master-manifest.json',
+  );
 
   beforeAll(() => {
     // Generate manifest from .bmad samples
@@ -29,7 +32,9 @@ describe('Master Manifest Snapshot Test', () => {
   });
 
   it('should match expected agent count', () => {
-    expect(generatedManifest.agents.length).toBe(expectedManifest.agents.length);
+    expect(generatedManifest.agents.length).toBe(
+      expectedManifest.agents.length,
+    );
   });
 
   it('should match expected workflow count', () => {
@@ -165,7 +170,9 @@ describe('Master Manifest Snapshot Test', () => {
     const generatedMissingNames = new Set(
       generatedMissing.map((a: any) => a.name),
     );
-    const expectedMissingNames = new Set(expectedMissing.map((a: any) => a.name));
+    const expectedMissingNames = new Set(
+      expectedMissing.map((a: any) => a.name),
+    );
 
     expect(generatedMissingNames).toEqual(expectedMissingNames);
   });

@@ -26,10 +26,10 @@ interface SearchOptions {
  */
 function shouldSearchDirectory(dirName: string): boolean {
   const lowerName = dirName.toLowerCase();
-  
+
   // Check if contains 'bmad'
   if (lowerName.includes('bmad')) return true;
-  
+
   // Check for exact matches
   const exactMatches = ['agents', 'workflows', 'tasks', '_cfg'];
   return exactMatches.includes(dirName);
