@@ -1,86 +1,146 @@
 # Development Guide
 
-Complete guide for contributing to and developing the BMAD MCP Server.
+Complete guide for contributing to the BMAD MCP Server.
 
-## Development Setup
+> **New to the project?** Start here to understand how to contribute, test, and submit changes.
+
+## Quick Start
 
 ```bash
+# Clone and setup
 git clone https://github.com/mkellerman/bmad-mcp-server.git
 cd bmad-mcp-server
 npm install
+
+# Verify everything works
+npm test          # Run full test suite
+npm run build     # Build for production
 ```
 
-## Available Commands
+## Essential Commands
 
 ```bash
 npm install              # Install dependencies
-npm run dev              # Run in development mode (tsx)
-npm run build            # Build for production
-npm test                 # Run tests (131 passing)
-npm run test:coverage    # With coverage report
+npm run dev              # Run in development mode (tsx with watch)
+npm run build            # Compile TypeScript to build/
+npm test                 # Run all tests
+npm run test:coverage    # Generate coverage report
 npm run lint:fix         # Auto-fix linting issues
 npm run format           # Format code with Prettier
-npm run precommit        # Run linting and formatting checks
+npm run precommit        # Run all checks (runs before commit)
 ```
 
-## Testing
+## Testing Strategy
 
-See `tests/README.md` for comprehensive testing documentation including:
+The project has comprehensive test coverage across multiple levels. See `tests/README.md` for detailed testing documentation.
 
-- Unit tests
-- Integration tests
-- LLM-powered E2E tests with Playwright
+### Unit Tests
 
-### Running Tests
+Fast, focused tests for individual modules:
 
 ```bash
 # Run all unit tests
 npm test
 
-# Run with coverage
-npm run test:coverage
-
 # Run specific test file
 npm test -- tests/unit/manifest-loader.test.ts
 
-# Run E2E tests (requires LiteLLM)
-npm run e2e:start    # Start LiteLLM Docker container
-npm run test:e2e     # Run E2E tests
-npm run test:report  # View Playwright report
-npm run e2e:stop     # Stop LiteLLM container
+# Watch mode during development
+npm test -- --watch
+
+# With coverage report
+npm run test:coverage
 ```
 
-## Pre-commit Hooks
+**Where to add unit tests:**
+- New utilities in `src/utils/`
+- Path resolution logic
+- Tool routing and parsing
+- Manifest loading and querying
 
-Husky runs linting and formatting automatically before each commit. Run manually with:
+### Integration Tests
+
+Test how components work together:
 
 ```bash
+npm test -- tests/integration/
+```
+
+### E2E Tests (LLM-Powered)
+
+End-to-end tests using Playwright and LiteLLM to simulate real AI interactions:
+
+```bash
+# Start LiteLLM Docker container
+npm run e2e:start
+
+# Run E2E tests
+npm run test:e2e
+
+# View test report
+npm run test:report
+
+# Stop LiteLLM
+npm run e2e:stop
+
+# Health check
+npm run litellm:docker:health
+```
+
+**E2E test structure:**
+- Specs: `tests/e2e/framework/*.spec.ts`
+- Test cases: `tests/e2e/test-cases/*.yaml`
+
+### Coverage Goals
+
+- Maintain or increase coverage with each PR
+- Focus on critical paths (manifest loading, file resolution, tool routing)
+- Current coverage visible in `coverage/` after `npm run test:coverage`
+
+## Code Quality Standards
+
+### Pre-commit Checks
+
+Husky automatically runs checks before each commit:
+
+```bash
+# Manual run (same checks as pre-commit)
 npm run precommit
 ```
 
-## Coding Standards
+This runs:
+- ESLint (code quality)
+- Prettier (formatting)
+- Type checking
 
-### Language & Module System
+### TypeScript & Module System
 
-- **TypeScript** with ESM modules
-- Use explicit `.js` in relative imports (required for ESM)
-- Prefer `interface` over `type` aliases
+- **Language:** TypeScript with ESM modules
+- **Imports:** Use explicit `.js` extension in relative imports (required for ESM)
+- **Types:** Prefer `interface` over `type` aliases for object shapes
+
+```typescript
+// ✅ Correct
+import { FileReader } from './utils/file-reader.js';
+
+// ❌ Wrong
+import { FileReader } from './utils/file-reader';
+```
 
 ### Code Style
 
-**Prettier** (`.prettierrc`):
-
+**Prettier configuration** (`.prettierrc`):
 - 2-space indentation
 - 80 character line width
 - Single quotes
 - Trailing commas
 
-**ESLint** (typescript-eslint flat config):
-
+**ESLint rules** (typescript-eslint flat config):
 - Semicolons required
-- `no-console` warns (allowed in tests/scripts)
+- `no-console` warns (allowed in tests and scripts)
+- TypeScript strict mode enabled
 
-Run formatters:
+**Apply formatting:**
 
 ```bash
 npm run format      # Prettier
@@ -89,176 +149,276 @@ npm run lint:fix    # ESLint auto-fix
 
 ### Naming Conventions
 
-**Runtime naming:**
+**Runtime (BMAD resources):**
+- Agents and workflows: lowercase-hyphen (e.g., `analyst`, `party-mode`)
+- Workflow invocation: `*` prefix (e.g., `bmad *party-mode`)
 
-- Agents and workflows use lowercase-hyphen format (e.g., `analyst`, `party-mode`)
-- Workflows are invoked with `*` prefix (e.g., `bmad *party-mode`)
+**Code (TypeScript/JavaScript):**
+- Variables/functions: camelCase
+- Classes/interfaces: PascalCase
+- Files: kebab-case (e.g., `manifest-loader.ts`)
+- Constants: SCREAMING_SNAKE_CASE (e.g., `DEFAULT_PRIORITY`)
 
-**Code naming:**
-
-- TypeScript follows standard conventions (camelCase, PascalCase)
-- Files use kebab-case (e.g., `manifest-loader.ts`)
-
-## Project Architecture
-
-### Directory Structure
+## Project Structure
 
 ```
-src/
-├── index.ts              # Entry point
-├── server.ts             # MCP server implementation
-├── types/
-│   └── index.ts          # TypeScript type definitions
-├── tools/
-│   ├── index.ts          # Tools module exports
-│   └── unified-tool.ts   # Unified BMAD tool implementation
-├── utils/
-│   ├── manifest-loader.ts # CSV manifest parser
-│   ├── file-reader.ts     # Secure file reader
-│   ├── file-scanner.ts    # Directory scanner
-│   └── bmad-path-resolver.ts # BMAD root discovery
-├── prompts/
-│   └── index.ts          # Prompt definitions
-└── bmad/                 # BMAD methodology files
-    ├── _cfg/             # Configuration and manifests
-    ├── core/             # Core BMAD agents and workflows
-    ├── bmm/              # BMM module agents and workflows
-    └── docs/             # BMAD documentation
+bmad-mcp-server/
+├── src/                     # TypeScript source code
+│   ├── index.ts             # CLI entry point
+│   ├── server.ts            # MCP server implementation
+│   ├── types/               # TypeScript type definitions
+│   ├── services/            # Singleton services (master manifest cache)
+│   ├── tools/               # MCP tool implementations
+│   │   ├── index.ts         # UnifiedBMADTool export
+│   │   ├── common/          # Shared utilities
+│   │   └── internal/        # Built-in commands (doctor, init, list)
+│   ├── utils/               # Core utilities
+│   │   ├── master-manifest.ts       # Manifest builder
+│   │   ├── master-manifest-query.ts # Query functions
+│   │   ├── v4-module-inventory.ts   # V4 scanner
+│   │   ├── v6-module-inventory.ts   # V6 scanner
+│   │   ├── file-reader.ts           # Priority-based file I/O
+│   │   └── bmad-path-resolver.ts    # BMAD root discovery
+│   ├── prompts/             # MCP prompt definitions
+│   └── bmad/                # Embedded BMAD methodology files
+│       ├── _cfg/            # Configuration and manifests
+│       ├── core/            # Core agents and workflows
+│       └── bmm/             # BMM module
+├── tests/                   # Test suite
+│   ├── unit/                # Unit tests
+│   ├── integration/         # Integration tests
+│   └── e2e/                 # End-to-end tests
+├── build/                   # Compiled JavaScript (generated)
+├── docs/                    # Documentation
+└── scripts/                 # Helper scripts
 ```
 
 ### Key Components
 
-**MCP Server** (`src/server.ts`)
+**Server Layer** (`src/server.ts`)
+- MCP protocol implementation using `@modelcontextprotocol/sdk`
+- Stdio transport for communication
+- Registers prompt handlers and unified `bmad` tool
 
-- Uses `@modelcontextprotocol/sdk` with stdio transport
-- Registers prompt handlers and the unified `bmad` tool
+**Master Manifest System**
+- `MasterManifestService` - Builds and caches inventory of all BMAD resources
+- `v4-module-inventory` / `v6-module-inventory` - Scan BMAD installations
+- `master-manifest-adapter` - Convert MasterRecords to legacy interfaces
+- `master-manifest-query` - Priority-based resource lookup
 
-**Unified Tool** (`src/tools/unified-tool.ts`)
+**Unified Tool** (`src/tools/index.ts`)
+- Command routing and parsing
+- Handles: agents, workflows, built-in commands
+- Supports module-qualified names (`module/name`)
 
-- Routes commands:
-  - Empty string → default agent (bmad-master)
-  - `<agent-name>` → load specific agent
-  - `*<workflow-name>` → execute workflow
-- Includes discovery commands (`*list-agents`, `*list-workflows`, etc.)
+**Resource Loading**
+- `bmad-path-resolver` - Discovers BMAD roots (project → CLI → env → user → package)
+- `file-reader` - Priority-based file loading with fallback
+- All file access validated and secure
 
-**BMAD Discovery** (`src/utils/bmad-path-resolver.ts`)
+📖 **Detailed architecture:** See [Architecture Guide](./architecture.md)
 
-- Resolves active BMAD root from:
-  1. Current working directory (`./bmad`)
-  2. CLI argument
-  3. `BMAD_ROOT` environment variable
-  4. User defaults (`~/.bmad`)
-  5. Package defaults
+## Contributing Workflow
 
-**Manifest Loading** (`src/utils/manifest-loader.ts`)
-
-- Reads CSV manifests for agents, workflows, and tasks
-- Returns agent content and workflow YAML without mutating files
-
-**Safe I/O** (`src/utils/file-reader.ts`)
-
-- Validates paths and prevents directory traversal
-- Server acts as file proxy; LLM processes content
-
-## Testing Guidelines
-
-### Unit Tests
-
-- Located in `tests/unit/*.test.ts`
-- Keep or increase coverage
-- Add tests for new utils, path resolution, and tool routing
-
-Example:
+### 1. Create a Feature Branch
 
 ```bash
-npm test -- tests/unit/manifest-loader.test.ts
+git checkout -b feature/your-feature-name
+# or
+git checkout -b fix/issue-description
 ```
 
-### E2E Tests
+### 2. Make Your Changes
 
-- Specs in `tests/e2e/framework/*.spec.ts`
-- YAML test cases in `tests/e2e/test-cases/`
-- Requires LiteLLM (Docker)
+- Write clean, well-documented code
+- Follow naming conventions and style guide
+- Add or update tests as needed
+- Keep commits focused and atomic
 
-Verify LiteLLM health:
+### 3. Test Thoroughly
 
 ```bash
-npm run litellm:docker:health
+# Run tests
+npm test
+
+# Check coverage
+npm run test:coverage
+
+# Run linting
+npm run lint:fix
+
+# Format code
+npm run format
 ```
 
-## Commit Guidelines
+### 4. Commit with Conventional Commits
 
-Use [Conventional Commits](https://www.conventionalcommits.org/):
-
-- `feat:` - New features
-- `fix:` - Bug fixes
-- `chore:` - Maintenance tasks
-- `refactor:` - Code restructuring
-- `test:` - Test updates
-- `docs:` - Documentation changes
-
-Examples:
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```bash
-git commit -m "feat: add new workflow discovery command"
-git commit -m "fix: resolve path traversal security issue"
-git commit -m "test: add coverage for manifest loader"
+# Features
+git commit -m "feat: add support for custom agent templates"
+
+# Bug fixes
+git commit -m "fix: resolve path resolution on Windows"
+
+# Documentation
+git commit -m "docs: update installation guide"
+
+# Maintenance
+git commit -m "chore: update dependencies"
+
+# Refactoring
+git commit -m "refactor: simplify manifest loading logic"
+
+# Tests
+git commit -m "test: add coverage for file reader"
 ```
 
-## Pull Request Guidelines
+**Commit types:**
+- `feat:` New feature (MINOR version)
+- `fix:` Bug fix (PATCH version)
+- `docs:` Documentation only
+- `chore:` Maintenance, dependencies
+- `refactor:` Code restructuring without behavior change
+- `test:` Test additions or updates
+- `BREAKING CHANGE:` in footer (MAJOR version)
 
-PRs must include:
+### 5. Submit a Pull Request
 
-1. **Clear description** of changes
-2. **Linked issues** (if applicable)
-3. **Test plan** demonstrating verification
-4. **Updated tests** (unit/E2E as needed)
-5. **Updated documentation** (README, docs/, manifests)
-6. **Updated manifests** (`src/bmad/_cfg/*.csv`) if adding agents/workflows
+**PR must include:**
 
-### CI Requirements
+1. ✅ **Clear description** - What and why
+2. ✅ **Linked issues** - Reference related issues
+3. ✅ **Test plan** - How you verified changes
+4. ✅ **Updated tests** - Add/update unit/E2E tests
+5. ✅ **Updated docs** - README, docs/, code comments
+6. ✅ **Updated manifests** - If adding agents/workflows to `src/bmad/_cfg/*.csv`
 
-- `npm run precommit` passes (lint + format)
-- All tests pass
-- For E2E changes, attach Playwright report or logs
+**CI Requirements:**
+- All tests passing (`npm test`)
+- Linting clean (`npm run precommit`)
+- No type errors
+- For E2E changes: include Playwright report or logs
 
-## Security Considerations
+**Example PR description:**
 
-- All file access goes through `utils/file-reader.ts` to prevent path traversal
-- Never expose raw file system operations to the LLM
-- Validate all user inputs
-- Use `BMAD_ROOT` explicitly during development for predictable behavior
+```markdown
+## Summary
+Add support for loading agents from custom directories
+
+## Changes
+- Added `--custom-path` CLI argument
+- Updated `bmad-path-resolver` to include custom paths
+- Added priority level 2.5 for custom paths
+
+## Testing
+- Added unit tests for custom path resolution
+- Verified with local test directory
+- All existing tests still pass
+
+## Documentation
+- Updated installation.md with custom path examples
+- Added architecture notes about priority ordering
+
+Fixes #123
+```
 
 ## Development Tips
 
-### Using BMAD_ROOT
+### Local Testing
 
-Prefer explicit `BMAD_ROOT` during development:
-
-```bash
-BMAD_ROOT=/path/to/project npm run dev
-```
-
-### Debugging
-
-Enable verbose logging by modifying `src/server.ts` or add debug statements:
-
-```typescript
-console.error('[DEBUG]', yourVariable);
-```
-
-### Building
-
-Always build before testing published behavior:
+**Test the built version:**
 
 ```bash
 npm run build
 node build/index.js
 ```
 
+**Development mode with auto-rebuild:**
+
+```bash
+npm run dev
+```
+
+**Point to specific BMAD location:**
+
+```bash
+BMAD_ROOT=/path/to/test/bmad npm run dev
+```
+
+### Debugging
+
+**Enable verbose output:**
+
+```typescript
+// Add to any file
+console.error('[DEBUG]', variableName);
+```
+
+**Inspect master manifest:**
+
+```bash
+npm run build
+node -e "
+  const { buildMasterManifests } = require('./build/utils/master-manifest.js');
+  const manifest = buildMasterManifests([...]);
+  console.log(JSON.stringify(manifest, null, 2));
+"
+```
+
+**Test MCP communication:**
+
+The server uses stdio for MCP protocol. Test manually:
+
+```bash
+echo '{"method":"initialize"}' | node build/index.js
+```
+
+### Common Development Tasks
+
+**Add a new agent to embedded BMAD:**
+
+1. Create agent file: `src/bmad/<module>/agents/new-agent.md`
+2. Update manifest: `src/bmad/_cfg/agent-manifest.csv`
+3. Rebuild: `npm run build`
+4. Test: `bmad new-agent`
+
+**Add a new workflow:**
+
+1. Create workflow: `src/bmad/<module>/workflows/<name>/workflow.yaml`
+2. Update manifest: `src/bmad/_cfg/workflow-manifest.csv`
+3. Rebuild and test: `npm run build && bmad *workflow-name`
+
+**Update utility function:**
+
+1. Modify file in `src/utils/`
+2. Add/update unit tests in `tests/unit/`
+3. Run tests: `npm test`
+4. Check coverage: `npm run test:coverage`
+
+### Security Considerations
+
+**File access safety:**
+- All file reads go through `FileReader`
+- Path validation prevents directory traversal
+- Master manifest defines allowed resources
+- Never expose raw filesystem operations to LLM
+
+**Environment variables:**
+- `BMAD_ROOT` for explicit path override
+- Use absolute paths in production configs
+- Validate all user-provided paths
+
+### Performance Tips
+
+- Master manifest built once at startup (cached in `MasterManifestService`)
+- FileReader checks filesystem on-demand (cache if needed for performance)
+- Large BMAD installations: ensure manifests are accurate to avoid filesystem scans
+
 ## Getting Help
 
 - Check existing issues: [GitHub Issues](https://github.com/mkellerman/bmad-mcp-server/issues)
-- Review `AGENTS.md` for architecture overview
+- Review `docs/architecture.md` for architectural overview
 - See `tests/README.md` for testing details
 - Ask in discussions: [GitHub Discussions](https://github.com/mkellerman/bmad-mcp-server/discussions)

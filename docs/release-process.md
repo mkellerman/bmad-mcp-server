@@ -1,26 +1,34 @@
 # Release Process
 
-Guide for versioning, releasing, and publishing the BMAD MCP Server.
+Guide for maintainers: versioning, testing, and publishing the BMAD MCP Server.
 
-## Versioning
+> **For contributors:** See [Development Guide](./development.md) for contribution workflow.  
+> **For users:** Releases are automatic—just use `npx bmad-mcp-server@latest`.
+
+## Versioning Strategy
 
 This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH):
 
-- **MAJOR**: Breaking changes (e.g., 1.0.0 → 2.0.0)
-- **MINOR**: New features, backward compatible (e.g., 0.1.0 → 0.2.0)
-- **PATCH**: Bug fixes, backward compatible (e.g., 0.1.0 → 0.1.1)
+- **MAJOR** (x.0.0) - Breaking changes, incompatible API changes
+- **MINOR** (0.x.0) - New features, backward compatible
+- **PATCH** (0.0.x) - Bug fixes, backward compatible
 
-## Testing Changes with Pre-releases
+**Examples:**
+- `feat: add new agent` → MINOR (0.1.0 → 0.2.0)
+- `fix: resolve path bug` → PATCH (0.1.0 → 0.1.1)
+- `feat!: change config format` → MAJOR (0.1.0 → 1.0.0)
+
+## Pre-Release Testing
 
 ### Automatic PR Pre-releases
 
-When you open a Pull Request, GitHub Actions automatically creates a pre-release that you can test on another machine.
+Every Pull Request automatically creates a pre-release for testing on other machines.
 
 **How it works:**
 
-1. **Open a PR** - A pre-release is automatically created with tag `pr-{number}-{sha}`
-2. **Check the PR comments** - The bot will post installation instructions
-3. **Test on another machine** using npx:
+1. **Open a PR** - GitHub Actions creates pre-release tag `pr-{number}-{sha}`
+2. **Bot comments** with installation instructions
+3. **Test on any machine** using the pre-release:
 
    ```json
    {
@@ -36,290 +44,417 @@ When you open a Pull Request, GitHub Actions automatically creates a pre-release
    }
    ```
 
-4. **Pre-release cleanup** - Automatically deleted when PR is merged or closed
+4. **Auto-cleanup** when PR is merged or closed
 
 **Benefits:**
+- ✅ Test before merging
+- ✅ No local installation needed on test machines
+- ✅ Works with any MCP client
+- ✅ Automatic cleanup
 
-- Test changes before merging
-- No need to clone locally on every machine
-- Works with any MCP client (VS Code, Claude Desktop, Cursor, etc.)
-- Clean automatic cleanup
+### Local Testing
 
-### Testing Locally
-
-To test changes locally before creating a PR:
+Test locally before creating a PR:
 
 ```bash
-# Make your changes
+# Make changes
 npm run build
 
-# Test the built version
+# Test built version
 node build/index.js
 
-# Or run in dev mode
+# Run in dev mode
 npm run dev
+
+# Run all tests
+npm test
 ```
+
+---
 
 ## Creating a Release
 
 ### Pre-Release Checklist
 
-Before creating a release, ensure:
+Before creating a release:
 
-- [ ] All tests pass: `npm test`
-- [ ] Linting passes: `npm run lint`
-- [ ] Build succeeds: `npm run build`
-- [ ] Update CHANGELOG.md with changes
-- [ ] All changes committed to main/v2-node branch
-- [ ] Pull latest from main/v2-node branch
+- [ ] All tests passing (`npm test`)
+- [ ] Linting clean (`npm run lint`)
+- [ ] Build succeeds (`npm run build`)
+- [ ] CHANGELOG.md updated
+- [ ] All changes committed and pushed
+- [ ] Pull latest from main branch
 
 ### Release Steps
 
-1. **Update version** using npm's built-in commands:
+**1. Update version**
 
-   ```bash
-   # For a patch release (0.1.0 → 0.1.1)
-   npm version patch
-
-   # For a minor release (0.1.0 → 0.2.0)
-   npm version minor
-
-   # For a major release (0.1.0 → 1.0.0)
-   npm version major
-   ```
-
-   This automatically:
-   - Updates `version` in `package.json` and `package-lock.json`
-   - Creates a git commit with message "v0.1.1"
-   - Creates a git tag "v0.1.1"
-
-2. **Push the tag to GitHub**:
-
-   ```bash
-   git push origin v2-node --follow-tags
-   ```
-
-3. **Create a GitHub Release**:
-   - Go to [GitHub Releases](https://github.com/mkellerman/bmad-mcp-server/releases)
-   - Click "Draft a new release"
-   - Select the tag you just pushed (e.g., `v0.1.1`)
-   - Add release title (e.g., "v0.1.1 - Bug fixes and improvements")
-   - Add release notes describing changes, bug fixes, and new features
-   - Click "Publish release"
-
-4. **Automated Publishing**:
-   - GitHub Actions will automatically run the `release.yml` workflow
-   - It will:
-     - Run linting checks
-     - Run unit tests
-     - Build the package
-     - Publish to npm with provenance (requires `NPM_TOKEN` secret)
-
-## NPM Token Setup
-
-To enable automated npm publishing, configure an NPM token in GitHub secrets.
-
-### Generate NPM Token
-
-1. Log in to [npmjs.com](https://www.npmjs.com/)
-2. Go to Account Settings → Access Tokens
-3. Click "Generate New Token"
-4. Select "Automation" token type
-5. Copy the token (you won't see it again!)
-
-### Add to GitHub Secrets
-
-1. Go to repository Settings → Secrets and variables → Actions
-2. Click "New repository secret"
-3. Name: `NPM_TOKEN`
-4. Value: paste your npm token
-5. Click "Add secret"
-
-## Manual Publishing
-
-If automated publishing fails or you need to publish manually:
+Use npm's built-in versioning:
 
 ```bash
-# Ensure you're logged in to npm
+# Patch release (0.1.0 → 0.1.1)
+npm version patch
+
+# Minor release (0.1.0 → 0.2.0)
+npm version minor
+
+# Major release (0.1.0 → 1.0.0)
+npm version major
+```
+
+This automatically:
+- Updates `package.json` and `package-lock.json`
+- Creates git commit: "v0.1.1"
+- Creates git tag: "v0.1.1"
+
+**2. Push tag to GitHub**
+
+```bash
+git push origin main --follow-tags
+```
+
+**3. Create GitHub Release**
+
+1. Go to [Releases](https://github.com/mkellerman/bmad-mcp-server/releases)
+2. Click "Draft a new release"
+3. Select tag (e.g., `v0.1.1`)
+4. Title: "v0.1.1 - Brief description"
+5. Release notes:
+   - **Added** - New features
+   - **Changed** - Improvements
+   - **Fixed** - Bug fixes
+   - **Breaking Changes** - If any
+6. Click "Publish release"
+
+**4. Automatic Publishing**
+
+GitHub Actions automatically:
+- Runs linting checks
+- Runs unit tests
+- Builds package
+- Publishes to npm with provenance
+
+**5. Verify Publication**
+
+1. Check [npm package page](https://www.npmjs.com/package/bmad-mcp-server)
+2. Verify version number
+3. Test installation:
+   ```bash
+   npx bmad-mcp-server@latest
+   ```
+
+---
+
+## NPM Publishing Setup
+
+### Configure NPM Token
+
+Required for automated npm publishing via GitHub Actions.
+
+**Generate token:**
+
+1. Login to [npmjs.com](https://www.npmjs.com/)
+2. Account Settings → Access Tokens
+3. "Generate New Token" → "Automation" type
+4. Copy token (shown only once!)
+
+**Add to GitHub:**
+
+1. Repository Settings → Secrets → Actions
+2. "New repository secret"
+3. Name: `NPM_TOKEN`
+4. Value: paste your token
+5. "Add secret"
+
+### Manual Publishing
+
+If automated publishing fails:
+
+```bash
+# Login to npm
 npm login
 
-# Build the package
+# Build
 npm run build
 
 # Publish
 npm publish --access public
 ```
 
-### Verify Publication
+---
 
-After publishing:
+## Release Workflows
 
-1. Check [npm package page](https://www.npmjs.com/package/bmad-mcp-server)
-2. Verify version number is correct
-3. Test installation:
-   ```bash
-   npx bmad-mcp-server@latest
-   ```
+### Standard Release Flow
 
-## Release Workflow
+```
+1. Development
+   ├─ Create feature branch
+   ├─ Make changes
+   ├─ Create PR (auto pre-release)
+   └─ Test pre-release
 
-### Standard Release Workflow
+2. Merge to Main
+   ├─ Review and approve
+   └─ Merge PR
 
-```mermaid
-graph TD
-    A[Make Changes] --> B[Create PR]
-    B --> C[Auto Pre-release Created]
-    C --> D[Test Pre-release]
-    D --> E{Tests Pass?}
-    E -->|No| A
-    E -->|Yes| F[Merge PR]
-    F --> G[Update Version]
-    G --> H[Push Tags]
-    H --> I[Create GitHub Release]
-    I --> J[Auto Publish to NPM]
+3. Create Release
+   ├─ npm version [patch|minor|major]
+   ├─ git push --follow-tags
+   └─ Create GitHub Release
+
+4. Automatic Publishing
+   ├─ GitHub Actions runs
+   ├─ Tests execute
+   └─ Published to npm
 ```
 
 ### Hotfix Workflow
 
-For urgent fixes:
+For urgent production fixes:
 
-1. Create hotfix branch from main
-2. Make minimal changes
-3. Create PR with "hotfix" label
-4. Fast-track review
-5. Merge and release as PATCH version
-6. Consider backporting to older versions if needed
+1. **Create hotfix branch** from main
+2. **Make minimal changes**
+3. **Fast-track PR** with "hotfix" label
+4. **Merge and release** as PATCH version
+5. **Consider backporting** to older versions if needed
 
-## Version History Best Practices
+---
 
-### CHANGELOG.md Format
+## CHANGELOG Best Practices
 
-Use this format for changelog entries:
+### Format
+
+Use this structure:
 
 ```markdown
 ## [0.2.0] - 2025-01-15
 
 ### Added
-
 - New workflow for automated testing
 - Support for custom agent configurations
 
 ### Changed
-
 - Improved error messages in manifest loader
 - Updated documentation structure
 
 ### Fixed
-
 - Path resolution on Windows
 - Memory leak in file scanner
 
 ### Deprecated
-
 - Old configuration format (will be removed in v1.0.0)
+
+### Breaking Changes
+- Configuration format changed from X to Y
+- Migration guide: [link]
 ```
 
-### Commit Messages
+### When to Update
+
+- **During development** - Add entries as you work
+- **Before PR** - Ensure changes are documented
+- **Before release** - Review and organize entries
+
+### Categories
+
+- **Added** - New features
+- **Changed** - Changes to existing features
+- **Deprecated** - Soon-to-be removed features
+- **Removed** - Removed features
+- **Fixed** - Bug fixes
+- **Security** - Security fixes
+- **Breaking Changes** - Incompatible changes
+
+---
+
+## Commit Message Guidelines
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-- `feat:` - New features (MINOR version bump)
-- `fix:` - Bug fixes (PATCH version bump)
-- `BREAKING CHANGE:` - Breaking changes (MAJOR version bump)
-- `docs:` - Documentation only
-- `chore:` - Maintenance tasks
-- `refactor:` - Code restructuring
-- `test:` - Test updates
+```bash
+# Features (MINOR version)
+feat: add support for custom templates
+feat(agents): add game development specialist
 
-## GitHub Actions Workflows
+# Bug fixes (PATCH version)
+fix: resolve Windows path handling
+fix(manifest): handle missing CSV files
+
+# Breaking changes (MAJOR version)
+feat!: change configuration format
+feat(api)!: rename loadAgent to getAgent
+
+BREAKING CHANGE: Configuration format changed.
+See migration guide for details.
+
+# Other types (no version bump)
+docs: update installation guide
+chore: update dependencies
+refactor: simplify file reader
+test: add coverage for manifest loader
+perf: optimize manifest loading
+```
+
+**Commit scope:**
+- Use when helpful: `feat(agents):`, `fix(workflows):`
+- Optional but encouraged
+
+---
+
+## GitHub Actions
 
 ### Release Workflow
 
-Triggered on: GitHub Release published
+**Trigger:** GitHub Release published
 
-Steps:
-
+**Steps:**
 1. Checkout code
 2. Setup Node.js 18
 3. Install dependencies
-4. Run linting
-5. Run tests
-6. Build package
-7. Publish to npm with provenance
+4. Run linting (`npm run lint`)
+5. Run tests (`npm test`)
+6. Build package (`npm run build`)
+7. Publish to npm (with provenance)
+
+**Configuration:** `.github/workflows/release.yml`
 
 ### PR Pre-release Workflow
 
-Triggered on: Pull Request opened/updated
+**Trigger:** Pull Request opened/updated
 
-Steps:
-
+**Steps:**
 1. Build package
 2. Create pre-release tag
-3. Comment on PR with installation instructions
+3. Comment installation instructions on PR
 4. Auto-delete on PR close/merge
+
+**Configuration:** `.github/workflows/pr-prerelease.yml`
+
+---
 
 ## Troubleshooting Releases
 
-### Release workflow fails
+### Release Workflow Fails
 
 **Check:**
+- NPM_TOKEN is valid and not expired
+- All tests passing locally (`npm test`)
+- Build succeeds locally (`npm run build`)
+- Review GitHub Actions logs for specific errors
 
-- NPM_TOKEN is valid
-- Tests are passing
-- Build succeeds locally
-- GitHub Actions logs for specific error
+**Common issues:**
+- Test failures - Fix tests before release
+- Linting errors - Run `npm run lint:fix`
+- NPM authentication - Regenerate NPM_TOKEN
 
-### Version conflict
+### Version Conflict
+
+**Symptoms:** Version already exists on npm
 
 **Solution:**
 
 ```bash
 # Pull latest
-git pull origin v2-node
+git pull origin main
 
-# Retry version bump
-npm version patch
-git push origin v2-node --follow-tags
+# Check current version
+npm version
+
+# Bump to next version
+npm version patch  # or minor, major
+git push origin main --follow-tags
 ```
 
-### npm publish permission denied
+### npm Publish Permission Denied
 
-**Solution:**
+**Solutions:**
 
-1. Verify you're logged in: `npm whoami`
-2. Check package ownership on npmjs.com
-3. Ensure NPM_TOKEN has correct permissions
-4. Try manual publish with `npm publish --access public`
+1. **Verify login:**
+   ```bash
+   npm whoami
+   ```
+
+2. **Check package ownership** on npmjs.com
+
+3. **Verify NPM_TOKEN** has correct permissions
+
+4. **Manual publish:**
+   ```bash
+   npm publish --access public
+   ```
+
+---
 
 ## Best Practices
 
-1. **Always test before releasing**
-   - Run full test suite
-   - Test on multiple platforms if possible
-   - Verify in different MCP clients
+### Before Releasing
 
-2. **Keep changelog updated**
-   - Update as you make changes, not at release time
-   - Be specific about what changed and why
+1. ✅ **Test thoroughly** - Run full test suite
+2. ✅ **Update CHANGELOG** - Document all changes
+3. ✅ **Review changes** - Ensure quality and consistency
+4. ✅ **Test on multiple platforms** - If possible
+5. ✅ **Verify in different MCP clients** - VS Code, Claude Desktop, Cursor
 
-3. **Use semantic versioning correctly**
-   - Breaking changes = MAJOR
-   - New features = MINOR
-   - Bug fixes = PATCH
+### Version Bump Guidelines
 
-4. **Communicate changes**
-   - Write clear release notes
-   - Mention breaking changes prominently
-   - Include migration guides for MAJOR versions
+- **PATCH (0.0.x)** - Bug fixes only, no new features
+- **MINOR (0.x.0)** - New features, backward compatible
+- **MAJOR (x.0.0)** - Breaking changes, incompatible updates
 
-5. **Tag and release from stable branch**
-   - Ensure main/v2-node is stable
-   - Don't release from feature branches
+### Release Notes
+
+**Good release notes include:**
+- Clear summary of changes
+- Breaking changes highlighted
+- Migration guide for MAJOR versions
+- Credits to contributors
+- Links to relevant issues/PRs
+
+**Example:**
+
+```markdown
+## v0.2.0 - Enhanced Resource Discovery
+
+### 🎉 New Features
+- Master Manifest architecture for multi-location BMAD resources
+- Module-qualified agent/workflow names (e.g., `bmad core/analyst`)
+- Built-in `*doctor` command for diagnostics
+
+### 🔧 Changes
+- Improved priority-based resource resolution
+- Better error messages for missing agents
+
+### 🐛 Fixes
+- Fixed path resolution on Windows (#45)
+- Resolved manifest loading race condition (#47)
+
+### 📚 Documentation
+- Updated architecture guide
+- Simplified installation instructions
+
+### 🙏 Contributors
+Thanks to @contributor1 and @contributor2!
+```
+
+### Communication
+
+1. **Tag releases** clearly with version
+2. **Write clear release notes** for users
+3. **Mention breaking changes** prominently
+4. **Provide migration guides** for MAJOR versions
+5. **Announce** in relevant channels (if applicable)
+
+---
 
 ## Support and Questions
 
-For release-related questions:
+**For release-related questions:**
+- Review [GitHub Actions](https://github.com/mkellerman/bmad-mcp-server/actions)
+- Check [existing releases](https://github.com/mkellerman/bmad-mcp-server/releases)
+- Open an [issue](https://github.com/mkellerman/bmad-mcp-server/issues) for problems
 
-- Check [GitHub Actions](https://github.com/mkellerman/bmad-mcp-server/actions)
-- Review [existing releases](https://github.com/mkellerman/bmad-mcp-server/releases)
-- Open an [issue](https://github.com/mkellerman/bmad-mcp-server/issues) if you encounter problems
+**Related documentation:**
+- [Development Guide](./development.md) - Contributing workflow
+- [Installation Guide](./installation.md) - How users install releases
+- [Architecture Guide](./architecture.md) - System design

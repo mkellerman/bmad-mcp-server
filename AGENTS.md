@@ -12,8 +12,8 @@
 - MCP server (`src/server.ts`) uses `@modelcontextprotocol/sdk` with stdio transport; registers prompt handlers and a single `bmad` tool.
 - Unified tool (`src/tools/unified-tool.ts`) routes commands: empty → default agent, `<agent>`, or `*<workflow>`; includes discovery commands.
 - Discovery (`utils/bmad-path-resolver.ts`) resolves active BMAD root from CWD, CLI arg, `BMAD_ROOT`, `~/.bmad`, package defaults.
-- Manifests (`utils/manifest-loader.ts`) read CSVs; server returns agent content and workflow YAML/instructions without mutating files.
-- Safe I/O (`utils/file-reader.ts`) validates paths and prevents traversal; server acts as a file proxy while LLM processes content.
+- Master manifest (`utils/master-manifest.ts`) aggregates all BMAD resources (agents, workflows, tasks) from all discovered installations into a flattened catalog with absolute paths.
+- File resolution (`utils/file-reader.ts`) uses module-aware path resolution: parses v4 (`.bmad-<module>/file`) and v6 (`{project-root}/bmad/<module>/file`) formats, queries master manifest by module+file, returns first match by priority. No path traversal validation needed—master manifest is the source of truth.
 
 ## Build, Test, and Development Commands
 
@@ -44,5 +44,7 @@
 
 ## Security & Configuration Tips
 
-- All file access goes through `utils/file-reader.ts` to prevent path traversal.
+- File access through `utils/file-reader.ts` uses master manifest for path resolution. Security validation happens during manifest construction (only validated BMAD installations are included).
+- Agent/workflow lookup supports qualified names: `core/bmad-master` (specific module) or `bmad-master` (first by priority).
+- Path resolution supports v4 format (`.bmad-<module>/file.md`) and v6 format (`{project-root}/bmad/<module>/file.yaml`) with placeholder expansion.
 - BMAD discovery order: `./bmad` → CLI arg → `BMAD_ROOT` → `~/.bmad` → package defaults. Prefer explicit `BMAD_ROOT` during development.
