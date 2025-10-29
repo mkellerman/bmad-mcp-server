@@ -16,6 +16,7 @@ export default tseslint.config(
       'playwright-report/**',
       'test-results/**',
       '**/*.d.ts',
+      'tests/support/fixtures/**',
     ],
   },
   {
