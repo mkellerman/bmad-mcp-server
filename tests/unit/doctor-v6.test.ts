@@ -9,10 +9,7 @@ function sampleProjectRoot(): string {
   // Use the directory containing the 'bmad' folder as the project root
   return path.resolve(
     process.cwd(),
-    'tests',
-    'support',
-    'fixtures',
-    'bmad_samples',
+    '.bmad',
     '6.0.0-alpha.0',
   );
 }

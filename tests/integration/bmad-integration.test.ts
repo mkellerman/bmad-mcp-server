@@ -6,8 +6,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import { BMADMCPServer } from '../../src/server.js';
-import { UnifiedBMADTool } from '../../src/tools/unified-tool.js';
+import { UnifiedBMADTool } from '../../src/tools/index.js';
 import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
+import { MasterManifestService } from '../../src/services/master-manifest-service.js';
 import {
   createTestFixture,
   createBMADStructure,
@@ -68,8 +69,7 @@ describe('BMAD MCP Server Integration', () => {
 
     const discovery = resolveBmadPaths({
       cwd: fixture.tmpDir,
-      packageRoot: fixture.tmpDir,
-      cliArg: undefined,
+      cliArgs: [],
       envVar: undefined,
       userBmadPath: path.join(fixture.tmpDir, '.bmad'),
     });
@@ -77,9 +77,15 @@ describe('BMAD MCP Server Integration', () => {
     server = new BMADMCPServer(fixture.tmpDir, discovery);
 
     const root = discovery.activeLocation.resolvedRoot ?? fixture.tmpDir;
+
+    // Create and populate master manifest service for integration tests
+    const masterManifestService = new MasterManifestService(discovery);
+    masterManifestService.generate();
+
     tool = new UnifiedBMADTool({
       bmadRoot: root,
       discovery,
+      masterManifestService,
     });
   });
 
@@ -146,42 +152,7 @@ describe('BMAD MCP Server Integration', () => {
     });
   });
 
-  describe('End-to-end discovery', () => {
-    it('should list all agents', async () => {
-      const result = await tool.execute('*list-agents');
-
-      expect(result.success).toBe(true);
-      expect(result.count).toBeGreaterThan(0);
-      expect(result.content).toContain('bmad-master');
-      expect(result.content).toContain('analyst');
-      expect(result.content).toContain('dev');
-    });
-
-    it('should list all workflows', async () => {
-      const result = await tool.execute('*list-workflows');
-
-      expect(result.success).toBe(true);
-      expect(result.count).toBeGreaterThan(0);
-      expect(result.content).toContain('party-mode');
-      expect(result.content).toContain('analysis');
-    });
-
-    it('should list all tasks', async () => {
-      const result = await tool.execute('*list-tasks');
-
-      expect(result.success).toBe(true);
-      expect(result.count).toBeGreaterThan(0);
-      expect(result.content).toContain('daily-standup');
-      expect(result.content).toContain('retrospective');
-    });
-
-    it('should show help', async () => {
-      const result = await tool.execute('*help');
-
-      expect(result.success).toBe(true);
-      expect(result.content).toContain('BMAD MCP Server');
-    });
-  });
+  // Discovery commands removed; integration tests omitted
 
   describe('Error handling integration', () => {
     it('should handle invalid agent gracefully', async () => {
@@ -226,7 +197,6 @@ describe('BMAD MCP Server Integration', () => {
         tool.execute('analyst'),
         tool.execute('dev'),
         tool.execute('*party-mode'),
-        tool.execute('*list-agents'),
       ];
 
       const results = await Promise.all(promises);
@@ -248,13 +218,7 @@ describe('BMAD MCP Server Integration', () => {
       expect(workflow2.success).toBe(true);
     });
 
-    it('should support discovery before execution', async () => {
-      const list = await tool.execute('*list-agents');
-      expect(list.success).toBe(true);
-
-      const load = await tool.execute('analyst');
-      expect(load.success).toBe(true);
-    });
+    // Discovery removed; no pre-exec listing
 
     it('should handle error recovery', async () => {
       const error = await tool.execute('invalid');

@@ -19,26 +19,7 @@ describe('BMAD MCP Tool', () => {
     await mcpClient.cleanup();
   });
 
-  it('should list all available agents', async () => {
-    const result = await mcpClient.callTool('bmad', {
-      command: '*list-agents',
-    });
-
-    expect(result).toBeDefined();
-    expect(result.content).toContain('Available BMAD Agents');
-    expect(result.content).toContain('bmad-master');
-    expect(result.content).toContain('analyst');
-    expect(result.content).toContain('tea');
-  });
-
-  it('should list all available workflows', async () => {
-    const result = await mcpClient.callTool('bmad', {
-      command: '*list-workflows',
-    });
-
-    expect(result).toBeDefined();
-    expect(result.content).toContain('Available BMAD Workflows');
-  });
+  // Discovery commands removed; skip listing tests
 
   it('should load an agent by name', async () => {
     const result = await mcpClient.callTool('bmad', {
@@ -60,14 +41,5 @@ describe('BMAD MCP Tool', () => {
     expect(result.content).toMatch(/not found|Agent.*not available/i);
   });
 
-  it('should provide help when requested', async () => {
-    const result = await mcpClient.callTool('bmad', {
-      command: '*help',
-    });
-
-    expect(result).toBeDefined();
-    expect(result.content).toMatch(/Command Reference/i);
-    expect(result.content).toMatch(/Load.*agent/i);
-    expect(result.content).toMatch(/Execute.*workflow/i);
-  });
+  // Help command removed; skip
 });

@@ -37,12 +37,14 @@ One server installation serves all your projects:
 **Scenario: You maintain 10 projects**
 
 Traditional BMAD:
+
 - 10 separate installations
 - 10 places to update when BMAD improves
 - 10 sets of files to manage
 - Hours of maintenance time
 
 MCP Server:
+
 - 1 installation
 - 1 update location
 - 0 files in your projects
@@ -74,6 +76,7 @@ Add this to your VS Code settings, Claude Desktop, or Cursor config:
 **Step 3: Start using BMAD anywhere**
 
 Open any project and say:
+
 ```
 bmad analyst
 ```
@@ -90,7 +93,7 @@ Every agent brings unique expertise, personality, and specialized workflows:
 
 ```bash
 bmad analyst      # Mary - Strategic Business Analyst
-bmad architect    # Winston - Solution Architect  
+bmad architect    # Winston - Solution Architect
 bmad dev          # Amelia - Senior Implementation Engineer
 bmad ux-expert    # Sally - UX/UI Specialist
 bmad tea          # Murat - Master Test Architect
@@ -107,7 +110,7 @@ Complex multi-step processes become single commands:
 bmad *party-mode       # Multi-agent brainstorming
 bmad *workflow-status  # Project health check
 bmad *atdd            # Generate acceptance tests
-bmad *ux-spec         # Create UX specifications  
+bmad *ux-spec         # Create UX specifications
 ```
 
 ### Works With Your Workflow
@@ -120,11 +123,13 @@ bmad *ux-spec         # Create UX specifications
 ### Flexible When You Need It
 
 **Global by default:**
+
 - Server provides BMAD to all projects
 - Consistent methodology everywhere
 - Zero setup per project
 
 **Customizable when needed:**
+
 - Place `./bmad` in any project for custom agents
 - Project customizations override global defaults
 - Keep global access for other projects
@@ -135,15 +140,16 @@ bmad *ux-spec         # Create UX specifications
 
 The MCP Server intelligently finds BMAD resources:
 
-| Priority | Location         | Use Case                        |
-| -------- | ---------------- | ------------------------------- |
-| 1        | `./bmad`         | Project-specific customizations |
-| 2        | CLI argument     | Development/testing             |
-| 3        | `BMAD_ROOT` env  | Point to specific location      |
-| 4        | `~/.bmad`        | Your personal defaults          |
-| 5        | Package defaults | Built-in files (always available)|
+| Priority | Location         | Use Case                          |
+| -------- | ---------------- | --------------------------------- |
+| 1        | `./bmad`         | Project-specific customizations   |
+| 2        | CLI argument     | Development/testing               |
+| 3        | `BMAD_ROOT` env  | Point to specific location        |
+| 4        | `~/.bmad`        | Your personal defaults            |
+| 5        | Package defaults | Built-in files (always available) |
 
 **Project overrides work seamlessly:**
+
 - Most projects: Use global BMAD (no local files needed)
 - Special projects: Add `./bmad` folder with customizations
 - MCP Server uses project version when present, global otherwise
@@ -161,7 +167,7 @@ Work through the full development lifecycle with specialist agents:
 bmad analyst
 # → Mary helps gather and structure requirements
 
-# Architecture & Design  
+# Architecture & Design
 bmad architect
 # → Winston designs the technical approach
 
@@ -194,7 +200,7 @@ Brings all agents together for collaborative problem-solving. Each specialist co
 # Quick requirements check
 bmad analyst "Review this user story"
 
-# Architecture review  
+# Architecture review
 bmad architect "Is this design pattern appropriate?"
 
 # Code review
@@ -243,12 +249,11 @@ Every command works in every project. No setup, no configuration, just results.
 
 ## 🔧 Commands Reference
 
-| Command                | Purpose                      | Example            |
-| ---------------------- | ---------------------------- | ------------------ |
-| `bmad`                 | Load default orchestrator    | `bmad`             |
-| `bmad <agent>`         | Load specialist agent        | `bmad analyst`     |
-| `bmad *<workflow>`     | Execute workflow             | `bmad *party-mode` |
- 
+| Command            | Purpose                   | Example            |
+| ------------------ | ------------------------- | ------------------ |
+| `bmad`             | Load default orchestrator | `bmad`             |
+| `bmad <agent>`     | Load specialist agent     | `bmad analyst`     |
+| `bmad *<workflow>` | Execute workflow          | `bmad *party-mode` |
 
 ## 🚦 Contributing
 

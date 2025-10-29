@@ -473,10 +473,7 @@ ides:
       // This test uses the actual sample directory if it exists
       const v6SamplePath = path.join(
         process.cwd(),
-        'tests',
-        'support',
-        'fixtures',
-        'bmad_samples',
+        '.bmad',
         '6.0.0-alpha.0',
         'bmad',
       );
@@ -505,10 +502,7 @@ ides:
       // This test uses the actual sample directory if it exists
       const v4SamplePath = path.join(
         process.cwd(),
-        'tests',
-        'support',
-        'fixtures',
-        'bmad_samples',
+        '.bmad',
         '4.44.1',
         '.bmad-core',
       );

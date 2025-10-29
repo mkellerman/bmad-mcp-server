@@ -45,6 +45,23 @@ export function createBMADStructure(baseDir: string): void {
   // Create core agents directory
   const coreAgentsDir = path.join(baseDir, 'src', 'bmad', 'core', 'agents');
   fs.mkdirSync(coreAgentsDir, { recursive: true });
+
+  // Create v6-style manifest.yaml (required for master manifest detection)
+  const manifestYaml = `# BMAD v6 Manifest
+version: "6.0.0"
+modules:
+  - name: core
+    version: "6.0.0"
+    path: core
+  - name: bmm
+    version: "6.0.0"
+    path: bmm
+`;
+  fs.writeFileSync(
+    path.join(manifestDir, 'manifest.yaml'),
+    manifestYaml,
+    'utf-8',
+  );
 }
 
 /**

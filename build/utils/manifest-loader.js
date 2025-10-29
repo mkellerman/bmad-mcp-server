@@ -18,8 +18,10 @@ import { parse } from 'csv-parse/sync';
 export class ManifestLoader {
     bmadRoot;
     manifestDir;
-    constructor(bmadRoot) {
+    logger;
+    constructor(bmadRoot, logger) {
         this.bmadRoot = path.resolve(bmadRoot);
+        this.logger = logger ?? console;
         const srcCfg = path.join(this.bmadRoot, 'src', 'bmad', '_cfg');
         const nestedPath = path.join(this.bmadRoot, 'bmad', '_cfg');
         const directPath = path.join(this.bmadRoot, '_cfg');
@@ -74,7 +76,8 @@ export class ManifestLoader {
         const manifestPath = path.join(this.manifestDir, filename);
         // Check if file exists
         if (!fs.existsSync(manifestPath)) {
-            console.warn(`Manifest not found: ${manifestPath}`);
+            // Always warn in test/dev to aid diagnostics
+            this.logger.warn(`Manifest not found: ${manifestPath}`);
             return [];
         }
         try {
@@ -97,12 +100,13 @@ export class ManifestLoader {
                 }
                 return record;
             });
-            console.error(`Loaded ${filtered.length} entries from ${filename}`);
+            // Log loaded entry count for visibility and tests
+            this.logger.error(`Loaded ${filtered.length} entries from ${filename}`);
             return filtered;
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`Error loading manifest ${manifestPath}:`, errorMessage);
+            this.logger.error(`Error loading manifest ${manifestPath}:`, errorMessage);
             return [];
         }
     }

@@ -20,8 +20,8 @@ import { type BmadPathResolution } from './utils/bmad-path-resolver.js';
 export declare class BMADMCPServer {
     private bmadRoot;
     private projectRoot;
-    private manifestLoader;
     private unifiedTool;
+    private masterService;
     private agents;
     private server;
     private discovery;

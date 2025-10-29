@@ -44,9 +44,23 @@ export interface Task {
 /**
  * Result of input validation
  */
+export declare enum ErrorCode {
+    TOO_MANY_ARGUMENTS = "TOO_MANY_ARGUMENTS",
+    INVALID_ASTERISK_COUNT = "INVALID_ASTERISK_COUNT",
+    MISSING_WORKFLOW_NAME = "MISSING_WORKFLOW_NAME",
+    MISSING_ASTERISK = "MISSING_ASTERISK",
+    INVALID_CHARACTERS = "INVALID_CHARACTERS",
+    NON_ASCII_CHARACTERS = "NON_ASCII_CHARACTERS",
+    NAME_TOO_SHORT = "NAME_TOO_SHORT",
+    NAME_TOO_LONG = "NAME_TOO_LONG",
+    INVALID_NAME_FORMAT = "INVALID_NAME_FORMAT",
+    UNKNOWN_WORKFLOW = "UNKNOWN_WORKFLOW",
+    CASE_MISMATCH = "CASE_MISMATCH",
+    UNKNOWN_AGENT = "UNKNOWN_AGENT"
+}
 export interface ValidationResult {
     valid: boolean;
-    errorCode?: string;
+    errorCode?: ErrorCode | string;
     errorMessage?: string;
     suggestions?: string[];
     exitCode: number;
@@ -85,6 +99,51 @@ export interface WorkflowContext {
     agentManifestPath: string;
     agentManifestData: Agent[];
     agentCount: number;
+}
+/**
+ * BMAD v6 Master Manifest Types
+ */
+export type BmadOriginSource = 'project' | 'cli' | 'env' | 'user' | 'package';
+export interface BmadOrigin {
+    kind: BmadOriginSource;
+    displayName: string;
+    root: string;
+    manifestDir: string;
+    priority: number;
+}
+export interface V6ModuleInfo {
+    name: string;
+    path: string;
+    configPath: string;
+    configValid: boolean;
+    errors: string[];
+    moduleVersion?: string;
+    bmadVersion?: string;
+    origin: BmadOrigin;
+}
+export type MasterKind = 'agent' | 'workflow' | 'task';
+export interface MasterRecordBase {
+    kind: MasterKind;
+    source: 'manifest' | 'filesystem';
+    origin: BmadOrigin;
+    moduleName: string;
+    moduleVersion?: string;
+    bmadVersion?: string;
+    name?: string;
+    displayName?: string;
+    description?: string;
+    bmadRelativePath: string;
+    moduleRelativePath: string;
+    absolutePath: string;
+    exists: boolean;
+    status: 'verified' | 'not-in-manifest' | 'no-file-found';
+}
+export type MasterRecord = MasterRecordBase;
+export interface MasterManifests {
+    agents: MasterRecord[];
+    workflows: MasterRecord[];
+    tasks: MasterRecord[];
+    modules: V6ModuleInfo[];
 }
 /**
  * Command parsing result

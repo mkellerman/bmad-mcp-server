@@ -20,6 +20,7 @@ Before diving into specific issues, try these:
 ### Server Not Responding
 
 **Symptoms:**
+
 - No response when typing `bmad` commands
 - AI client can't connect to server
 - Timeout errors
@@ -35,6 +36,7 @@ Before diving into specific issues, try these:
 **2. Verify configuration location and syntax**
 
 Check your configuration file:
+
 - **VS Code:** `.vscode/settings.json` or User Settings
 - **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
 - **Cursor:** MCP settings file
@@ -78,6 +80,7 @@ npx -y bmad-mcp-server
 ### Agent Not Found
 
 **Symptoms:**
+
 - "Agent not found" error
 - Specific agent doesn't load (e.g., `bmad analyst` fails)
 
@@ -136,6 +139,7 @@ bmad bmm/architect     # Load from 'bmm' module
 ### Workflow Not Executing
 
 **Symptoms:**
+
 - Workflow command recognized but doesn't run
 - "Workflow not found" error
 
@@ -174,6 +178,7 @@ bmad *Party-Mode        # ❌ Wrong
 ### BMAD Files Not Found
 
 **Symptoms:**
+
 - Server can't locate BMAD resources
 - "BMAD directory not found" errors
 - Using wrong version of agent/workflow
@@ -237,6 +242,7 @@ If using `BMAD_ROOT`, ensure it's an absolute path:
 ### Path Issues (Claude Desktop / Cursor)
 
 **Symptoms:**
+
 - Works in VS Code but not Claude Desktop
 - Path-related errors
 - Can't find files
@@ -279,6 +285,7 @@ ls /Users/username/my-project/bmad
 ### Build Errors (Contributors)
 
 **Symptoms:**
+
 - `npm run build` fails
 - Missing `build/` directory
 - TypeScript compilation errors
@@ -324,6 +331,7 @@ node --version  # Must be 18+
 ### Test Failures (Contributors)
 
 **Symptoms:**
+
 - `npm test` shows failures
 - Coverage drops
 - E2E tests timeout
@@ -373,6 +381,7 @@ npm run test:e2e
 ### Linting / Formatting Errors
 
 **Symptoms:**
+
 - Pre-commit hooks fail
 - `npm run lint` shows errors
 - Code style inconsistencies
@@ -465,6 +474,7 @@ Search existing issues: [bmad-mcp-server/issues](https://github.com/mkellerman/b
 ### Create a New Issue
 
 Include:
+
 - **Error messages** (full text)
 - **Steps to reproduce**
 - **Your configuration** (remove sensitive paths)

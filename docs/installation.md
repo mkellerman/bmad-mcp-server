@@ -108,13 +108,13 @@ You should see Mary (the Business Analyst) load. That's it—you're done! BMAD n
 
 The MCP Server finds BMAD files using a priority system. Lower numbers win:
 
-| Priority | Location         | When to Use                           |
-| -------- | ---------------- | ------------------------------------- |
-| 1        | `./bmad`         | Project-specific custom agents        |
-| 2        | CLI argument     | Development/testing                   |
-| 3        | `BMAD_ROOT` env  | Point to specific project             |
-| 4        | `~/.bmad`        | Your personal agent customizations    |
-| 5        | Package defaults | Always available, no setup needed     |
+| Priority | Location         | When to Use                        |
+| -------- | ---------------- | ---------------------------------- |
+| 1        | `./bmad`         | Project-specific custom agents     |
+| 2        | CLI argument     | Development/testing                |
+| 3        | `BMAD_ROOT` env  | Point to specific project          |
+| 4        | `~/.bmad`        | Your personal agent customizations |
+| 5        | Package defaults | Always available, no setup needed  |
 
 **How it works in practice:**
 
@@ -270,9 +270,11 @@ bmad analyst  # ← Uses your custom version
 ```
 
 **For this project only:**
+
 - `bmad analyst` → Loads `./bmad/core/agents/analyst.md` (Priority 1)
 
 **For all other projects:**
+
 - `bmad analyst` → Loads global defaults (Priority 5)
 
 ### Multiple Locations Working Together
@@ -281,7 +283,7 @@ The server can discover and merge resources from multiple locations:
 
 ```
 Priority 1: ./bmad (project)           → Custom architect
-Priority 4: ~/.bmad (user)             → Custom analyst  
+Priority 4: ~/.bmad (user)             → Custom analyst
 Priority 5: package (built-in)         → All other agents
 
 Result: architect from project, analyst from user, rest from package

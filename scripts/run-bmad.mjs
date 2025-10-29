@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run a BMAD tool command via the compiled build
 // Usage:
-//   npm run bmad -- "*doctor --reload" ./tests/support/fixtures/bmad_samples/6.0.0-alpha.0/bmad
+//   npm run bmad -- "*doctor --reload" ./.bmad/6.0.0-alpha.0/bmad
 //   npm run bmad -- "*list-agents" /path/to/bmad1 /path/to/bmad2
 //   npm run bmad -- "*export-master-manifest" /path/to/bmad1 /path/to/bmad2
 
@@ -30,7 +30,7 @@ async function main() {
     console.error('Usage: npm run bmad -- "<command>" [path1] [path2] ...');
     console.error('Examples:');
     console.error(
-      '  npm run bmad -- "*doctor --reload" ./tests/support/fixtures/bmad_samples/6.0.0-alpha.0/bmad',
+      '  npm run bmad -- "*doctor --reload" ./.bmad/6.0.0-alpha.0/bmad',
     );
     console.error(
       '  npm run bmad -- "*list-agents" /path/to/bmad1 /path/to/bmad2',

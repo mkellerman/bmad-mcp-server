@@ -17,6 +17,7 @@ export default tseslint.config(
       'test-results/**',
       '**/*.d.ts',
       'tests/support/fixtures/**',
+      '.bmad/**',
     ],
   },
   {

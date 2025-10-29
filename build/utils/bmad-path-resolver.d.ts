@@ -1,4 +1,4 @@
-export type BmadLocationSource = 'project' | 'cli' | 'env' | 'user' | 'package';
+export type BmadLocationSource = 'project' | 'cli' | 'env' | 'user';
 export interface BmadLocationInfo {
     source: BmadLocationSource;
     priority: number;
@@ -12,16 +12,13 @@ export interface BmadLocationInfo {
 export interface BmadPathResolution {
     activeLocation: BmadLocationInfo;
     locations: BmadLocationInfo[];
-    packageRoot: string;
-    packageBmadPath: string;
     userBmadPath: string;
     projectRoot: string;
 }
 export interface ResolveBmadPathsOptions {
     cwd: string;
-    cliArg?: string;
+    cliArgs?: string[];
     envVar?: string;
-    packageRoot: string;
     userBmadPath?: string;
 }
 export interface ManifestInfo {

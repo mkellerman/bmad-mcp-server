@@ -10,10 +10,7 @@ describe('List commands', () => {
     const projectRoot = process.cwd();
     const bmadRoot = path.resolve(
       projectRoot,
-      'tests',
-      'support',
-      'fixtures',
-      'bmad_samples',
+      '.bmad',
       '6.0.0-alpha.0',
       'bmad',
     );

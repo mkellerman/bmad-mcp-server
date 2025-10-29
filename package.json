@@ -7,7 +7,7 @@
     "bmad-mcp-server": "./build/index.js"
   },
   "scripts": {
-    "build": "tsc && node ./scripts/copy-bmad.mjs && chmod +x build/index.js",
+    "build": "tsc && chmod +x build/index.js",
     "prepare": "husky || true",
     "start": "node build/index.js",
     "dev": "tsx src/index.ts",
@@ -22,11 +22,14 @@
     "lint": "eslint . --ext .ts,.js,.mjs",
     "lint:fix": "eslint . --ext .ts,.js,.mjs --fix",
     "format": "prettier --write .",
-    "precommit": "npm run lint:fix && npm run format",
+    "guard:src-js": "node scripts/guard-src-js.mjs",
+    "precommit": "npm run guard:src-js && npm run lint:fix && npm run format",
     "litellm:docker:start": "docker run -d --name litellm-proxy -p 4000:4000 -v $(pwd)/tests/support/litellm-config.yaml:/app/config.yaml ghcr.io/berriai/litellm:main-latest --config /app/config.yaml --port 4000",
     "litellm:docker:stop": "docker stop litellm-proxy && docker rm litellm-proxy",
     "litellm:docker:logs": "docker logs -f litellm-proxy",
-    "litellm:docker:health": "curl -s http://localhost:4000/health/readiness | jq"
+    "litellm:docker:health": "curl -s http://localhost:4000/health/readiness | jq",
+    "doctor:show": "node scripts/show-doctor.mjs",
+    "bmad": "node scripts/run-bmad.mjs"
   },
   "files": [
     "build/"

@@ -6,6 +6,10 @@
  * the manifests for discovery purposes.
  */
 import type { Agent, Workflow, Task } from '../types/index.js';
+interface SimpleLogger {
+    warn: (...args: unknown[]) => void;
+    error: (...args: unknown[]) => void;
+}
 /**
  * Loads and parses BMAD CSV manifest files for resource discovery.
  *
@@ -16,7 +20,8 @@ import type { Agent, Workflow, Task } from '../types/index.js';
 export declare class ManifestLoader {
     private bmadRoot;
     private manifestDir;
-    constructor(bmadRoot: string);
+    private logger;
+    constructor(bmadRoot: string, logger?: SimpleLogger);
     /**
      * Load agent-manifest.csv and return list of agent metadata.
      *
@@ -57,4 +62,5 @@ export declare class ManifestLoader {
      */
     getWorkflowByName(workflowName: string): Workflow | undefined;
 }
+export {};
 //# sourceMappingURL=manifest-loader.d.ts.map

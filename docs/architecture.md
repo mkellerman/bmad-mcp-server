@@ -72,27 +72,27 @@ The Master Manifest is a **unified inventory** of all BMAD resources (agents, wo
 ```typescript
 interface MasterRecord {
   kind: 'agent' | 'workflow' | 'task';
-  source: 'manifest' | 'filesystem';      // From CSV or discovered?
-  origin: BmadOrigin;                     // Where it came from
-  moduleName: string;                     // e.g., 'bmm', 'core'
+  source: 'manifest' | 'filesystem'; // From CSV or discovered?
+  origin: BmadOrigin; // Where it came from
+  moduleName: string; // e.g., 'bmm', 'core'
   moduleVersion?: string;
   bmadVersion?: string;
   name?: string;
   displayName?: string;
   description?: string;
-  bmadRelativePath: string;               // e.g., 'bmad/bmm/agents/analyst.md'
-  moduleRelativePath: string;             // e.g., 'bmm/agents/analyst.md'
-  absolutePath: string;                   // Full filesystem path
-  exists: boolean;                        // File actually exists?
+  bmadRelativePath: string; // e.g., 'bmad/bmm/agents/analyst.md'
+  moduleRelativePath: string; // e.g., 'bmm/agents/analyst.md'
+  absolutePath: string; // Full filesystem path
+  exists: boolean; // File actually exists?
   status: 'verified' | 'not-in-manifest' | 'no-file-found';
 }
 
 interface BmadOrigin {
   kind: 'project' | 'cli' | 'env' | 'user' | 'package';
-  displayName: string;                    // e.g., 'Project', 'User Defaults'
-  root: string;                           // Absolute path to bmad root
-  manifestDir: string;                    // Absolute path to _cfg
-  priority: number;                       // Lower = higher priority
+  displayName: string; // e.g., 'Project', 'User Defaults'
+  root: string; // Absolute path to bmad root
+  manifestDir: string; // Absolute path to _cfg
+  priority: number; // Lower = higher priority
 }
 ```
 
@@ -155,13 +155,13 @@ interface BmadOrigin {
 
 **Lower priority number = Higher priority**
 
-| Source | Priority | Description | Example |
-|--------|----------|-------------|---------|
-| Project | 1 | Local `./bmad` folder | `/project/bmad` |
-| CLI Args | 2+ | Command-line paths | `--path /custom/bmad` |
-| Environment | 3+ | `BMAD_ROOT` variable | `BMAD_ROOT=/path` |
-| User | 4+ | `~/.bmad` folder | `/home/user/.bmad` |
-| Package | 5 | Embedded in npm package | `/package/bmad` |
+| Source      | Priority | Description             | Example               |
+| ----------- | -------- | ----------------------- | --------------------- |
+| Project     | 1        | Local `./bmad` folder   | `/project/bmad`       |
+| CLI Args    | 2+       | Command-line paths      | `--path /custom/bmad` |
+| Environment | 3+       | `BMAD_ROOT` variable    | `BMAD_ROOT=/path`     |
+| User        | 4+       | `~/.bmad` folder        | `/home/user/.bmad`    |
+| Package     | 5        | Embedded in npm package | `/package/bmad`       |
 
 ### Selection Algorithm
 
@@ -171,17 +171,16 @@ When loading a resource (e.g., agent "architect"):
 function findAgentByName(
   manifest: MasterManifests,
   name: string,
-  module?: string
+  module?: string,
 ): MasterRecord | undefined {
-
   // 1. Filter by name and exists=true
   let candidates = manifest.agents.filter(
-    a => a.name === name && a.exists === true
+    (a) => a.name === name && a.exists === true,
   );
 
   // 2. If module specified, filter by module
   if (module) {
-    candidates = candidates.filter(a => a.moduleName === module);
+    candidates = candidates.filter((a) => a.moduleName === module);
   }
 
   // 3. Sort by priority (ascending - lowest wins)
@@ -251,7 +250,7 @@ FileReader maintains a priority-ordered list of BMAD roots and tries each locati
 
 ```typescript
 class FileReader {
-  private roots: string[];  // ['/project/bmad', '~/.bmad', '/package/bmad']
+  private roots: string[]; // ['/project/bmad', '~/.bmad', '/package/bmad']
 
   readFile(relativePath: string): string {
     for (const root of this.roots) {
@@ -277,7 +276,7 @@ const agentMd = fs.readFileSync(agentRecord.absolutePath, 'utf-8');
 // Supporting files: Use FileReader with fallback
 try {
   const customization = fileReader.readFile(
-    '_cfg/agents/bmm-architect.customize.yaml'
+    '_cfg/agents/bmm-architect.customize.yaml',
   );
   // Tries: project → user → package
 } catch (e) {
@@ -294,13 +293,13 @@ try {
 
 ### FileReader vs Master Manifest
 
-| Aspect | Master Manifest | FileReader |
-|--------|----------------|------------|
-| **Purpose** | What resources exist | How to load any file |
-| **Scope** | Agents, workflows, tasks | Templates, configs, arbitrary files |
-| **Discovery** | Pre-built inventory | On-demand lookup |
-| **Fallback** | Priority-based selection | Sequential try-each-location |
-| **Performance** | Fast (cached) | Slower (filesystem checks) |
+| Aspect          | Master Manifest          | FileReader                          |
+| --------------- | ------------------------ | ----------------------------------- |
+| **Purpose**     | What resources exist     | How to load any file                |
+| **Scope**       | Agents, workflows, tasks | Templates, configs, arbitrary files |
+| **Discovery**   | Pre-built inventory      | On-demand lookup                    |
+| **Fallback**    | Priority-based selection | Sequential try-each-location        |
+| **Performance** | Fast (cached)            | Slower (filesystem checks)          |
 
 ---
 
@@ -325,8 +324,8 @@ bmad *core/brainstorming
 
 ```typescript
 interface ParsedName {
-  module?: string;  // Optional module qualifier
-  name: string;     // The actual resource name
+  module?: string; // Optional module qualifier
+  name: string; // The actual resource name
   original: string; // Original input
 }
 
@@ -488,7 +487,7 @@ Converts MasterRecords to legacy interfaces:
 
 ```typescript
 function filterExisting(records: MasterRecord[]): MasterRecord[] {
-  return records.filter(r => r.exists === true);
+  return records.filter((r) => r.exists === true);
 }
 
 function masterRecordToAgent(record: MasterRecord): Agent {
@@ -514,13 +513,13 @@ Query functions with priority logic:
 function findAgentByName(
   manifest: MasterManifests,
   name: string,
-  module?: string
+  module?: string,
 ): MasterRecord | undefined;
 
 function findWorkflowByName(
   manifest: MasterManifests,
   name: string,
-  module?: string
+  module?: string,
 ): MasterRecord | undefined;
 ```
 
@@ -532,8 +531,10 @@ function findWorkflowByName(
 
 ```typescript
 // Filter records to only include files that exist
-const existingAgents = masterManifest.agents.filter(a => a.exists === true);
-const existingWorkflows = masterManifest.workflows.filter(w => w.exists === true);
+const existingAgents = masterManifest.agents.filter((a) => a.exists === true);
+const existingWorkflows = masterManifest.workflows.filter(
+  (w) => w.exists === true,
+);
 ```
 
 **Why this works:**
@@ -552,6 +553,7 @@ const existingWorkflows = masterManifest.workflows.filter(w => w.exists === true
 **Decision:** Master manifest contains all records from all origins (not flattened by priority)
 
 **Rationale:**
+
 - Transparency - Can see all available options
 - Flexibility - Query can apply different filters
 - Debugging - Easy to see what's available where
@@ -562,6 +564,7 @@ const existingWorkflows = masterManifest.workflows.filter(w => w.exists === true
 **Decision:** Use FileReader for supporting files instead of inventorying everything
 
 **Rationale:**
+
 - **Primary resources** (agents/workflows/tasks) - Use master manifest (predictable, discoverable)
 - **Supporting files** (templates/configs) - Use FileReader (arbitrary paths, on-demand)
 - Master manifest would be huge if it included every file
@@ -572,6 +575,7 @@ const existingWorkflows = masterManifest.workflows.filter(w => w.exists === true
 **Decision:** Support both `architect` and `bmm/architect` syntax
 
 **Rationale:**
+
 - Convenience - Short names for common cases
 - Precision - Module qualifier when needed (e.g., same name in different modules)
 - Overrides - User can customize specific module's agent without affecting others
@@ -582,13 +586,13 @@ const existingWorkflows = masterManifest.workflows.filter(w => w.exists === true
 
 ### What Changed
 
-| Old (main branch) | New (v0.2.x+) |
-|-------------------|---------------|
-| CSV files only | Master manifest (CSV + filesystem) |
-| Single location | Multiple locations with priority |
-| ManifestLoader | MasterManifestService + Query |
-| Direct CSV reads | Master records with metadata |
-| No module support | Module-qualified names |
+| Old (main branch) | New (v0.2.x+)                      |
+| ----------------- | ---------------------------------- |
+| CSV files only    | Master manifest (CSV + filesystem) |
+| Single location   | Multiple locations with priority   |
+| ManifestLoader    | MasterManifestService + Query      |
+| Direct CSV reads  | Master records with metadata       |
+| No module support | Module-qualified names             |
 
 ### What Stayed the Same
 
@@ -606,8 +610,9 @@ The adapter layer ensures existing code works:
 const agents: Agent[] = this.manifestLoader.loadAgentManifest();
 
 // New code provides Agent[] from master manifest
-const agents: Agent[] = filterExisting(masterManifest.agents)
-  .map(masterRecordToAgent);
+const agents: Agent[] = filterExisting(masterManifest.agents).map(
+  masterRecordToAgent,
+);
 ```
 
 ---

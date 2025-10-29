@@ -25,12 +25,18 @@ export class MCPClientFixture {
     const serverPath = path.join(__dirname, '../../build/index.js');
 
     // Create transport
+    // Use v6 sample data for E2E tests
+    const bmadSamplePath = path.join(
+      __dirname,
+      '../../.bmad/6.0.0-alpha.0/bmad',
+    );
+
     this.transport = new StdioClientTransport({
       command: 'node',
       args: [serverPath],
       env: {
         ...process.env,
-        BMAD_ROOT: path.join(__dirname, '../../src/bmad'),
+        BMAD_ROOT: bmadSamplePath,
       },
     });
 

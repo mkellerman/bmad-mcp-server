@@ -11,10 +11,7 @@ import type { BmadOrigin } from '../../src/types/index.js';
 function sampleV6Root(): string {
   const root = path.resolve(
     process.cwd(),
-    'tests',
-    'support',
-    'fixtures',
-    'bmad_samples',
+    '.bmad',
     '6.0.0-alpha.0',
     'bmad',
   );

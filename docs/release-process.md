@@ -14,6 +14,7 @@ This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PAT
 - **PATCH** (0.0.x) - Bug fixes, backward compatible
 
 **Examples:**
+
 - `feat: add new agent` → MINOR (0.1.0 → 0.2.0)
 - `fix: resolve path bug` → PATCH (0.1.0 → 0.1.1)
 - `feat!: change config format` → MAJOR (0.1.0 → 1.0.0)
@@ -47,6 +48,7 @@ Every Pull Request automatically creates a pre-release for testing on other mach
 4. **Auto-cleanup** when PR is merged or closed
 
 **Benefits:**
+
 - ✅ Test before merging
 - ✅ No local installation needed on test machines
 - ✅ Works with any MCP client
@@ -103,6 +105,7 @@ npm version major
 ```
 
 This automatically:
+
 - Updates `package.json` and `package-lock.json`
 - Creates git commit: "v0.1.1"
 - Creates git tag: "v0.1.1"
@@ -129,6 +132,7 @@ git push origin main --follow-tags
 **4. Automatic Publishing**
 
 GitHub Actions automatically:
+
 - Runs linting checks
 - Runs unit tests
 - Builds package
@@ -231,21 +235,26 @@ Use this structure:
 ## [0.2.0] - 2025-01-15
 
 ### Added
+
 - New workflow for automated testing
 - Support for custom agent configurations
 
 ### Changed
+
 - Improved error messages in manifest loader
 - Updated documentation structure
 
 ### Fixed
+
 - Path resolution on Windows
 - Memory leak in file scanner
 
 ### Deprecated
+
 - Old configuration format (will be removed in v1.0.0)
 
 ### Breaking Changes
+
 - Configuration format changed from X to Y
 - Migration guide: [link]
 ```
@@ -297,6 +306,7 @@ perf: optimize manifest loading
 ```
 
 **Commit scope:**
+
 - Use when helpful: `feat(agents):`, `fix(workflows):`
 - Optional but encouraged
 
@@ -309,6 +319,7 @@ perf: optimize manifest loading
 **Trigger:** GitHub Release published
 
 **Steps:**
+
 1. Checkout code
 2. Setup Node.js 18
 3. Install dependencies
@@ -324,6 +335,7 @@ perf: optimize manifest loading
 **Trigger:** Pull Request opened/updated
 
 **Steps:**
+
 1. Build package
 2. Create pre-release tag
 3. Comment installation instructions on PR
@@ -338,12 +350,14 @@ perf: optimize manifest loading
 ### Release Workflow Fails
 
 **Check:**
+
 - NPM_TOKEN is valid and not expired
 - All tests passing locally (`npm test`)
 - Build succeeds locally (`npm run build`)
 - Review GitHub Actions logs for specific errors
 
 **Common issues:**
+
 - Test failures - Fix tests before release
 - Linting errors - Run `npm run lint:fix`
 - NPM authentication - Regenerate NPM_TOKEN
@@ -371,6 +385,7 @@ git push origin main --follow-tags
 **Solutions:**
 
 1. **Verify login:**
+
    ```bash
    npm whoami
    ```
@@ -405,6 +420,7 @@ git push origin main --follow-tags
 ### Release Notes
 
 **Good release notes include:**
+
 - Clear summary of changes
 - Breaking changes highlighted
 - Migration guide for MAJOR versions
@@ -417,23 +433,28 @@ git push origin main --follow-tags
 ## v0.2.0 - Enhanced Resource Discovery
 
 ### 🎉 New Features
+
 - Master Manifest architecture for multi-location BMAD resources
 - Module-qualified agent/workflow names (e.g., `bmad core/analyst`)
 - Built-in `*doctor` command for diagnostics
 
 ### 🔧 Changes
+
 - Improved priority-based resource resolution
 - Better error messages for missing agents
 
 ### 🐛 Fixes
+
 - Fixed path resolution on Windows (#45)
 - Resolved manifest loading race condition (#47)
 
 ### 📚 Documentation
+
 - Updated architecture guide
 - Simplified installation instructions
 
 ### 🙏 Contributors
+
 Thanks to @contributor1 and @contributor2!
 ```
 
@@ -450,11 +471,13 @@ Thanks to @contributor1 and @contributor2!
 ## Support and Questions
 
 **For release-related questions:**
+
 - Review [GitHub Actions](https://github.com/mkellerman/bmad-mcp-server/actions)
 - Check [existing releases](https://github.com/mkellerman/bmad-mcp-server/releases)
 - Open an [issue](https://github.com/mkellerman/bmad-mcp-server/issues) for problems
 
 **Related documentation:**
+
 - [Development Guide](./development.md) - Contributing workflow
 - [Installation Guide](./installation.md) - How users install releases
 - [Architecture Guide](./architecture.md) - System design

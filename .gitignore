@@ -11,6 +11,9 @@ lerna-debug.log*
 dist/
 *.tsbuildinfo
 
+# Disallow committed JS in src (TS sources only)
+src/**/*.js
+
 # TypeScript
 *.js.map
 *.d.ts.map
@@ -85,3 +88,4 @@ temp/
 pyproject.toml
 test-results/
 playwright-report/
+master-manifest.json

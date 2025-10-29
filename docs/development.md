@@ -53,6 +53,7 @@ npm run test:coverage
 ```
 
 **Where to add unit tests:**
+
 - New utilities in `src/utils/`
 - Path resolution logic
 - Tool routing and parsing
@@ -88,6 +89,7 @@ npm run litellm:docker:health
 ```
 
 **E2E test structure:**
+
 - Specs: `tests/e2e/framework/*.spec.ts`
 - Test cases: `tests/e2e/test-cases/*.yaml`
 
@@ -109,6 +111,7 @@ npm run precommit
 ```
 
 This runs:
+
 - ESLint (code quality)
 - Prettier (formatting)
 - Type checking
@@ -130,12 +133,14 @@ import { FileReader } from './utils/file-reader';
 ### Code Style
 
 **Prettier configuration** (`.prettierrc`):
+
 - 2-space indentation
 - 80 character line width
 - Single quotes
 - Trailing commas
 
 **ESLint rules** (typescript-eslint flat config):
+
 - Semicolons required
 - `no-console` warns (allowed in tests and scripts)
 - TypeScript strict mode enabled
@@ -150,10 +155,12 @@ npm run lint:fix    # ESLint auto-fix
 ### Naming Conventions
 
 **Runtime (BMAD resources):**
+
 - Agents and workflows: lowercase-hyphen (e.g., `analyst`, `party-mode`)
 - Workflow invocation: `*` prefix (e.g., `bmad *party-mode`)
 
 **Code (TypeScript/JavaScript):**
+
 - Variables/functions: camelCase
 - Classes/interfaces: PascalCase
 - Files: kebab-case (e.g., `manifest-loader.ts`)
@@ -196,22 +203,26 @@ bmad-mcp-server/
 ### Key Components
 
 **Server Layer** (`src/server.ts`)
+
 - MCP protocol implementation using `@modelcontextprotocol/sdk`
 - Stdio transport for communication
 - Registers prompt handlers and unified `bmad` tool
 
 **Master Manifest System**
+
 - `MasterManifestService` - Builds and caches inventory of all BMAD resources
 - `v4-module-inventory` / `v6-module-inventory` - Scan BMAD installations
 - `master-manifest-adapter` - Convert MasterRecords to legacy interfaces
 - `master-manifest-query` - Priority-based resource lookup
 
 **Unified Tool** (`src/tools/index.ts`)
+
 - Command routing and parsing
 - Handles: agents, workflows, built-in commands
 - Supports module-qualified names (`module/name`)
 
 **Resource Loading**
+
 - `bmad-path-resolver` - Discovers BMAD roots (project → CLI → env → user → package)
 - `file-reader` - Priority-based file loading with fallback
 - All file access validated and secure
@@ -276,6 +287,7 @@ git commit -m "test: add coverage for file reader"
 ```
 
 **Commit types:**
+
 - `feat:` New feature (MINOR version)
 - `fix:` Bug fix (PATCH version)
 - `docs:` Documentation only
@@ -296,6 +308,7 @@ git commit -m "test: add coverage for file reader"
 6. ✅ **Updated manifests** - If adding agents/workflows to `src/bmad/_cfg/*.csv`
 
 **CI Requirements:**
+
 - All tests passing (`npm test`)
 - Linting clean (`npm run precommit`)
 - No type errors
@@ -305,19 +318,23 @@ git commit -m "test: add coverage for file reader"
 
 ```markdown
 ## Summary
+
 Add support for loading agents from custom directories
 
 ## Changes
+
 - Added `--custom-path` CLI argument
 - Updated `bmad-path-resolver` to include custom paths
 - Added priority level 2.5 for custom paths
 
 ## Testing
+
 - Added unit tests for custom path resolution
 - Verified with local test directory
 - All existing tests still pass
 
 ## Documentation
+
 - Updated installation.md with custom path examples
 - Added architecture notes about priority ordering
 
@@ -400,12 +417,14 @@ echo '{"method":"initialize"}' | node build/index.js
 ### Security Considerations
 
 **File access safety:**
+
 - All file reads go through `FileReader`
 - Path validation prevents directory traversal
 - Master manifest defines allowed resources
 - Never expose raw filesystem operations to LLM
 
 **Environment variables:**
+
 - `BMAD_ROOT` for explicit path override
 - Use absolute paths in production configs
 - Validate all user-provided paths

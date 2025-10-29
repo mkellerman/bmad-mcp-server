@@ -8,3 +8,6 @@ coverage
 
 # Test fixtures should not be linted
 tests/support/fixtures/
+
+# BMAD sample installations should not be linted
+.bmad/
