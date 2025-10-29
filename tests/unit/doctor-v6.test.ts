@@ -7,11 +7,7 @@ import { doctor } from '../../src/tools/internal/doctor.js';
 
 function sampleProjectRoot(): string {
   // Use the directory containing the 'bmad' folder as the project root
-  return path.resolve(
-    process.cwd(),
-    '.bmad',
-    '6.0.0-alpha.0',
-  );
+  return path.resolve(process.cwd(), '.bmad', '6.0.0-alpha.0');
 }
 
 describe('doctor v6 integration', () => {

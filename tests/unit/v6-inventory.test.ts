@@ -9,12 +9,7 @@ import { resolveAvailableCatalog } from '../../src/utils/availability-resolver.j
 import type { BmadOrigin } from '../../src/types/index.js';
 
 function sampleV6Root(): string {
-  const root = path.resolve(
-    process.cwd(),
-    '.bmad',
-    '6.0.0-alpha.0',
-    'bmad',
-  );
+  const root = path.resolve(process.cwd(), '.bmad', '6.0.0-alpha.0', 'bmad');
   if (!fs.existsSync(root))
     throw new Error(`Sample v6 root not found at ${root}`);
   return root;
