@@ -34,6 +34,7 @@ export declare function detectV6(root: string): DetectedV6 | undefined;
 /**
  * Detect v6 structure by filesystem (no manifest required)
  * Looks for module directories with agents/workflows/tasks folders
+ * Also detects flat structures (agents/workflows/tasks at root)
  */
 export declare function detectV6Filesystem(root: string): DetectedV6 | undefined;
 export declare function detectV4(root: string): DetectedV4 | undefined;

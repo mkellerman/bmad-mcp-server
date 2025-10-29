@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  findBmadRootsRecursive,
+  sortBmadRoots,
+} from './bmad-root-finder.js';
 
 export type BmadLocationSource = 'project' | 'cli' | 'env' | 'user';
 
@@ -11,6 +15,8 @@ export interface BmadLocationInfo {
   originalPath?: string;
   resolvedRoot?: string;
   manifestDir?: string;
+  manifestPath?: string;
+  version?: 'v4' | 'v6' | 'unknown';
   status: 'valid' | 'missing' | 'not-found' | 'invalid';
   details?: string;
 }
@@ -45,21 +51,21 @@ export function resolveBmadPaths(
   const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
 
   const candidates: BmadLocationInfo[] = [
-    buildCandidate('project', 'Local project', options.cwd),
-    buildCandidate('env', 'BMAD_ROOT environment variable', options.envVar),
-    buildCandidate('user', 'User defaults (~/.bmad)', userBmadPath),
+    ...buildCandidate('project', 'Local project', options.cwd),
+    ...buildCandidate('env', 'BMAD_ROOT environment variable', options.envVar),
+    ...buildCandidate('user', 'User defaults (~/.bmad)', userBmadPath),
   ];
 
   // Add all CLI arguments as candidates with priority based on order
   if (options.cliArgs && options.cliArgs.length > 0) {
     options.cliArgs.forEach((cliArg, index) => {
-      const candidate = buildCandidate(
+      const cliCandidates = buildCandidate(
         'cli',
         `CLI argument #${index + 1}`,
         cliArg,
       );
       // Insert CLI candidates at the beginning (highest priority)
-      candidates.splice(index + 1, 0, candidate);
+      candidates.splice(index + 1, 0, ...cliCandidates);
     });
   }
 
@@ -125,40 +131,60 @@ export function resolveBmadPaths(
 
 /**
  * Resolve manifests for an individual candidate path.
+ * Returns an array since one path may contain multiple BMAD installations.
  */
-function resolveCandidate(candidate?: string): Partial<BmadLocationInfo> {
+function resolveCandidate(candidate?: string): BmadLocationInfo[] {
   if (!candidate) {
-    return {
-      status: 'not-found',
-    };
+    return [];
   }
 
   const resolvedPath = path.resolve(candidate);
   if (!fs.existsSync(resolvedPath)) {
-    return {
-      status: 'missing',
-      originalPath: candidate,
-    };
+    return [
+      {
+        status: 'missing',
+        originalPath: candidate,
+      } as BmadLocationInfo,
+    ];
   }
 
   const stats = fs.statSync(resolvedPath);
   if (!stats.isDirectory()) {
-    return {
-      status: 'invalid',
-      resolvedRoot: resolvedPath,
-      originalPath: candidate,
-    };
+    return [
+      {
+        status: 'invalid',
+        resolvedRoot: resolvedPath,
+        originalPath: candidate,
+      } as BmadLocationInfo,
+    ];
   }
 
-  // Directory exists - determine the manifest directory and BMAD root
-  const manifest = findManifestDirectory(resolvedPath);
+  // Search for BMAD installations recursively
+  const foundRoots = findBmadRootsRecursive(resolvedPath);
 
-  return {
+  if (foundRoots.length === 0) {
+    // No BMAD installations found - return as valid directory but no manifests
+    return [
+      {
+        status: 'valid',
+        resolvedRoot: resolvedPath,
+        originalPath: candidate,
+      } as BmadLocationInfo,
+    ];
+  }
+
+  // Sort by depth and version preference
+  const sortedRoots = sortBmadRoots(foundRoots);
+
+  // Convert each found root to a location info
+  return sortedRoots.map((root) => ({
     status: 'valid',
-    resolvedRoot: manifest?.resolvedRoot ?? resolvedPath,
-    manifestDir: manifest?.manifestDir,
+    resolvedRoot: root.root,
+    manifestPath: root.manifestPath,
+    manifestDir: root.manifestDir,
+    version: root.version,
     originalPath: candidate,
-  };
+  })) as BmadLocationInfo[];
 }
 
 /**
@@ -175,11 +201,16 @@ function enrichCandidate(location: BmadLocationInfo): BmadLocationInfo {
     location.resolvedRoot &&
     location.manifestDir
   ) {
-    location.details = `Using manifests from ${location.manifestDir}`;
+    const versionLabel = location.version ? ` (${location.version})` : '';
+    location.details = `Using manifests from ${location.manifestDir}${versionLabel}`;
     return location;
   }
   if (location.status === 'valid' && location.resolvedRoot) {
-    location.details = 'Using directory directly (no _cfg found)';
+    if (location.version === 'unknown') {
+      location.details = 'Custom installation (no manifest)';
+    } else {
+      location.details = 'Using directory directly (no manifests found)';
+    }
     return location;
   }
 
@@ -282,15 +313,34 @@ function buildCandidate(
   source: BmadLocationSource,
   displayName: string,
   candidatePath?: string,
-): BmadLocationInfo {
-  const base: BmadLocationInfo = {
-    source,
-    priority: PRIORITY_ORDER.indexOf(source) + 1,
-    displayName,
-    originalPath: candidatePath,
-    status: 'not-found',
-  };
+): BmadLocationInfo[] {
+  if (!candidatePath) {
+    return [
+      enrichCandidate({
+        source,
+        priority: PRIORITY_ORDER.indexOf(source) + 1,
+        displayName,
+        originalPath: candidatePath,
+        status: 'not-found',
+      }),
+    ];
+  }
 
-  const resolved = resolveCandidate(candidatePath);
-  return enrichCandidate({ ...base, ...resolved });
+  const resolvedLocations = resolveCandidate(candidatePath);
+
+  // Enrich each location with source metadata
+  return resolvedLocations.map((location, index) => {
+    // Preserve location properties, override only source metadata
+    const enriched = enrichCandidate({
+      ...location,
+      source,
+      priority: PRIORITY_ORDER.indexOf(source) + 1,
+      // If multiple installations, append index to display name
+      displayName:
+        resolvedLocations.length > 1
+          ? `${displayName} [${index + 1}]`
+          : displayName,
+    });
+    return enriched;
+  });
 }

@@ -110,6 +110,7 @@ export interface BmadOrigin {
     root: string;
     manifestDir: string;
     priority: number;
+    version?: 'v4' | 'v6' | 'unknown';
 }
 export interface V6ModuleInfo {
     name: string;

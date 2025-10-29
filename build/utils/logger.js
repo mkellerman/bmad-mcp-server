@@ -8,6 +8,7 @@ function fmt(msg, ...args) {
 }
 export const logger = {
     debug: (msg, ...args) => {
+        // eslint-disable-next-line no-console
         if (DEBUG_ENABLED)
             console.debug(...fmt(msg, ...args));
     },

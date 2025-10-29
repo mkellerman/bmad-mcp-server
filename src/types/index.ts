@@ -124,6 +124,7 @@ export interface BmadOrigin {
   root: string; // absolute path to bmad root (the 'bmad' folder)
   manifestDir: string; // absolute path to bmad/_cfg
   priority: number;
+  version?: 'v4' | 'v6' | 'unknown'; // detected version from finder
 }
 
 export interface V6ModuleInfo {

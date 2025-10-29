@@ -6,6 +6,8 @@ export interface BmadLocationInfo {
     originalPath?: string;
     resolvedRoot?: string;
     manifestDir?: string;
+    manifestPath?: string;
+    version?: 'v4' | 'v6' | 'unknown';
     status: 'valid' | 'missing' | 'not-found' | 'invalid';
     details?: string;
 }

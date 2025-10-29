@@ -12,6 +12,7 @@ function fmt(msg: any, ...args: any[]): any[] {
 
 export const logger = {
   debug: (msg: any, ...args: any[]) => {
+    // eslint-disable-next-line no-console
     if (DEBUG_ENABLED) console.debug(...fmt(msg, ...args));
   },
   info: (msg: any, ...args: any[]) => console.error(...fmt(msg, ...args)),

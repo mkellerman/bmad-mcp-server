@@ -32,27 +32,38 @@ export function detectV6(root) {
 /**
  * Detect v6 structure by filesystem (no manifest required)
  * Looks for module directories with agents/workflows/tasks folders
+ * Also detects flat structures (agents/workflows/tasks at root)
  */
 export function detectV6Filesystem(root) {
     const bmadRoot = path.resolve(root);
     try {
         if (!fs.existsSync(bmadRoot))
             return undefined;
-        // Scan for module directories (any dir with agents/workflows/tasks subdirs)
-        const entries = fs.readdirSync(bmadRoot, { withFileTypes: true });
         const modules = [];
-        for (const entry of entries) {
-            if (!entry.isDirectory())
-                continue;
-            if (entry.name.startsWith('_') || entry.name.startsWith('.'))
-                continue;
-            const modulePath = path.join(bmadRoot, entry.name);
-            const hasAgents = fs.existsSync(path.join(modulePath, 'agents'));
-            const hasWorkflows = fs.existsSync(path.join(modulePath, 'workflows'));
-            const hasTasks = fs.existsSync(path.join(modulePath, 'tasks'));
-            // If it has at least one of these folders, consider it a module
-            if (hasAgents || hasWorkflows || hasTasks) {
-                modules.push({ name: entry.name });
+        // Check if root itself has agents/workflows/tasks (flat structure)
+        const rootHasAgents = fs.existsSync(path.join(bmadRoot, 'agents'));
+        const rootHasWorkflows = fs.existsSync(path.join(bmadRoot, 'workflows'));
+        const rootHasTasks = fs.existsSync(path.join(bmadRoot, 'tasks'));
+        if (rootHasAgents || rootHasWorkflows || rootHasTasks) {
+            // Flat structure - treat root as a single unnamed module
+            modules.push({ name: '' });
+        }
+        else {
+            // Scan for module directories (subdirs with agents/workflows/tasks)
+            const entries = fs.readdirSync(bmadRoot, { withFileTypes: true });
+            for (const entry of entries) {
+                if (!entry.isDirectory())
+                    continue;
+                if (entry.name.startsWith('_') || entry.name.startsWith('.'))
+                    continue;
+                const modulePath = path.join(bmadRoot, entry.name);
+                const hasAgents = fs.existsSync(path.join(modulePath, 'agents'));
+                const hasWorkflows = fs.existsSync(path.join(modulePath, 'workflows'));
+                const hasTasks = fs.existsSync(path.join(modulePath, 'tasks'));
+                // If it has at least one of these folders, consider it a module
+                if (hasAgents || hasWorkflows || hasTasks) {
+                    modules.push({ name: entry.name });
+                }
             }
         }
         if (modules.length === 0)

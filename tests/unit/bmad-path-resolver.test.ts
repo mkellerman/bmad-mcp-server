@@ -208,20 +208,20 @@ describe('bmad-path-resolver', () => {
     });
 
     it('should use user location when project location not found', () => {
-      // Create user bmad structure
-      const userBmad = path.join(fixture.tmpDir, 'user', 'bmad', '_cfg');
-      fs.mkdirSync(userBmad, { recursive: true });
+      // Create user bmad structure - use .bmad as the user path (typical ~/.bmad pattern)
+      const userBmadDir = path.join(fixture.tmpDir, '.bmad');
+      const cfgDir = path.join(userBmadDir, '_cfg');
+      fs.mkdirSync(cfgDir, { recursive: true });
 
       const result = resolveBmadPaths({
         cwd: '/some/other/path',
-        userBmadPath: path.join(fixture.tmpDir, 'user'),
+        userBmadPath: userBmadDir,
       });
 
       expect(result.activeLocation.source).toBe('user');
       expect(result.activeLocation.status).toBe('valid');
-      expect(result.activeLocation.resolvedRoot).toBe(
-        path.join(fixture.tmpDir, 'user', 'bmad'),
-      );
+      // The resolver finds the bmad root directly
+      expect(result.activeLocation.resolvedRoot).toBe(userBmadDir);
     });
   });
 });
