@@ -25,7 +25,7 @@ import {
   resolveBmadPaths,
   type BmadPathResolution,
 } from './utils/bmad-path-resolver.js';
-import { UnifiedBMADTool, getHelpResult } from './tools/index.js';
+import { UnifiedBMADTool, buildToolDescription } from './tools/index.js';
 import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
 import logger from './utils/logger.js';
@@ -264,20 +264,35 @@ export class BMADMCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, () => {
       logger.info('list_tools called - returning unified bmad tool');
 
-      // Generate help content with available agents and workflows
-      const help = getHelpResult();
+      // Get master manifest data for dynamic tool description
+      const masterData = this.masterService.get();
+      const agents = masterData.agents
+        .filter((a) => a.name) // Filter out agents without names
+        .map((a) => ({
+          name: a.name!,
+          description: a.description,
+        }));
+      const workflows = masterData.workflows
+        .filter((w) => w.name) // Filter out workflows without names
+        .map((w) => ({
+          name: w.name!,
+          description: w.description,
+        }));
+
+      // Build dynamic tool description with full inventory
+      const description = buildToolDescription(agents, workflows);
 
       const tools: Tool[] = [
         {
           name: 'bmad',
-          description: help.content ?? 'Unified BMAD tool',
+          description,
           inputSchema: {
             type: 'object',
             properties: {
               command: {
                 type: 'string',
                 description:
-                  "Command to execute: empty string for default, 'agent-name' or 'module/agent-name' for agents, '*workflow-name' or '*module/workflow-name' for workflows",
+                  "Command to execute: empty string for default, 'agent-name' for agents, '*workflow-name' for workflows",
               },
             },
             required: ['command'],

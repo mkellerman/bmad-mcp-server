@@ -7,7 +7,7 @@ export { doctor } from './internal/doctor.js';
 export { handleInit } from './internal/init.js';
 export { parseCommand } from './common/parser.js';
 export { validateName } from './common/validators.js';
-export { getHelpResult } from './common/help.js';
+export { getHelpResult, buildToolDescription } from './common/help.js';
 export {
   AGENT_NAME_PATTERN,
   WORKFLOW_NAME_PATTERN,

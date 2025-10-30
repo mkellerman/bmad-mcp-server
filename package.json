@@ -16,6 +16,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:llm": "vitest run --config vitest.config.llm.ts",
+    "test:e2e": "vitest run --config vitest.config.llm.ts",
+    "test:report": "npx playwright show-report playwright-report",
     "e2e:start": "docker-compose -f tests/e2e/framework/docker-compose.yml up -d",
     "e2e:stop": "docker-compose -f tests/e2e/framework/docker-compose.yml down",
     "e2e:logs": "docker-compose -f tests/e2e/framework/docker-compose.yml logs -f",

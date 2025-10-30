@@ -1,0 +1,187 @@
+# Test Suite: Comprehensive Agent Loading
+# Validates agent loading with various scenarios and edge cases
+
+test_suite: 'Comprehensive Agent Loading Tests'
+description: 'Validate BMAD agent loading with various agents and edge cases'
+
+config:
+  llm_model: 'gpt-4.1'
+  temperature: 0.1
+  timeout: 30000
+  judge_model: 'gpt-4.1'
+  judge_threshold: 0.8
+
+tests:
+  - id: 'agent-load-001'
+    name: 'Load BMAD Master (default orchestrator)'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "Load the BMAD master agent"
+
+      Call bmad with command "bmad-master" to load the orchestrator.
+
+    expectations:
+      - type: 'contains'
+        value: 'bmad-master'
+        case_sensitive: false
+        description: 'Should reference bmad-master'
+
+      - type: 'response_length'
+        min: 50
+        max: 5000
+        description: 'Should load successfully'
+
+      - type: 'not_contains'
+        value: 'not found'
+        case_sensitive: false
+        description: 'Should find the agent'
+
+  - id: 'agent-load-002'
+    name: 'Load Business Analyst'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "I need help analyzing requirements. Load the analyst agent."
+
+      Call bmad with command "analyst"
+
+    expectations:
+      - type: 'contains'
+        value: 'analyst'
+        case_sensitive: false
+        description: 'Should reference analyst'
+
+      - type: 'not_contains'
+        value: 'error'
+        case_sensitive: false
+        description: 'Should not error'
+
+  - id: 'agent-load-003'
+    name: 'Load Developer Agent'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "Load the dev agent for coding help"
+
+      Call bmad with command "dev"
+
+    expectations:
+      - type: 'contains'
+        value: 'dev'
+        case_sensitive: false
+        description: 'Should reference dev agent'
+
+      - type: 'response_length'
+        min: 20
+        max: 5000
+
+  - id: 'agent-load-004'
+    name: 'Load Architect Agent'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "I need architecture guidance. Load the architect."
+
+      Call bmad with command "architect"
+
+    expectations:
+      - type: 'contains'
+        value: 'architect'
+        case_sensitive: false
+        description: 'Should reference architect'
+
+  - id: 'agent-load-005'
+    name: 'Load Product Manager Agent'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "Load the PM agent for product management"
+
+      Call bmad with command "pm"
+
+    expectations:
+      - type: 'contains'
+        value: 'pm'
+        case_sensitive: false
+        description: 'Should reference PM'
+
+  - id: 'agent-load-006'
+    name: 'Load Scrum Master Agent'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "Load the scrum master agent"
+
+      Call bmad with command "sm"
+
+    expectations:
+      - type: 'contains'
+        value: 'sm'
+        case_sensitive: false
+        description: 'Should reference scrum master'
+
+  - id: 'agent-load-007'
+    name: 'Load Test Architect (TEA) Agent'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "Load the test architect for QA help"
+
+      Call bmad with command "tea"
+
+    expectations:
+      - type: 'contains'
+        value: 'tea'
+        case_sensitive: false
+        description: 'Should reference TEA'
+
+  - id: 'agent-load-008'
+    name: 'Load UX Expert Agent'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User request: "Load the UX expert for design help"
+
+      Call bmad with command "ux-expert"
+
+    expectations:
+      - type: 'contains'
+        value: 'ux'
+        case_sensitive: false
+        description: 'Should reference UX'
+
+  - id: 'agent-load-009'
+    name: 'Load agent with module prefix'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User says: "Load core/bmad-master"
+
+      Call bmad with command "core/bmad-master" (qualified name)
+
+    expectations:
+      - type: 'response_length'
+        min: 50
+        max: 5000
+        description: 'Should handle qualified names'
+
+  - id: 'agent-load-010'
+    name: 'Case insensitive agent loading'
+    prompt: |
+      You have access to a BMAD MCP tool.
+
+      User says: "Load ANALYST agent (uppercase)"
+
+      Call bmad with command "analyst" (normalized to lowercase)
+
+    expectations:
+      - type: 'contains'
+        value: 'analyst'
+        case_sensitive: false
+        description: 'Should be case insensitive'
+
+      - type: 'not_contains'
+        value: 'not found'
+        case_sensitive: false
+        description: 'Should find the agent'
