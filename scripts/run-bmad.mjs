@@ -6,11 +6,14 @@
 //   npm run bmad -- "*export-master-manifest" /path/to/bmad1 /path/to/bmad2
 
 function parseArgs(argv) {
-  const args = { paths: [], command: undefined };
+  const args = { paths: [], command: undefined, mode: undefined };
   const rest = [];
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a.startsWith('--')) {
+    if (a.startsWith('--mode=')) {
+      // Extract mode flag
+      args.mode = a.split('=')[1];
+    } else if (a.startsWith('--')) {
       rest.push(a);
     } else if (args.command === undefined) {
       // First non-flag arg is the command
@@ -56,6 +59,7 @@ async function main() {
     cwd: projectRoot,
     cliArgs: args.paths,
     envVar: process.env.BMAD_ROOT,
+    mode: args.mode || process.env.BMAD_DISCOVERY_MODE || 'auto',
   });
 
   // Validate locations and show warnings (only for explicitly provided paths)
@@ -147,6 +151,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error(err.message || err);
   process.exit(1);
 });

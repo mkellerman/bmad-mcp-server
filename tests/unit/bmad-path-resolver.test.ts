@@ -224,4 +224,185 @@ describe('bmad-path-resolver', () => {
       expect(result.activeLocation.resolvedRoot).toBe(userBmadDir);
     });
   });
+
+  describe('strict mode', () => {
+    it('should throw error when strict mode has no CLI args', () => {
+      expect(() => {
+        resolveBmadPaths({
+          cwd: fixture.tmpDir,
+          mode: 'strict',
+        });
+      }).toThrow(/Strict mode requires explicit CLI arguments/);
+    });
+
+    it('should throw error when strict mode path does not exist', () => {
+      expect(() => {
+        resolveBmadPaths({
+          cwd: fixture.tmpDir,
+          cliArgs: ['/nonexistent/path'],
+          mode: 'strict',
+        });
+      }).toThrow(/No Valid Installation Found/);
+    });
+
+    it('should throw error when strict mode path is not a directory', () => {
+      const filePath = path.join(fixture.tmpDir, 'file.txt');
+      fs.writeFileSync(filePath, 'content');
+
+      expect(() => {
+        resolveBmadPaths({
+          cwd: fixture.tmpDir,
+          cliArgs: [filePath],
+          mode: 'strict',
+        });
+      }).toThrow(/No Valid Installation Found/);
+    });
+
+    it('should throw error when strict mode path has no BMAD installation', () => {
+      const emptyDir = path.join(fixture.tmpDir, 'empty');
+      fs.mkdirSync(emptyDir, { recursive: true });
+
+      expect(() => {
+        resolveBmadPaths({
+          cwd: fixture.tmpDir,
+          cliArgs: [emptyDir],
+          mode: 'strict',
+        });
+      }).toThrow(/No Valid Installation Found/);
+    });
+
+    it('should succeed when strict mode has valid v6 installation', () => {
+      const bmadDir = path.join(fixture.tmpDir, 'bmad');
+      const cfgDir = path.join(bmadDir, '_cfg');
+      const manifestPath = path.join(cfgDir, 'manifest.yaml');
+      fs.mkdirSync(cfgDir, { recursive: true });
+      fs.writeFileSync(manifestPath, 'version: 6');
+
+      const result = resolveBmadPaths({
+        cwd: '/some/other/path',
+        cliArgs: [bmadDir],
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('valid');
+      expect(result.activeLocation.source).toBe('cli');
+      expect(result.activeLocation.version).toBe('v6');
+      expect(result.activeLocation.resolvedRoot).toBe(bmadDir);
+    });
+
+    it('should succeed when strict mode has valid v4 installation', () => {
+      const v4Dir = path.join(fixture.tmpDir, 'v4-bmad');
+      const manifestPath = path.join(v4Dir, 'install-manifest.yaml');
+      fs.mkdirSync(v4Dir, { recursive: true });
+      fs.writeFileSync(manifestPath, 'version: 4');
+
+      const result = resolveBmadPaths({
+        cwd: '/some/other/path',
+        cliArgs: [v4Dir],
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('valid');
+      expect(result.activeLocation.source).toBe('cli');
+      expect(result.activeLocation.version).toBe('v4');
+      expect(result.activeLocation.resolvedRoot).toBe(v4Dir);
+    });
+
+    it('should use first valid path when multiple CLI args provided in strict mode', () => {
+      const bmadDir1 = path.join(fixture.tmpDir, 'bmad1');
+      const cfgDir1 = path.join(bmadDir1, '_cfg');
+      const manifestPath1 = path.join(cfgDir1, 'manifest.yaml');
+      fs.mkdirSync(cfgDir1, { recursive: true });
+      fs.writeFileSync(manifestPath1, 'version: 6');
+
+      const bmadDir2 = path.join(fixture.tmpDir, 'bmad2');
+      const cfgDir2 = path.join(bmadDir2, '_cfg');
+      const manifestPath2 = path.join(cfgDir2, 'manifest.yaml');
+      fs.mkdirSync(cfgDir2, { recursive: true });
+      fs.writeFileSync(manifestPath2, 'version: 6');
+
+      const result = resolveBmadPaths({
+        cwd: '/some/other/path',
+        cliArgs: [bmadDir1, bmadDir2],
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('valid');
+      expect(result.activeLocation.resolvedRoot).toBe(bmadDir1);
+    });
+
+    it('should not use auto-discovery in strict mode', () => {
+      // Create valid project bmad structure
+      const projectBmad = path.join(fixture.tmpDir, 'bmad', '_cfg');
+      fs.mkdirSync(projectBmad, { recursive: true });
+
+      // In strict mode, should fail even though project has valid bmad
+      expect(() => {
+        resolveBmadPaths({
+          cwd: fixture.tmpDir,
+          mode: 'strict',
+        });
+      }).toThrow(/Strict mode requires explicit CLI arguments/);
+    });
+
+    it('should accept custom installations in strict mode', () => {
+      const customDir = path.join(fixture.tmpDir, 'custom-bmad');
+      const agentsDir = path.join(customDir, 'agents');
+      const workflowsDir = path.join(customDir, 'workflows');
+      fs.mkdirSync(agentsDir, { recursive: true });
+      fs.mkdirSync(workflowsDir, { recursive: true });
+
+      const result = resolveBmadPaths({
+        cwd: '/some/other/path',
+        cliArgs: [customDir],
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('valid');
+      expect(result.activeLocation.source).toBe('cli');
+      expect(result.activeLocation.version).toBe('unknown');
+      expect(result.activeLocation.resolvedRoot).toBe(customDir);
+    });
+  });
+
+  describe('auto mode (default)', () => {
+    it('should use auto-discovery by default', () => {
+      // Create bmad structure in project root
+      const projectBmad = path.join(fixture.tmpDir, 'bmad', '_cfg');
+      fs.mkdirSync(projectBmad, { recursive: true });
+
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+      });
+
+      expect(result.activeLocation.source).toBe('project');
+      expect(result.activeLocation.status).toBe('valid');
+    });
+
+    it('should discover recursively in auto mode', () => {
+      // Create nested bmad structure
+      const nestedBmad = path.join(fixture.tmpDir, 'nested', 'bmad', '_cfg');
+      fs.mkdirSync(nestedBmad, { recursive: true });
+
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+      });
+
+      expect(result.activeLocation.status).toBe('valid');
+      expect(result.activeLocation.resolvedRoot).toContain('bmad');
+    });
+
+    it('should respect mode parameter when set to auto', () => {
+      const projectBmad = path.join(fixture.tmpDir, 'bmad', '_cfg');
+      fs.mkdirSync(projectBmad, { recursive: true });
+
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+        mode: 'auto',
+      });
+
+      expect(result.activeLocation.source).toBe('project');
+      expect(result.activeLocation.status).toBe('valid');
+    });
+  });
 });

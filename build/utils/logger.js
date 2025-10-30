@@ -3,7 +3,7 @@
  * Uses console.* under the hood to preserve existing test expectations.
  */
 function isDebugEnabled() {
-    return (process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true');
+    return process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true';
 }
 function fmt(msg, ...args) {
     return [msg, ...args];

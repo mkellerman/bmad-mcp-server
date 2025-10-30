@@ -5,6 +5,20 @@
  */
 
 /**
+ * Discovery mode for BMAD path resolution
+ * - auto: Recursive search with priority-based resolution (default)
+ * - strict: Exact paths only, no discovery, fail fast
+ */
+export type DiscoveryMode = 'auto' | 'strict';
+
+/**
+ * Server configuration options
+ */
+export interface ServerConfig {
+  discoveryMode: DiscoveryMode;
+}
+
+/**
  * Agent metadata from agent-manifest.csv
  */
 export interface Agent {

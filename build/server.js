@@ -353,6 +353,18 @@ export async function main() {
     // Support multiple paths as CLI arguments (argv[2], argv[3], ...)
     // Filter out commands (starting with * or --) to only keep paths
     const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
+    // Parse --mode flag
+    const modeArg = allArgs.find((arg) => arg.startsWith('--mode='));
+    const modeValue = modeArg?.split('=')[1];
+    const envMode = process.env.BMAD_DISCOVERY_MODE;
+    const rawMode = modeValue || envMode || 'auto';
+    // Validate mode
+    if (rawMode !== 'auto' && rawMode !== 'strict') {
+        console.error(`❌ Invalid discovery mode: ${rawMode}`);
+        console.error('   Valid modes: auto, strict');
+        throw new Error(`Invalid BMAD_DISCOVERY_MODE: ${rawMode}`);
+    }
+    const mode = rawMode;
     const cliArgs = allArgs.filter((arg) => !arg.startsWith('*') && !arg.startsWith('--'));
     const envVar = process.env.BMAD_ROOT;
     const userBmadPath = path.join(os.homedir(), '.bmad');
@@ -373,8 +385,10 @@ export async function main() {
         cliArgs,
         envVar,
         userBmadPath,
+        mode,
     });
     console.error(`BMAD MCP Server v${version}`);
+    console.error(`Discovery Mode: ${mode}`);
     console.error('Starting BMAD MCP Server...');
     // Validate locations and show warnings (only for explicitly provided paths)
     // Only warn about CLI args and ENV vars, not defaults (project, user)

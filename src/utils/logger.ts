@@ -4,9 +4,7 @@
  */
 
 function isDebugEnabled(): boolean {
-  return (
-    process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true'
-  );
+  return process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true';
 }
 
 function fmt(msg: any, ...args: any[]): any[] {

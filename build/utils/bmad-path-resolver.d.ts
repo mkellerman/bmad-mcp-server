@@ -1,3 +1,4 @@
+import type { DiscoveryMode } from '../types/index.js';
 export type BmadLocationSource = 'project' | 'cli' | 'env' | 'user';
 export interface BmadLocationInfo {
     source: BmadLocationSource;
@@ -22,6 +23,7 @@ export interface ResolveBmadPathsOptions {
     cliArgs?: string[];
     envVar?: string;
     userBmadPath?: string;
+    mode?: DiscoveryMode;
 }
 export interface ManifestInfo {
     resolvedRoot: string;
@@ -29,6 +31,9 @@ export interface ManifestInfo {
 }
 /**
  * Resolve the active BMAD root by evaluating all known locations in priority order.
+ * Supports two modes:
+ * - auto (default): Recursive search with priority-based resolution
+ * - strict: Exact paths only from CLI args, no discovery, fail fast
  */
 export declare function resolveBmadPaths(options: ResolveBmadPathsOptions): BmadPathResolution;
 export declare function detectManifestDirectory(candidatePath: string): ManifestInfo | undefined;
