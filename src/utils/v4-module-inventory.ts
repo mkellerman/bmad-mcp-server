@@ -203,6 +203,30 @@ export function inventoryOriginV4(origin: BmadOrigin): OriginInventoryResult {
         status: exists ? 'verified' : 'no-file-found',
       };
 
+      // For workflows, try to read description from YAML file
+      if (classification.kind === 'workflow' && exists) {
+        try {
+          const y = readYaml<{
+            name?: string;
+            description?: string;
+            workflow?: { name?: string; description?: string };
+          }>(absolutePath);
+          // v4 format has workflow.description
+          if (
+            y?.workflow?.description &&
+            typeof y.workflow.description === 'string'
+          ) {
+            record.description = y.workflow.description;
+            record.displayName = y.workflow.description;
+          } else if (y?.description && typeof y.description === 'string') {
+            record.description = y.description;
+            record.displayName = y.description;
+          }
+        } catch {
+          // ignore parsing errors
+        }
+      }
+
       if (classification.kind === 'agent') {
         agentRecords.push(record);
       } else if (classification.kind === 'workflow') {
@@ -306,7 +330,30 @@ export function inventoryOriginV4(origin: BmadOrigin): OriginInventoryResult {
 
         // Only add if NOT in manifest (orphan)
         if (!manifestPaths.has(relativePath)) {
-          const name = path.basename(absolutePath, path.extname(absolutePath));
+          // Try to read name and description from yaml
+          let name = path.basename(absolutePath, path.extname(absolutePath));
+          let description: string | undefined;
+          try {
+            const y = readYaml<{
+              name?: string;
+              description?: string;
+              workflow?: { name?: string; description?: string };
+            }>(absolutePath);
+            // v4 format has workflow.name and workflow.description
+            if (y?.workflow?.name && typeof y.workflow.name === 'string')
+              name = y.workflow.name;
+            else if (y?.name && typeof y.name === 'string') name = y.name;
+
+            if (
+              y?.workflow?.description &&
+              typeof y.workflow.description === 'string'
+            )
+              description = y.workflow.description;
+            else if (y?.description && typeof y.description === 'string')
+              description = y.description;
+          } catch {
+            // ignore
+          }
           // Normalize module name: strip 'bmad-' prefix to match manifest entries
           const normalizedModuleName =
             moduleName === 'core'
@@ -322,6 +369,8 @@ export function inventoryOriginV4(origin: BmadOrigin): OriginInventoryResult {
             moduleVersion: manifest.version,
             bmadVersion: manifest.version,
             name,
+            displayName: description,
+            description,
             bmadRelativePath: relativePath,
             moduleRelativePath: relativePath,
             absolutePath,

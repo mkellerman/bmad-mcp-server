@@ -205,7 +205,6 @@ Within each source, installations are prioritized by:
 - `npm run bmad -- "*doctor"` - Show diagnostic information
 - `npm run bmad -- "*list-agents"` - List all available agents
 - `npm run bmad -- "*list-workflows"` - List all available workflows
-- `npm run bmad -- "*list-modules"` - List all BMAD modules
 
 ## Still Having Issues?
 

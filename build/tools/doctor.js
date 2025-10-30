@@ -83,7 +83,7 @@ export function doctor(command, ctx) {
     else {
         lines.push('⚠️  Master manifest service is not available.');
     }
-    lines.push('Tip: Use *list-agents, *list-workflows, *list-tasks, *list-modules for detailed listings');
+    lines.push('Tip: Use `bmad *list-agents` or `bmad *list-workflows` for detailed listings');
     return {
         success: true,
         type: 'diagnostic',

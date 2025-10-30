@@ -29,10 +29,12 @@ export function doctor(command, ctx) {
     lines.push('# 🏥 BMAD Health Diagnostic\n');
     // Installation Discovery
     lines.push('## 📍 Installation Discovery\n');
-    const activeLocation = localDiscovery.locations.find(loc => loc.status === 'valid');
+    const activeLocation = localDiscovery.locations.find((loc) => loc.status === 'valid');
     if (activeLocation) {
         const v6info = detectV6(v6Root);
-        const versionStr = v6info?.installationVersion ? `v${v6info.installationVersion}` : active.version || 'unknown';
+        const versionStr = v6info?.installationVersion
+            ? `v${v6info.installationVersion}`
+            : active.version || 'unknown';
         lines.push(`✅ **Active Location:** ${relPath} (${activeLocation.displayName})`);
         lines.push(`- **Version:** ${versionStr}`);
         lines.push(`- **Format:** ${active.version === 'v6' ? 'Modern modular structure' : active.version === 'v4' ? 'Legacy dotfolder structure' : 'Custom installation'}`);
@@ -71,9 +73,11 @@ export function doctor(command, ctx) {
         }
         else {
             const reason = location.details ||
-                (location.status === 'not-found' ? 'Not found' :
-                    location.status === 'missing' ? 'Missing required files' :
-                        'Invalid');
+                (location.status === 'not-found'
+                    ? 'Not found'
+                    : location.status === 'missing'
+                        ? 'Missing required files'
+                        : 'Invalid');
             detail = ` — ${reason}`;
         }
         lines.push(`${statusIcon} **${location.displayName}:** \`${shortPath}\`${detail}`);
@@ -152,8 +156,6 @@ export function doctor(command, ctx) {
     lines.push('## 💡 Next Steps\n');
     lines.push('- View all agents: `*list-agents`');
     lines.push('- Check workflows: `*list-workflows`');
-    lines.push('- View tasks: `*list-tasks`');
-    lines.push('- Module overview: `*list-modules`');
     return {
         success: true,
         type: 'diagnostic',

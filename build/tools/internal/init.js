@@ -7,7 +7,7 @@ function performInitialization() {
     const message = [
         'ℹ️ Manual Installation Required',
         '',
-        'The BMAD MCP server doesn\'t handle installation.',
+        "The BMAD MCP server doesn't handle installation.",
         'Please run: npx bmad-method install',
         '',
         'Once installed, restart the MCP server to detect it.',

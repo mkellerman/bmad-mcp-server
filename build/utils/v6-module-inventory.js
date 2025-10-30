@@ -134,6 +134,22 @@ export function inventoryOriginV6(origin) {
             const moduleRelativePath = row.path;
             const absolutePath = path.join(origin.root, moduleRelativePath);
             const exists = fs.existsSync(absolutePath);
+            // Start with manifest description, then enrich from YAML if file exists
+            let description = row.description;
+            let displayName = row.description;
+            if (exists) {
+                try {
+                    const y = readYaml(absolutePath);
+                    // Prefer description from YAML file (it's the source of truth)
+                    if (y?.description && typeof y.description === 'string') {
+                        description = y.description;
+                        displayName = y.description;
+                    }
+                }
+                catch {
+                    // If YAML parsing fails, keep manifest description
+                }
+            }
             const rec = {
                 kind: 'workflow',
                 source: 'manifest',
@@ -142,8 +158,8 @@ export function inventoryOriginV6(origin) {
                 moduleVersion: moduleInfo.moduleVersion,
                 bmadVersion: moduleInfo.bmadVersion,
                 name: row.name,
-                displayName: row.description,
-                description: row.description,
+                displayName,
+                description,
                 bmadRelativePath: path.join('bmad', moduleRelativePath),
                 moduleRelativePath,
                 absolutePath,
@@ -240,12 +256,15 @@ export function inventoryOriginV6(origin) {
             const inManifest = csvWorkflowPaths.has(moduleRelativePath);
             // Only add if NOT in manifest (orphan file)
             if (!inManifest) {
-                // Try to read name from yaml
+                // Try to read name and description from yaml
                 let name;
+                let description;
                 try {
                     const y = readYaml(abs);
                     if (y?.name && typeof y.name === 'string')
                         name = y.name;
+                    if (y?.description && typeof y.description === 'string')
+                        description = y.description;
                 }
                 catch {
                     // ignore
@@ -260,6 +279,8 @@ export function inventoryOriginV6(origin) {
                     moduleVersion: moduleInfo.moduleVersion,
                     bmadVersion: moduleInfo.bmadVersion,
                     name,
+                    displayName: description,
+                    description,
                     bmadRelativePath: path.join('bmad', moduleRelativePath),
                     moduleRelativePath,
                     absolutePath: abs,

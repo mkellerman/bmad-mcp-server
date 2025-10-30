@@ -229,8 +229,6 @@ export function doctor(command: string, ctx: DoctorContext): BMADToolResult {
   lines.push('## 💡 Next Steps\n');
   lines.push('- View all agents: `*list-agents`');
   lines.push('- Check workflows: `*list-workflows`');
-  lines.push('- View tasks: `*list-tasks`');
-  lines.push('- Module overview: `*list-modules`');
 
   return {
     success: true,

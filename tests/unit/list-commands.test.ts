@@ -6,7 +6,7 @@ import { MasterManifestService } from '../../src/services/master-manifest-servic
 import { UnifiedBMADTool } from '../../src/tools/index.js';
 
 describe('List commands', () => {
-  it('lists agents, workflows, tasks, and modules from v6 sample', async () => {
+  it('lists agents and workflows from v6 sample', async () => {
     const projectRoot = process.cwd();
     const bmadRoot = path.resolve(
       projectRoot,
@@ -37,17 +37,6 @@ describe('List commands', () => {
     expect(workflows.success).toBe(true);
     expect(workflows.content).toContain('BMAD Workflows');
     expect(workflows.content).toContain('party-mode');
-
-    const tasks = await tool.execute('*list-tasks');
-    expect(tasks.success).toBe(true);
-    expect(tasks.content).toContain('BMAD Tasks');
-
-    const modules = await tool.execute('*list-modules');
-    expect(modules.success).toBe(true);
-    expect(modules.content).toContain('BMAD Modules');
-    expect(modules.content).toContain(
-      '| Module | Agents | Workflows | Tasks |',
-    );
   });
 
   it('lists agents from multiple CLI roots (multi-root support)', async () => {
@@ -74,7 +63,7 @@ describe('List commands', () => {
     const agents = await tool.execute('*list-agents');
     expect(agents.success).toBe(true);
     expect(agents.content).toContain('BMAD Agents');
-    expect(agents.content).toContain('Summary:');
+    expect(agents.content).toContain('Found');
 
     // Should contain agents from both roots
     expect(agents.content).toContain('debug'); // from custom

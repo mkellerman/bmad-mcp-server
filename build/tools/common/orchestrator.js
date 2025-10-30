@@ -78,8 +78,6 @@ export class UnifiedBMADTool {
         // Listing commands (handled before general parsing)
         if (normalized === '*list-agents' ||
             normalized === '*list-workflows' ||
-            normalized === '*list-tasks' ||
-            normalized === '*list-modules' ||
             normalized.startsWith('*export-master-manifest')) {
             return this.handleListCommand(normalized);
         }
@@ -99,7 +97,7 @@ export class UnifiedBMADTool {
         }
     }
     /**
-     * Handle list commands (*list-agents, *list-workflows, *list-tasks).
+     * Handle list commands (*list-agents, *list-workflows).
      *
      * Queries master manifest and formats results for display.
      * Uses all CLI-provided active locations to support multi-root setups.

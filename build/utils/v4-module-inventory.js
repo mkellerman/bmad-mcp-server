@@ -154,6 +154,25 @@ export function inventoryOriginV4(origin) {
                 exists,
                 status: exists ? 'verified' : 'no-file-found',
             };
+            // For workflows, try to read description from YAML file
+            if (classification.kind === 'workflow' && exists) {
+                try {
+                    const y = readYaml(absolutePath);
+                    // v4 format has workflow.description
+                    if (y?.workflow?.description &&
+                        typeof y.workflow.description === 'string') {
+                        record.description = y.workflow.description;
+                        record.displayName = y.workflow.description;
+                    }
+                    else if (y?.description && typeof y.description === 'string') {
+                        record.description = y.description;
+                        record.displayName = y.description;
+                    }
+                }
+                catch {
+                    // ignore parsing errors
+                }
+            }
             if (classification.kind === 'agent') {
                 agentRecords.push(record);
             }
@@ -239,7 +258,25 @@ export function inventoryOriginV4(origin) {
                     .replace(/\\/g, '/');
                 // Only add if NOT in manifest (orphan)
                 if (!manifestPaths.has(relativePath)) {
-                    const name = path.basename(absolutePath, path.extname(absolutePath));
+                    // Try to read name and description from yaml
+                    let name = path.basename(absolutePath, path.extname(absolutePath));
+                    let description;
+                    try {
+                        const y = readYaml(absolutePath);
+                        // v4 format has workflow.name and workflow.description
+                        if (y?.workflow?.name && typeof y.workflow.name === 'string')
+                            name = y.workflow.name;
+                        else if (y?.name && typeof y.name === 'string')
+                            name = y.name;
+                        if (y?.workflow?.description &&
+                            typeof y.workflow.description === 'string')
+                            description = y.workflow.description;
+                        else if (y?.description && typeof y.description === 'string')
+                            description = y.description;
+                    }
+                    catch {
+                        // ignore
+                    }
                     // Normalize module name: strip 'bmad-' prefix to match manifest entries
                     const normalizedModuleName = moduleName === 'core'
                         ? 'core'
@@ -254,6 +291,8 @@ export function inventoryOriginV4(origin) {
                         moduleVersion: manifest.version,
                         bmadVersion: manifest.version,
                         name,
+                        displayName: description,
+                        description,
                         bmadRelativePath: relativePath,
                         moduleRelativePath: relativePath,
                         absolutePath,

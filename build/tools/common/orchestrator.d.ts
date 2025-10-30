@@ -27,7 +27,7 @@ export declare class UnifiedBMADTool {
     });
     execute(command: string): BMADToolResult;
     /**
-     * Handle list commands (*list-agents, *list-workflows, *list-tasks).
+     * Handle list commands (*list-agents, *list-workflows).
      *
      * Queries master manifest and formats results for display.
      * Uses all CLI-provided active locations to support multi-root setups.

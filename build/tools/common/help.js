@@ -28,8 +28,6 @@ export function getHelpResult() {
     lines.push('| `*doctor` | System health check (paths, versions, inventory) |');
     lines.push('| `*list-agents` | Browse all available agents |');
     lines.push('| `*list-workflows` | Browse all available workflows |');
-    lines.push('| `*list-tasks` | Browse all available tasks |');
-    lines.push('| `*list-modules` | View module inventory |');
     lines.push('| `*help` | Show this help guide |\n');
     lines.push('**Pro Tip:** Add `--full` to `*doctor` for detailed debug output\n');
     lines.push('---\n');

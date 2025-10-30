@@ -42,12 +42,7 @@ const resolved = {
 const ctx = { resolved, master, discovery };
 
 // Test all list commands
-const commands = [
-  '*list-agents',
-  '*list-workflows',
-  '*list-tasks',
-  '*list-modules',
-];
+const commands = ['*list-agents', '*list-workflows'];
 
 console.log('='.repeat(70));
 console.log('Testing List Commands');
