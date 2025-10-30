@@ -83,9 +83,8 @@ export function doctor(command: string, ctx: DoctorContext): BMADToolResult {
       } else {
         checks.push('○ No BMAD structure detected');
       }
-      
-      checks.forEach(check => lines.push(`│    ${check}`));
-      
+
+      checks.forEach((check) => lines.push(`│    ${check}`));
     } else {
       lines.push(`│    ${location.details || location.status}`);
     }
