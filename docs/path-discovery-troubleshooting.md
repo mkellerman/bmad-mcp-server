@@ -55,11 +55,23 @@ Looks for:
 
 ## Detailed Debug Logging
 
-For verbose output showing every directory checked:
+For verbose output showing every directory checked, use either:
+
+**Environment variable:**
 
 ```bash
 BMAD_DEBUG=1 npm run bmad -- "*doctor"
 ```
+
+**Or the `--full` flag in scripts:**
+
+```bash
+node scripts/show-doctor.mjs --full
+# or
+npm run bmad -- "*doctor"  # when BMAD_DEBUG=1 is set
+```
+
+> **Note:** `BMAD_DEBUG=1` and `--full` are equivalent - both enable detailed path discovery logging.
 
 This shows:
 

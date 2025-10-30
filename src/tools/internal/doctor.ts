@@ -90,7 +90,9 @@ export function doctor(command: string, ctx: DoctorContext): BMADToolResult {
     }
     lines.push('│');
   }
-  lines.push('│  Tip: Set BMAD_DEBUG=1 to see detailed search logging');
+  lines.push(
+    '│  Tip: Set BMAD_DEBUG=1 for detailed search logging (or --full in scripts)',
+  );
   lines.push('└────────────────────────────────────────────────────────────┘');
   lines.push('');
 

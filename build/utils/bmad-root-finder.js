@@ -166,7 +166,7 @@ export function findBmadRootsRecursive(startPath, options = {}) {
         // At depth 0-1 (starting point and first level), search ALL subdirectories
         // At deeper levels (2+), only search directories matching our criteria
         const entries = fs.readdirSync(resolvedPath, { withFileTypes: true });
-        const dirCount = entries.filter(e => e.isDirectory()).length;
+        const dirCount = entries.filter((e) => e.isDirectory()).length;
         logger.debug(`${indent}[bmad-finder] Scanning ${dirCount} subdirectories in ${path.basename(resolvedPath)}`);
         for (const entry of entries) {
             if (!entry.isDirectory())

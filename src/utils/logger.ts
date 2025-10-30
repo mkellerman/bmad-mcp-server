@@ -3,8 +3,11 @@
  * Uses console.* under the hood to preserve existing test expectations.
  */
 
-const DEBUG_ENABLED =
-  process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true';
+function isDebugEnabled(): boolean {
+  return (
+    process.env.BMAD_DEBUG === '1' || process.env.BMAD_DEBUG === 'true'
+  );
+}
 
 function fmt(msg: any, ...args: any[]): any[] {
   return [msg, ...args];
@@ -13,7 +16,7 @@ function fmt(msg: any, ...args: any[]): any[] {
 export const logger = {
   debug: (msg: any, ...args: any[]) => {
     // eslint-disable-next-line no-console
-    if (DEBUG_ENABLED) console.debug(...fmt(msg, ...args));
+    if (isDebugEnabled()) console.debug(...fmt(msg, ...args));
   },
   info: (msg: any, ...args: any[]) => console.error(...fmt(msg, ...args)),
   warn: (msg: any, ...args: any[]) => console.warn(...fmt(msg, ...args)),

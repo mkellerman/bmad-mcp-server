@@ -11,21 +11,15 @@
  *   - For v4, point to the .bmad-core directory
  */
 
-import { UnifiedBMADTool } from '../build/tools/index.js';
-import { resolveBmadPaths } from '../build/utils/bmad-path-resolver.js';
-import { MasterManifestService } from '../build/services/master-manifest-service.js';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.resolve(path.dirname(__filename), '..');
-
+// Parse args early to set BMAD_DEBUG before importing modules
 function parseArgs(argv) {
-  const args = { root: undefined, reload: false };
+  const args = { root: undefined, reload: false, full: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--reload') {
       args.reload = true;
+    } else if (a === '--full') {
+      args.full = true;
     } else if (a === '--root') {
       args.root = argv[i + 1];
       i++;
@@ -37,9 +31,22 @@ function parseArgs(argv) {
   return args;
 }
 
-async function main() {
-  const args = parseArgs(process.argv);
+// Set BMAD_DEBUG before importing any modules
+const args = parseArgs(process.argv);
+if (args.full) {
+  process.env.BMAD_DEBUG = '1';
+}
 
+import { UnifiedBMADTool } from '../build/tools/index.js';
+import { resolveBmadPaths } from '../build/utils/bmad-path-resolver.js';
+import { MasterManifestService } from '../build/services/master-manifest-service.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.resolve(path.dirname(__filename), '..');
+
+async function main() {
   console.log('🏥 BMAD Doctor Output\n');
   console.log('='.repeat(70));
   console.log('');

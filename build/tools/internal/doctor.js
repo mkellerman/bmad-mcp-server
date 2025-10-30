@@ -62,14 +62,14 @@ export function doctor(command, ctx) {
             else {
                 checks.push('○ No BMAD structure detected');
             }
-            checks.forEach(check => lines.push(`│    ${check}`));
+            checks.forEach((check) => lines.push(`│    ${check}`));
         }
         else {
             lines.push(`│    ${location.details || location.status}`);
         }
         lines.push('│');
     }
-    lines.push('│  Tip: Set BMAD_DEBUG=1 to see detailed search logging');
+    lines.push('│  Tip: Set BMAD_DEBUG=1 for detailed search logging (or --full in scripts)');
     lines.push('└────────────────────────────────────────────────────────────┘');
     lines.push('');
     lines.push('┌─ Active Configuration ─────────────────────────────────────┐');
