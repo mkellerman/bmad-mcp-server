@@ -100,6 +100,16 @@ export interface BMADToolResult {
     listType?: string;
     count?: number;
     data?: unknown;
+    structuredData?: {
+        items: unknown[];
+        summary: {
+            total: number;
+            byGroup?: Record<string, number>;
+            message?: string;
+        };
+        metadata?: Record<string, unknown>;
+        followUpSuggestions?: string[];
+    };
 }
 /**
  * Workflow execution context with resolved paths and manifest data

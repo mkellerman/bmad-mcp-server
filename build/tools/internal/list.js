@@ -3,91 +3,289 @@ export function handleListCommand(cmd, ctx) {
     const { resolved, master, discovery } = ctx;
     const lines = [];
     if (cmd === '*list-agents') {
-        const groups = new Map();
-        for (const r of resolved.agents.filter((x) => x.kind === 'agent')) {
-            const name = (r.name || '').toString().toLowerCase();
-            const p = (r.moduleRelativePath || '').toString().toLowerCase();
+        // Build structured data
+        const agentsByModule = new Map();
+        const allAgents = [];
+        for (const r of resolved.agents.filter((x) => {
+            const agent = x;
+            return agent.kind === 'agent';
+        })) {
+            const agent = r;
+            const name = (agent.name || '').toString().toLowerCase();
+            const p = (agent.moduleRelativePath || '').toString().toLowerCase();
+            // Skip README files
             if (name === 'readme' || p.endsWith('/readme.md'))
                 continue;
-            const labelName = r.name ?? r.moduleRelativePath;
-            const desc = r.description || r.displayName;
-            const src = r.source === 'manifest' ? 'manifest' : 'filesystem';
-            const base = desc ? `${labelName} — ${desc}` : `${labelName}`;
-            const label = `${base} [${src}]`;
-            const list = groups.get(r.moduleName) ?? [];
-            list.push(label);
-            groups.set(r.moduleName, list);
+            const agentData = {
+                name: agent.name ?? agent.moduleRelativePath ?? 'unknown',
+                module: agent.moduleName,
+                displayName: agent.displayName || agent.title || agent.name,
+                description: agent.description,
+                title: agent.title,
+                icon: agent.icon,
+                role: agent.role,
+                source: agent.source === 'manifest' ? 'manifest' : 'filesystem',
+                path: agent.absolutePath || agent.moduleRelativePath,
+                commands: agent.commands || [],
+            };
+            allAgents.push(agentData);
+            const moduleList = agentsByModule.get(agent.moduleName) ?? [];
+            moduleList.push(agentData);
+            agentsByModule.set(agent.moduleName, moduleList);
         }
-        lines.push('Agents (available)');
-        for (const mod of Array.from(groups.keys()).sort()) {
-            lines.push(`\n  - module: ${mod}`);
-            for (const item of groups.get(mod).sort((a, b) => a.localeCompare(b))) {
-                lines.push(`      ${item}`);
+        // Sort modules and agents within each module
+        const sortedModules = Array.from(agentsByModule.keys()).sort();
+        // Build markdown content
+        const markdown = [];
+        markdown.push('# 📊 BMAD Agents\n');
+        markdown.push(`Found **${allAgents.length} agents** across **${sortedModules.length} modules**\n`);
+        // Add module breakdown
+        markdown.push('## Modules\n');
+        for (const mod of sortedModules) {
+            const agents = agentsByModule.get(mod);
+            markdown.push(`- **${mod}**: ${agents.length} agent${agents.length !== 1 ? 's' : ''}`);
+        }
+        markdown.push('\n## Agents by Module\n');
+        // List agents grouped by module
+        for (const mod of sortedModules) {
+            const agents = agentsByModule.get(mod);
+            markdown.push(`### ${mod}\n`);
+            for (const agentData of agents) {
+                const agent = agentData;
+                const icon = agent.icon || '🤖';
+                const displayName = agent.displayName || agent.name;
+                const desc = agent.description || agent.role || '';
+                markdown.push(`#### ${icon} ${displayName}`);
+                markdown.push(`- **Name**: \`${agent.name}\``);
+                if (desc)
+                    markdown.push(`- **Role**: ${desc}`);
+                markdown.push(`- **Source**: ${agent.source}`);
+                if (agent.commands && agent.commands.length > 0) {
+                    markdown.push(`- **Commands**: ${agent.commands.length} available`);
+                }
+                markdown.push('');
             }
+        }
+        // Add interactive guidance
+        markdown.push('\n---\n');
+        markdown.push('## 💡 What You Can Ask\n');
+        markdown.push('- "Tell me more about the [agent-name] agent"');
+        markdown.push('- "Show me agents in the [module] module"');
+        markdown.push('- "What commands does [agent-name] have?"');
+        markdown.push('- "Load the [agent-name] agent"');
+        // Build summary for structured data
+        const byGroup = {};
+        for (const mod of sortedModules) {
+            byGroup[mod] = agentsByModule.get(mod).length;
         }
         return {
             success: true,
             type: 'list',
             listType: 'agents',
-            count: resolved.agents.length,
-            content: lines.join('\n'),
+            count: allAgents.length,
+            content: markdown.join('\n'),
             exitCode: 0,
+            structuredData: {
+                items: allAgents,
+                summary: {
+                    total: allAgents.length,
+                    byGroup,
+                    message: `Found ${allAgents.length} agents across ${sortedModules.length} modules`,
+                },
+                metadata: {
+                    modules: sortedModules,
+                    timestamp: new Date().toISOString(),
+                },
+                followUpSuggestions: [
+                    'Tell me more about a specific agent',
+                    'Show me agents in a specific module',
+                    'What commands does an agent have?',
+                    'Load an agent to start working',
+                ],
+            },
         };
     }
     if (cmd === '*list-workflows') {
-        lines.push('Workflows (available)');
-        const byModule = new Map();
-        for (const r of resolved.workflows.filter((x) => x.kind === 'workflow')) {
-            const base = r.name ?? r.moduleRelativePath;
-            const src = r.source === 'manifest' ? 'manifest' : 'filesystem';
-            const label = `${base} [${src}]`;
-            const list = byModule.get(r.moduleName) ?? [];
-            list.push(label);
-            byModule.set(r.moduleName, list);
+        // Build structured data
+        const workflowsByModule = new Map();
+        const allWorkflows = [];
+        for (const r of resolved.workflows.filter((x) => {
+            const workflow = x;
+            return workflow.kind === 'workflow';
+        })) {
+            const workflow = r;
+            const workflowData = {
+                name: workflow.name ?? workflow.moduleRelativePath ?? 'unknown',
+                module: workflow.moduleName,
+                displayName: workflow.displayName || workflow.name,
+                description: workflow.description,
+                source: workflow.source === 'manifest' ? 'manifest' : 'filesystem',
+                path: workflow.absolutePath || workflow.moduleRelativePath,
+                trigger: workflow.trigger,
+            };
+            allWorkflows.push(workflowData);
+            const moduleList = workflowsByModule.get(workflow.moduleName) ?? [];
+            moduleList.push(workflowData);
+            workflowsByModule.set(workflow.moduleName, moduleList);
         }
-        for (const mod of Array.from(byModule.keys()).sort()) {
-            lines.push(`Module: ${mod}`);
-            for (const item of byModule
-                .get(mod)
-                .sort((a, b) => a.localeCompare(b))) {
-                lines.push(`- ${item}`);
+        // Sort modules
+        const sortedModules = Array.from(workflowsByModule.keys()).sort();
+        // Build markdown content
+        const markdown = [];
+        markdown.push('# 🔄 BMAD Workflows\n');
+        markdown.push(`Found **${allWorkflows.length} workflows** across **${sortedModules.length} modules**\n`);
+        // Add module breakdown
+        markdown.push('## Modules\n');
+        for (const mod of sortedModules) {
+            const workflows = workflowsByModule.get(mod);
+            markdown.push(`- **${mod}**: ${workflows.length} workflow${workflows.length !== 1 ? 's' : ''}`);
+        }
+        markdown.push('\n## Workflows by Module\n');
+        // List workflows grouped by module
+        for (const mod of sortedModules) {
+            const workflows = workflowsByModule.get(mod);
+            markdown.push(`### ${mod}\n`);
+            for (const workflowData of workflows) {
+                const workflow = workflowData;
+                const displayName = workflow.displayName || workflow.name;
+                const desc = workflow.description || '';
+                markdown.push(`#### 📋 ${displayName}`);
+                markdown.push(`- **Name**: \`${workflow.name}\``);
+                if (desc)
+                    markdown.push(`- **Description**: ${desc}`);
+                if (workflow.trigger)
+                    markdown.push(`- **Trigger**: ${workflow.trigger}`);
+                markdown.push(`- **Source**: ${workflow.source}`);
+                markdown.push('');
             }
+        }
+        // Add interactive guidance
+        markdown.push('\n---\n');
+        markdown.push('## 💡 What You Can Ask\n');
+        markdown.push('- "Tell me more about the [workflow-name] workflow"');
+        markdown.push('- "Show me workflows in the [module] module"');
+        markdown.push('- "Execute the [workflow-name] workflow"');
+        markdown.push('- "What does [workflow-name] do?"');
+        // Build summary
+        const byGroup = {};
+        for (const mod of sortedModules) {
+            byGroup[mod] = workflowsByModule.get(mod).length;
         }
         return {
             success: true,
             type: 'list',
             listType: 'workflows',
-            count: resolved.workflows.length,
-            content: lines.join('\n'),
+            count: allWorkflows.length,
+            content: markdown.join('\n'),
             exitCode: 0,
+            structuredData: {
+                items: allWorkflows,
+                summary: {
+                    total: allWorkflows.length,
+                    byGroup,
+                    message: `Found ${allWorkflows.length} workflows across ${sortedModules.length} modules`,
+                },
+                metadata: {
+                    modules: sortedModules,
+                    timestamp: new Date().toISOString(),
+                },
+                followUpSuggestions: [
+                    'Tell me more about a specific workflow',
+                    'Show me workflows in a specific module',
+                    'Execute a workflow',
+                    'What does a workflow do?',
+                ],
+            },
         };
     }
     if (cmd === '*list-tasks') {
-        lines.push('Tasks (available)');
-        const byModuleTasks = new Map();
-        for (const r of resolved.tasks.filter((x) => x.kind === 'task')) {
-            const base = r.name ?? r.moduleRelativePath;
-            const src = r.source === 'manifest' ? 'manifest' : 'filesystem';
-            const label = `${base} [${src}]`;
-            const list = byModuleTasks.get(r.moduleName) ?? [];
-            list.push(label);
-            byModuleTasks.set(r.moduleName, list);
+        // Build structured data
+        const tasksByModule = new Map();
+        const allTasks = [];
+        for (const r of resolved.tasks.filter((x) => {
+            const task = x;
+            return task.kind === 'task';
+        })) {
+            const task = r;
+            const taskData = {
+                name: task.name ?? task.moduleRelativePath ?? 'unknown',
+                module: task.moduleName,
+                displayName: task.displayName || task.name,
+                description: task.description,
+                source: task.source === 'manifest' ? 'manifest' : 'filesystem',
+                path: task.absolutePath || task.moduleRelativePath,
+            };
+            allTasks.push(taskData);
+            const moduleList = tasksByModule.get(task.moduleName) ?? [];
+            moduleList.push(taskData);
+            tasksByModule.set(task.moduleName, moduleList);
         }
-        for (const mod of Array.from(byModuleTasks.keys()).sort()) {
-            lines.push(`Module: ${mod}`);
-            for (const item of byModuleTasks
-                .get(mod)
-                .sort((a, b) => a.localeCompare(b))) {
-                lines.push(`- ${item}`);
+        // Sort modules
+        const sortedModules = Array.from(tasksByModule.keys()).sort();
+        // Build markdown content
+        const markdown = [];
+        markdown.push('# ⚙️ BMAD Tasks\n');
+        markdown.push(`Found **${allTasks.length} tasks** across **${sortedModules.length} modules**\n`);
+        // Add module breakdown
+        markdown.push('## Modules\n');
+        for (const mod of sortedModules) {
+            const tasks = tasksByModule.get(mod);
+            markdown.push(`- **${mod}**: ${tasks.length} task${tasks.length !== 1 ? 's' : ''}`);
+        }
+        markdown.push('\n## Tasks by Module\n');
+        // List tasks grouped by module
+        for (const mod of sortedModules) {
+            const tasks = tasksByModule.get(mod);
+            markdown.push(`### ${mod}\n`);
+            for (const taskData of tasks) {
+                const task = taskData;
+                const displayName = task.displayName || task.name;
+                const desc = task.description || '';
+                markdown.push(`#### 🔧 ${displayName}`);
+                markdown.push(`- **Name**: \`${task.name}\``);
+                if (desc)
+                    markdown.push(`- **Description**: ${desc}`);
+                markdown.push(`- **Source**: ${task.source}`);
+                markdown.push('');
             }
+        }
+        // Add interactive guidance
+        markdown.push('\n---\n');
+        markdown.push('## 💡 What You Can Ask\n');
+        markdown.push('- "Tell me more about the [task-name] task"');
+        markdown.push('- "Show me tasks in the [module] module"');
+        markdown.push('- "What does [task-name] do?"');
+        markdown.push('- "How do I use [task-name]?"');
+        // Build summary
+        const byGroup = {};
+        for (const mod of sortedModules) {
+            byGroup[mod] = tasksByModule.get(mod).length;
         }
         return {
             success: true,
             type: 'list',
             listType: 'tasks',
-            count: resolved.tasks.length,
-            content: lines.join('\n'),
+            count: allTasks.length,
+            content: markdown.join('\n'),
             exitCode: 0,
+            structuredData: {
+                items: allTasks,
+                summary: {
+                    total: allTasks.length,
+                    byGroup,
+                    message: `Found ${allTasks.length} tasks across ${sortedModules.length} modules`,
+                },
+                metadata: {
+                    modules: sortedModules,
+                    timestamp: new Date().toISOString(),
+                },
+                followUpSuggestions: [
+                    'Tell me more about a specific task',
+                    'Show me tasks in a specific module',
+                    'What does a task do?',
+                    'How do I use a task?',
+                ],
+            },
         };
     }
     if (cmd === '*list-modules') {
@@ -120,19 +318,72 @@ export function handleListCommand(cmd, ctx) {
             m.tasks += 1;
             byModule.set(r.moduleName, m);
         }
-        lines.push('Modules (available)');
-        lines.push('| Module | Agents | Workflows | Tasks |');
+        // Sort modules
         const mods = Array.from(byModule.entries()).sort(([a], [b]) => a.localeCompare(b));
+        // Build markdown content
+        const markdown = [];
+        markdown.push('# 📦 BMAD Modules\n');
+        markdown.push(`Found **${mods.length} modules** with resources\n`);
+        // Summary stats
+        const totalAgents = mods.reduce((sum, [, counts]) => sum + counts.agents, 0);
+        const totalWorkflows = mods.reduce((sum, [, counts]) => sum + counts.workflows, 0);
+        const totalTasks = mods.reduce((sum, [, counts]) => sum + counts.tasks, 0);
+        markdown.push('## Summary\n');
+        markdown.push(`- **Total Agents**: ${totalAgents}`);
+        markdown.push(`- **Total Workflows**: ${totalWorkflows}`);
+        markdown.push(`- **Total Tasks**: ${totalTasks}`);
+        markdown.push(`- **Origin**: ${origin}\n`);
+        // Module table
+        markdown.push('## Modules Overview\n');
+        markdown.push('| Module | Agents | Workflows | Tasks | Total |');
+        markdown.push('|--------|--------|-----------|-------|-------|');
         for (const [mod, counts] of mods) {
-            lines.push(`| ${mod} @ ${origin} | ${counts.agents} | ${counts.workflows} | ${counts.tasks} |`);
+            const total = counts.agents + counts.workflows + counts.tasks;
+            markdown.push(`| **${mod}** | ${counts.agents} | ${counts.workflows} | ${counts.tasks} | **${total}** |`);
         }
+        // Add interactive guidance
+        markdown.push('\n---\n');
+        markdown.push('## 💡 What You Can Ask\n');
+        markdown.push('- "Show me all agents in the [module] module"');
+        markdown.push('- "List workflows from [module]"');
+        markdown.push('- "What resources are in [module]?"');
+        markdown.push('- "Tell me about the [module] module"');
+        // Build structured items
+        const moduleItems = mods.map(([moduleName, counts]) => ({
+            module: moduleName,
+            agents: counts.agents,
+            workflows: counts.workflows,
+            tasks: counts.tasks,
+            total: counts.agents + counts.workflows + counts.tasks,
+            origin,
+        }));
         return {
             success: true,
             type: 'list',
             listType: 'modules',
             count: mods.length,
-            content: lines.join('\n'),
+            content: markdown.join('\n'),
             exitCode: 0,
+            structuredData: {
+                items: moduleItems,
+                summary: {
+                    total: mods.length,
+                    message: `Found ${mods.length} modules with ${totalAgents} agents, ${totalWorkflows} workflows, and ${totalTasks} tasks`,
+                },
+                metadata: {
+                    origin,
+                    totalAgents,
+                    totalWorkflows,
+                    totalTasks,
+                    timestamp: new Date().toISOString(),
+                },
+                followUpSuggestions: [
+                    'Show me all resources in a specific module',
+                    'List agents from a module',
+                    'Tell me about a module',
+                    'What workflows are available in a module?',
+                ],
+            },
         };
     }
     if (cmd.startsWith('*export-master-manifest') ||

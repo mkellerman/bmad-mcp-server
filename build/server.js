@@ -33,6 +33,40 @@ function getDirname() {
 }
 const __dirname = getDirname();
 /**
+ * Format MCP response with explicit display instructions for LLMs.
+ *
+ * This ensures that:
+ * 1. User-facing content (markdown/formatted text) is displayed EXACTLY as written
+ * 2. Structured data (JSON) is available for queries but NOT shown to the user
+ * 3. LLM understands the distinction between "display" and "use as context"
+ *
+ * @param displayContent - Content to show the user (markdown, formatted text)
+ * @param contextData - Optional structured data for LLM queries (not displayed)
+ * @returns MCP TextContent array with proper instructions
+ */
+function formatMCPResponse(displayContent, contextData) {
+    const response = [];
+    // Primary content with display instruction
+    response.push({
+        type: 'text',
+        text: `**INSTRUCTIONS: Display the content below to the user EXACTLY as written. Do not summarize or paraphrase.**
+
+---
+
+${displayContent}`,
+    });
+    // Optional structured data for queries (marked as context-only)
+    if (contextData) {
+        response.push({
+            type: 'text',
+            text: '\n---\n\n**📦 Structured Data** *(for your use in answering questions - do NOT display this to the user)*\n\n```json\n' +
+                JSON.stringify(contextData, null, 2) +
+                '\n```',
+        });
+    }
+    return response;
+}
+/**
  * MCP Server for BMAD methodology with unified tool interface.
  *
  * Exposes a single 'bmad' tool that uses instruction-based routing:
@@ -235,12 +269,7 @@ export class BMADMCPServer {
             // Success - format response based on type
             if (result.type === 'agent') {
                 return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: result.content ?? '',
-                        },
-                    ],
+                    content: formatMCPResponse(result.content ?? ''),
                 };
             }
             else if (result.type === 'workflow') {
@@ -312,14 +341,16 @@ Begin workflow execution now.`);
                     ],
                 };
             }
-            else if (result.type === 'list' || result.type === 'help') {
+            else if (result.type === 'list' || result.type === 'help' || result.type === 'diagnostic') {
+                // For list/diagnostic commands with structured data, include it as context
+                if (result.structuredData) {
+                    return {
+                        content: formatMCPResponse(result.content ?? '', result.structuredData),
+                    };
+                }
+                // Legacy format without structured data
                 return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: result.content ?? '',
-                        },
-                    ],
+                    content: formatMCPResponse(result.content ?? ''),
                 };
             }
             else {

@@ -113,6 +113,17 @@ export interface BMADToolResult {
   listType?: string;
   count?: number;
   data?: unknown;
+  // Rich structured data for list commands
+  structuredData?: {
+    items: unknown[];
+    summary: {
+      total: number;
+      byGroup?: Record<string, number>;
+      message?: string;
+    };
+    metadata?: Record<string, unknown>;
+    followUpSuggestions?: string[];
+  };
 }
 
 /**

@@ -27,8 +27,7 @@ export function resolveAvailableCatalog(master, options = {}) {
     const scopeFilter = (rec) => {
         if (options.scope === 'active-only') {
             // Support both activeRoots (plural, preferred) and activeRoot (singular, backward compat)
-            const roots = options.activeRoots ??
-                (options.activeRoot ? [options.activeRoot] : []);
+            const roots = options.activeRoots ?? (options.activeRoot ? [options.activeRoot] : []);
             // If no roots specified, no filtering (show all)
             if (roots.length === 0)
                 return true;
