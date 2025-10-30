@@ -45,7 +45,9 @@ export function buildMasterManifests(origins) {
             // Try v6 filesystem scan first (more flexible)
             try {
                 const inv = inventoryOriginV6(origin);
-                if (inv.agents.length > 0 || inv.workflows.length > 0 || inv.tasks.length > 0) {
+                if (inv.agents.length > 0 ||
+                    inv.workflows.length > 0 ||
+                    inv.tasks.length > 0) {
                     master.modules.push(...inv.modules);
                     master.agents.push(...inv.agents);
                     master.workflows.push(...inv.workflows);

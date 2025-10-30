@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findBmadRootsRecursive, sortBmadRoots, } from './bmad-root-finder.js';
+import { findBmadRootsRecursive, sortBmadRoots } from './bmad-root-finder.js';
 const PRIORITY_ORDER = ['project', 'cli', 'env', 'user'];
 /**
  * Resolve the active BMAD root by evaluating all known locations in priority order.
