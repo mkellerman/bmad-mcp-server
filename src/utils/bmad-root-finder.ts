@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { logger } from './logger.js';
 
 /**
  * Represents a discovered BMAD installation root
@@ -56,6 +57,11 @@ function isV6Root(dirPath: string): FoundBmadRoot | null {
         manifestDir: cfgDir,
         depth: 0, // Will be set by caller
       };
+    }
+    
+    // Log what we checked
+    if (fs.existsSync(cfgDir)) {
+      logger.debug(`    [v6 check] _cfg exists but no manifest.yaml in ${dirPath}`);
     }
   } catch {
     // Ignore permission errors, broken symlinks, etc.
@@ -139,19 +145,32 @@ export function findBmadRootsRecursive(
   try {
     const resolvedPath = path.resolve(startPath);
 
+    // Only log at depth 0 (initial search) or when checking directories
+    const indent = '  '.repeat(currentDepth);
+    if (currentDepth === 0) {
+      logger.debug(`[bmad-finder] Starting search from: ${resolvedPath}`);
+      logger.debug(`[bmad-finder] Max depth: ${maxDepth}`);
+    }
+
     // Check if path exists and is a directory
     if (!fs.existsSync(resolvedPath)) {
+      logger.debug(`${indent}[bmad-finder] Path does not exist: ${resolvedPath}`);
       return results;
     }
 
     const stats = fs.statSync(resolvedPath);
     if (!stats.isDirectory()) {
+      logger.debug(`${indent}[bmad-finder] Not a directory: ${resolvedPath}`);
       return results;
     }
+
+    logger.debug(`${indent}[bmad-finder] Checking: ${resolvedPath}`);
 
     // Check if current directory is a BMAD root
     const v6Root = isV6Root(resolvedPath);
     if (v6Root) {
+      logger.debug(`${indent}[bmad-finder] ✓ Found v6 installation at ${resolvedPath}`);
+      logger.debug(`${indent}[bmad-finder]   - Manifest: ${v6Root.manifestPath}`);
       v6Root.depth = currentDepth;
       results.push(v6Root);
       // Don't recurse into v6 installations - their subdirs are modules, not nested installations
@@ -160,6 +179,8 @@ export function findBmadRootsRecursive(
 
     const v4Root = isV4Root(resolvedPath);
     if (v4Root) {
+      logger.debug(`${indent}[bmad-finder] ✓ Found v4 installation at ${resolvedPath}`);
+      logger.debug(`${indent}[bmad-finder]   - Manifest: ${v4Root.manifestPath}`);
       v4Root.depth = currentDepth;
       results.push(v4Root);
       // Don't recurse into v4 installations - their subdirs are expansion packs, not nested installations
@@ -169,6 +190,8 @@ export function findBmadRootsRecursive(
     // Only check for custom if no manifest found (v6/v4 take precedence)
     const customRoot = isCustomRoot(resolvedPath);
     if (customRoot) {
+      logger.debug(`${indent}[bmad-finder] ✓ Found custom installation at ${resolvedPath}`);
+      logger.debug(`${indent}[bmad-finder]   - No manifest (custom)`);
       customRoot.depth = currentDepth;
       results.push(customRoot);
       // Don't recurse into custom installations either
@@ -177,6 +200,7 @@ export function findBmadRootsRecursive(
 
     // Stop recursion if we've reached max depth
     if (currentDepth >= maxDepth) {
+      logger.debug(`${indent}[bmad-finder] Max depth reached at ${resolvedPath}`);
       return results;
     }
 
@@ -184,16 +208,24 @@ export function findBmadRootsRecursive(
     // At depth 0-1 (starting point and first level), search ALL subdirectories
     // At deeper levels (2+), only search directories matching our criteria
     const entries = fs.readdirSync(resolvedPath, { withFileTypes: true });
+    
+    const dirCount = entries.filter(e => e.isDirectory()).length;
+    logger.debug(`${indent}[bmad-finder] Scanning ${dirCount} subdirectories in ${path.basename(resolvedPath)}`);
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
 
       // At depth > 1, only search bmad-named, agents, workflows, tasks, or src directories
-      if (currentDepth > 1 && !shouldSearchDirectory(entry.name)) continue;
+      if (currentDepth > 1 && !shouldSearchDirectory(entry.name)) {
+        logger.debug(`${indent}[bmad-finder] Skipping ${entry.name} (filtered by name)`);
+        continue;
+      }
 
       // Skip hidden directories unless they match our search criteria
-      if (entry.name.startsWith('.') && !shouldSearchDirectory(entry.name))
+      if (entry.name.startsWith('.') && !shouldSearchDirectory(entry.name)) {
+        logger.debug(`${indent}[bmad-finder] Skipping ${entry.name} (hidden)`);
         continue;
+      }
 
       const childPath = path.join(resolvedPath, entry.name);
 
@@ -205,9 +237,18 @@ export function findBmadRootsRecursive(
 
       results.push(...childResults);
     }
-  } catch {
+  } catch (error) {
     // Ignore permission errors, broken symlinks, etc.
     // Common in node_modules and system directories
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.debug(`[bmad-finder] Error accessing ${startPath}: ${errorMsg}`);
+  }
+
+  if (currentDepth === 0) {
+    logger.debug(`[bmad-finder] Search complete. Found ${results.length} installation(s)`);
+    results.forEach((root, i) => {
+      logger.debug(`[bmad-finder]   ${i + 1}. ${root.version} at ${root.root} (depth: ${root.depth})`);
+    });
   }
 
   return results;

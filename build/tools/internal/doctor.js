@@ -29,6 +29,49 @@ export function doctor(command, ctx) {
     lines.push('│          🏥 BMAD Health Diagnostic                          │');
     lines.push('╰─────────────────────────────────────────────────────────────╯');
     lines.push('');
+    // Show path discovery details
+    lines.push('┌─ Path Discovery ───────────────────────────────────────────┐');
+    for (const location of localDiscovery.locations) {
+        const statusIcon = location.status === 'valid'
+            ? '✓'
+            : location.status === 'missing'
+                ? '✗'
+                : location.status === 'not-found'
+                    ? '○'
+                    : '!';
+        const displayPath = location.resolvedRoot || location.originalPath || '(not provided)';
+        const relDisplayPath = path.relative(ctx.projectRoot, displayPath);
+        const shortPath = relDisplayPath && relDisplayPath.length < displayPath.length
+            ? relDisplayPath
+            : displayPath;
+        lines.push(`│  ${statusIcon} ${location.displayName}:`);
+        lines.push(`│    Path: ${shortPath}`);
+        if (location.status === 'valid') {
+            // Show what was checked and found
+            const checks = [];
+            if (location.manifestDir) {
+                checks.push(`✓ _cfg/manifest.yaml (${location.version})`);
+            }
+            else if (location.manifestPath && location.version === 'v4') {
+                checks.push(`✓ install-manifest.yaml (${location.version})`);
+            }
+            else if (location.version === 'unknown') {
+                checks.push('✓ agents/ or workflows/ (custom)');
+                checks.push('○ No manifest found');
+            }
+            else {
+                checks.push('○ No BMAD structure detected');
+            }
+            checks.forEach(check => lines.push(`│    ${check}`));
+        }
+        else {
+            lines.push(`│    ${location.details || location.status}`);
+        }
+        lines.push('│');
+    }
+    lines.push('│  Tip: Set BMAD_DEBUG=1 to see detailed search logging');
+    lines.push('└────────────────────────────────────────────────────────────┘');
+    lines.push('');
     lines.push('┌─ Active Configuration ─────────────────────────────────────┐');
     const activeSource = ctx.discovery.activeLocation.source;
     const v6info = detectV6(v6Root);
