@@ -126,18 +126,20 @@ The MCP Server finds BMAD files using a priority system. Lower numbers win:
 
 The MCP Server supports two discovery modes to control how BMAD installations are found:
 
-| Mode     | Behavior                                                      | When to Use                 |
-| -------- | ------------------------------------------------------------- | --------------------------- |
-| `auto`   | Recursive search with priority-based resolution (default)     | Development, flexibility    |
-| `strict` | Exact paths only from CLI args, no discovery, fail fast      | Production, predictability  |
+| Mode     | Behavior                                                  | When to Use                |
+| -------- | --------------------------------------------------------- | -------------------------- |
+| `auto`   | Recursive search with priority-based resolution (default) | Development, flexibility   |
+| `strict` | Exact paths only from CLI args, no discovery, fail fast   | Production, predictability |
 
 **Auto Mode (Default):**
+
 - Searches recursively for BMAD installations
 - Uses priority-based resolution (table above)
 - Automatically discovers from CWD, `~/.bmad`, package defaults
 - Most user-friendly for development
 
 **Strict Mode:**
+
 - Only uses exact paths provided via CLI arguments
 - No recursive search or automatic discovery
 - Fails fast with clear errors if paths are invalid
@@ -188,12 +190,7 @@ Provide exact path(s) and enable strict mode:
 ```json
 {
   "command": "npx",
-  "args": [
-    "-y", 
-    "bmad-mcp-server", 
-    "/absolute/path/to/bmad",
-    "--mode=strict"
-  ]
+  "args": ["-y", "bmad-mcp-server", "/absolute/path/to/bmad", "--mode=strict"]
 }
 ```
 
@@ -202,11 +199,7 @@ Or via environment variable:
 ```json
 {
   "command": "npx",
-  "args": [
-    "-y", 
-    "bmad-mcp-server",
-    "${workspaceFolder}/.bmad/6.0.0/bmad"
-  ],
+  "args": ["-y", "bmad-mcp-server", "${workspaceFolder}/.bmad/6.0.0/bmad"],
   "env": {
     "BMAD_DISCOVERY_MODE": "strict"
   }
@@ -214,6 +207,7 @@ Or via environment variable:
 ```
 
 **Note:** Strict mode requires at least one CLI argument path and will fail if:
+
 - No paths are provided
 - Path doesn't exist
 - Path doesn't contain a valid BMAD installation (v4 or v6)

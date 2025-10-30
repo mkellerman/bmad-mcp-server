@@ -86,6 +86,7 @@ That's it! Mary (the Business Analyst) is ready to help. Works in this project, 
 **Advanced: Discovery Modes**
 
 The server supports two modes for finding BMAD installations:
+
 - **`auto` (default)** - Automatically discovers from project, user defaults, or package
 - **`strict`** - Uses only exact paths provided via CLI arguments (production use)
 

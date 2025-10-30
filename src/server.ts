@@ -421,22 +421,22 @@ export async function main(): Promise<void> {
   // Support multiple paths as CLI arguments (argv[2], argv[3], ...)
   // Filter out commands (starting with * or --) to only keep paths
   const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
-  
+
   // Parse --mode flag
   const modeArg = allArgs.find((arg) => arg.startsWith('--mode='));
   const modeValue = modeArg?.split('=')[1];
   const envMode = process.env.BMAD_DISCOVERY_MODE;
   const rawMode = modeValue || envMode || 'auto';
-  
+
   // Validate mode
   if (rawMode !== 'auto' && rawMode !== 'strict') {
     console.error(`❌ Invalid discovery mode: ${rawMode}`);
     console.error('   Valid modes: auto, strict');
     throw new Error(`Invalid BMAD_DISCOVERY_MODE: ${rawMode}`);
   }
-  
+
   const mode: 'auto' | 'strict' = rawMode;
-  
+
   const cliArgs = allArgs.filter(
     (arg) => !arg.startsWith('*') && !arg.startsWith('--'),
   );
