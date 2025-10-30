@@ -14593,9 +14593,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/custom/debug",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/custom/debug/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "v6.x",
       "bmadVersion": "v6.x",
       "origin": {
@@ -14731,9 +14729,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-phaser-game-dev",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-phaser-game-dev/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -14750,9 +14746,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-unity-game-dev",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-unity-game-dev/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -14769,9 +14763,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-creative-writing",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-creative-writing/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -14788,9 +14780,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-godot-game-dev",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-godot-game-dev/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -14807,9 +14797,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-infrastructure-devops",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-infrastructure-devops/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -14877,9 +14865,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/custom/debug",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/custom/debug/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "v6.x",
       "bmadVersion": "v6.x",
       "origin": {
@@ -15015,9 +15001,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-phaser-game-dev",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-phaser-game-dev/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -15034,9 +15018,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-unity-game-dev",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-2d-unity-game-dev/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -15053,9 +15035,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-creative-writing",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-creative-writing/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -15072,9 +15052,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-godot-game-dev",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-godot-game-dev/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
@@ -15091,9 +15069,7 @@
       "path": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-infrastructure-devops",
       "configPath": "/Users/mkellerman/GitHub/bmad-mcp-server/.bmad/4.44.1/.bmad-core/.bmad-bmad-infrastructure-devops/config.yaml",
       "configValid": false,
-      "errors": [
-        "Missing config.yaml"
-      ],
+      "errors": ["Missing config.yaml"],
       "moduleVersion": "4.44.1",
       "bmadVersion": "4.44.1",
       "origin": {
