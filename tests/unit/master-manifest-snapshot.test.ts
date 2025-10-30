@@ -48,17 +48,17 @@ describe('Master Manifest Snapshot Test', () => {
   });
 
   it('should detect all expected installation origins', () => {
-    // Normalize paths to be relative to cwd for cross-platform compatibility
-    const cwd = process.cwd();
+    // Normalize paths by extracting only the .bmad/ relative portion
+    const normalizePath = (p: string) => {
+      const bmadIndex = p.indexOf('.bmad/');
+      return bmadIndex >= 0 ? p.substring(bmadIndex) : p;
+    };
+
     const generatedOrigins = new Set(
-      generatedManifest.agents.map((a: any) =>
-        path.relative(cwd, a.origin.root),
-      ),
+      generatedManifest.agents.map((a: any) => normalizePath(a.origin.root)),
     );
     const expectedOrigins = new Set(
-      expectedManifest.agents.map((a: any) =>
-        path.relative(cwd, a.origin.root),
-      ),
+      expectedManifest.agents.map((a: any) => normalizePath(a.origin.root)),
     );
 
     // Convert to sorted arrays for better error messages
@@ -69,11 +69,15 @@ describe('Master Manifest Snapshot Test', () => {
   });
 
   it('should correctly detect v4, v6, and custom (unknown) installations', () => {
-    // Normalize paths to be relative to cwd for cross-platform compatibility
-    const cwd = process.cwd();
+    // Normalize paths by extracting only the .bmad/ relative portion
+    const normalizePath = (p: string) => {
+      const bmadIndex = p.indexOf('.bmad/');
+      return bmadIndex >= 0 ? p.substring(bmadIndex) : p;
+    };
+
     const generatedVersions = generatedManifest.agents
       .map((a: any) => ({
-        root: path.relative(cwd, a.origin.root),
+        root: normalizePath(a.origin.root),
         version: a.origin.version,
       }))
       .filter(
@@ -84,7 +88,7 @@ describe('Master Manifest Snapshot Test', () => {
 
     const expectedVersions = expectedManifest.agents
       .map((a: any) => ({
-        root: path.relative(cwd, a.origin.root),
+        root: normalizePath(a.origin.root),
         version: a.origin.version,
       }))
       .filter(
