@@ -547,21 +547,40 @@ export async function main(): Promise<void> {
   const activeRoot = discovery.activeLocation.resolvedRoot;
 
   if (!activeRoot || discovery.activeLocation.status !== 'valid') {
-    console.error(`\n❌ No valid BMAD installation found!`);
-    console.error(`\nTo fix this, ensure your BMAD path contains either:`);
-    console.error(`  • v6: A 'bmad/_cfg/manifest.yaml' file`);
-    console.error(`  • v4: An 'install-manifest.yaml' file`);
-    console.error(`\nTried locations:`);
+    console.error(`\n❌ BMAD Installation Not Found\n`);
+    console.error(
+      `We searched these locations but couldn't find a valid installation:`,
+    );
     discovery.locations.forEach((loc) => {
+      const status = loc.status === 'valid' ? '✅' : '✗';
+      const reason =
+        loc.status === 'not-found'
+          ? 'not found'
+          : loc.status === 'missing'
+            ? 'missing required files'
+            : loc.status === 'invalid'
+              ? 'invalid structure'
+              : '';
+      const detail = reason ? ` — ${reason}` : '';
       console.error(
-        `  ${loc.status === 'valid' ? '✓' : '✗'} ${loc.displayName}: ${loc.originalPath || '(not provided)'}`,
+        `  ${status} ${loc.displayName} (${loc.originalPath || 'not provided'})${detail}`,
       );
     });
+    console.error(`\nTo fix this, ensure your BMAD path contains:`);
+    console.error(`  • v6: bmad/_cfg/manifest.yaml`);
+    console.error(`  • v4: install-manifest.yaml`);
+    console.error(`\nNeed help? Run: npx bmad-method install`);
     throw new Error('Unable to determine valid BMAD root');
   }
 
+  // Detect version for success message
+  const activeVersion = discovery.activeLocation.version || 'unknown';
+  const versionDisplay =
+    activeVersion !== 'unknown' ? ` (${activeVersion})` : '';
+
+  console.error(`\n✅ BMAD Installation Ready\n`);
   console.error(
-    `Active BMAD location (${discovery.activeLocation.displayName}): ${activeRoot}`,
+    `Active Location: ${activeRoot}${versionDisplay}\nSource: ${discovery.activeLocation.displayName}`,
   );
 
   try {

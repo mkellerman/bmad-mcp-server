@@ -30,21 +30,21 @@ describe('List commands', () => {
 
     const agents = await tool.execute('*list-agents');
     expect(agents.success).toBe(true);
-    expect(agents.content).toContain('Agents (available)');
+    expect(agents.content).toContain('BMAD Agents');
     expect(agents.content).toContain('analyst');
 
     const workflows = await tool.execute('*list-workflows');
     expect(workflows.success).toBe(true);
-    expect(workflows.content).toContain('Workflows (available)');
+    expect(workflows.content).toContain('BMAD Workflows');
     expect(workflows.content).toContain('party-mode');
 
     const tasks = await tool.execute('*list-tasks');
     expect(tasks.success).toBe(true);
-    expect(tasks.content).toContain('Tasks (available)');
+    expect(tasks.content).toContain('BMAD Tasks');
 
     const modules = await tool.execute('*list-modules');
     expect(modules.success).toBe(true);
-    expect(modules.content).toContain('Modules (available)');
+    expect(modules.content).toContain('BMAD Modules');
     expect(modules.content).toContain(
       '| Module | Agents | Workflows | Tasks |',
     );
@@ -73,7 +73,8 @@ describe('List commands', () => {
 
     const agents = await tool.execute('*list-agents');
     expect(agents.success).toBe(true);
-    expect(agents.content).toContain('Agents (available)');
+    expect(agents.content).toContain('BMAD Agents');
+    expect(agents.content).toContain('Summary:');
 
     // Should contain agents from both roots
     expect(agents.content).toContain('debug'); // from custom

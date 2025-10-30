@@ -82,11 +82,36 @@ export function validateName(
       const names = getAgentNames(agents);
       const caseMatch = checkCaseMismatch(parsed.name, names);
       const close = findClosestMatch(parsed.name, names);
+
+      // Build enhanced error message
+      let errorMessage = `❌ Agent Not Found: '${name}'`;
+      const suggestions: string[] = [];
+
+      if (caseMatch) {
+        suggestions.push(caseMatch);
+      }
+      if (close && close !== caseMatch) {
+        suggestions.push(close);
+      }
+
+      // Add helpful context
+      if (suggestions.length > 0) {
+        errorMessage += `\n\nDid you mean one of these?`;
+        suggestions.forEach((s) => {
+          const agent = agents.find((a) => a.name === s);
+          const desc = agent?.title || agent?.role || '';
+          errorMessage += `\n  • ${s}${desc ? ` (${desc})` : ''}`;
+        });
+        errorMessage += `\n\n💡 See all agents: *list-agents`;
+      } else {
+        errorMessage += `\n\n💡 See available agents: *list-agents`;
+      }
+
       return {
         valid: false,
         errorCode: ErrorCode.UNKNOWN_AGENT,
-        errorMessage: `Agent '${name}' not found`,
-        suggestions: [caseMatch, close].filter(Boolean) as string[],
+        errorMessage,
+        suggestions,
         exitCode: 2,
       };
     }
@@ -106,11 +131,36 @@ export function validateName(
       const names = getWorkflowNames(workflows);
       const caseMatch = checkCaseMismatch(parsed.name, names);
       const close = findClosestMatch(parsed.name, names);
+
+      // Build enhanced error message
+      let errorMessage = `❌ Workflow Not Found: '${name}'`;
+      const suggestions: string[] = [];
+
+      if (caseMatch) {
+        suggestions.push(caseMatch);
+      }
+      if (close && close !== caseMatch) {
+        suggestions.push(close);
+      }
+
+      // Add helpful context
+      if (suggestions.length > 0) {
+        errorMessage += `\n\nDid you mean one of these?`;
+        suggestions.forEach((s) => {
+          const workflow = workflows.find((w) => w.name === s);
+          const desc = workflow?.description || '';
+          errorMessage += `\n  • ${s}${desc ? ` (${desc})` : ''}`;
+        });
+        errorMessage += `\n\n💡 See all workflows: *list-workflows`;
+      } else {
+        errorMessage += `\n\n💡 See available workflows: *list-workflows`;
+      }
+
       return {
         valid: false,
         errorCode: ErrorCode.UNKNOWN_WORKFLOW,
-        errorMessage: `Workflow '${name}' not found`,
-        suggestions: [caseMatch, close].filter(Boolean) as string[],
+        errorMessage,
+        suggestions,
         exitCode: 2,
       };
     }

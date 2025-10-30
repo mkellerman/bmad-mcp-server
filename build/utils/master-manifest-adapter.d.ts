@@ -26,10 +26,14 @@ export declare function filterExisting(records: MasterRecord[]): MasterRecord[];
  * This adapter extracts the relevant fields from MasterRecord and maps them
  * to the expected Agent structure.
  *
+ * If the agent file exists and the manifest doesn't have rich metadata (role, icon),
+ * the file will be parsed to extract this information from the XML/YAML section.
+ *
  * @param record - MasterRecord entry for an agent
+ * @param parseMetadata - Whether to parse the agent file for metadata when needed (default: true)
  * @returns Agent interface compatible with legacy code
  */
-export declare function masterRecordToAgent(record: MasterRecord): Agent;
+export declare function masterRecordToAgent(record: MasterRecord, parseMetadata?: boolean): Agent;
 /**
  * Convert a MasterRecord (workflow) to legacy Workflow interface.
  *
@@ -57,9 +61,10 @@ export declare function masterRecordToTask(record: MasterRecord): Task;
  * Automatically filters for existing files before conversion.
  *
  * @param records - Array of MasterRecord entries (agents)
+ * @param parseMetadata - Whether to parse agent files for metadata (default: true)
  * @returns Array of Agent interfaces
  */
-export declare function convertAgents(records: MasterRecord[]): Agent[];
+export declare function convertAgents(records: MasterRecord[], parseMetadata?: boolean): Agent[];
 /**
  * Batch convert multiple workflow records to Workflow interfaces.
  *

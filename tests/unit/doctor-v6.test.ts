@@ -31,7 +31,8 @@ describe('doctor v6 integration', () => {
       masterManifestService: service,
     });
     expect(resCompact.success).toBe(true);
-    expect(resCompact.content).toContain('Inventory Summary (All Origins)');
+    expect(resCompact.content).toContain('Resource Inventory');
+    expect(resCompact.content).toContain('BMAD Health Diagnostic');
 
     const resFull = doctor('*doctor --reload', {
       discovery,
@@ -41,6 +42,7 @@ describe('doctor v6 integration', () => {
       masterManifestService: service,
     });
     expect(resFull.success).toBe(true);
-    expect(resFull.content).toContain('Inventory Summary (All Origins)');
+    expect(resFull.content).toContain('Resource Inventory');
+    expect(resFull.content).toContain('BMAD Health Diagnostic');
   });
 });

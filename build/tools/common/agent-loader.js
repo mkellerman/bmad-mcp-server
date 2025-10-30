@@ -18,9 +18,16 @@ export function loadAgent({ agentName, agents, fileReader, }) {
     }
     if (!agent) {
         // Should not happen after validation, but guard anyway
+        const errorMsg = [
+            `❌ Agent Not Found: '${agentName}'`,
+            ``,
+            `The agent exists in the registry but couldn't be loaded.`,
+            ``,
+            `💡 Try: *list-agents to see all available agents`,
+        ].join('\n');
         return {
             success: false,
-            error: `Agent '${agentName}' not found in manifest`,
+            error: errorMsg,
             exitCode: 2,
         };
     }
@@ -36,9 +43,19 @@ export function loadAgent({ agentName, agents, fileReader, }) {
         contentParts.push(agentContent);
     }
     catch (error) {
+        const errorMsg = [
+            `❌ Error Loading Agent File`,
+            ``,
+            `Agent: ${agentName}`,
+            `Error: ${error.message}`,
+            ``,
+            `💡 Possible fixes:`,
+            `  1. Run *doctor to check for missing files`,
+            `  2. Verify installation: npx bmad-method install`,
+        ].join('\n');
         return {
             success: false,
-            error: `Error loading agent file: ${error.message}`,
+            error: errorMsg,
             exitCode: 3,
         };
     }

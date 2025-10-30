@@ -11,6 +11,7 @@
 
 import type { MasterRecord, Agent, Workflow, Task } from '../types/index.js';
 import logger from './logger.js';
+import { parseAgentMetadata } from './agent-metadata-parser.js';
 
 /**
  * Filter master records to only include files that physically exist.
@@ -38,15 +39,35 @@ export function filterExisting(records: MasterRecord[]): MasterRecord[] {
  * This adapter extracts the relevant fields from MasterRecord and maps them
  * to the expected Agent structure.
  *
+ * If the agent file exists and the manifest doesn't have rich metadata (role, icon),
+ * the file will be parsed to extract this information from the XML/YAML section.
+ *
  * @param record - MasterRecord entry for an agent
+ * @param parseMetadata - Whether to parse the agent file for metadata when needed (default: true)
  * @returns Agent interface compatible with legacy code
  */
-export function masterRecordToAgent(record: MasterRecord): Agent {
+export function masterRecordToAgent(
+  record: MasterRecord,
+  parseMetadata = true,
+): Agent {
+  // Only parse agent file if we don't already have description/role from manifest
+  // and the file exists
+  let parsedMetadata: ReturnType<typeof parseAgentMetadata> = {};
+  const needsParsing =
+    parseMetadata &&
+    record.exists &&
+    record.absolutePath &&
+    !record.description; // If manifest has description, skip parsing
+
+  if (needsParsing) {
+    parsedMetadata = parseAgentMetadata(record.absolutePath);
+  }
+
   return {
     // Primary identification
     name: record.name || '',
-    displayName: record.displayName || record.name || '',
-    title: record.description || '',
+    displayName: parsedMetadata.name || record.displayName || record.name || '',
+    title: parsedMetadata.title || record.description || '',
 
     // Module and location info
     module: record.moduleName,
@@ -56,12 +77,12 @@ export function masterRecordToAgent(record: MasterRecord): Agent {
     sourceRoot: record.origin.root,
     sourceLocation: record.origin.displayName,
 
-    // Legacy fields (not in MasterRecord but required by interface)
-    role: '', // Not tracked in master manifest
-    icon: undefined,
-    identity: undefined,
-    communicationStyle: undefined,
-    principles: undefined,
+    // Rich metadata from parsed agent file (only if needed)
+    role: parsedMetadata.role || '',
+    icon: parsedMetadata.icon,
+    identity: parsedMetadata.identity,
+    communicationStyle: parsedMetadata.communicationStyle,
+    principles: parsedMetadata.principles,
   };
 }
 
@@ -123,11 +144,17 @@ export function masterRecordToTask(record: MasterRecord): Task {
  * Automatically filters for existing files before conversion.
  *
  * @param records - Array of MasterRecord entries (agents)
+ * @param parseMetadata - Whether to parse agent files for metadata (default: true)
  * @returns Array of Agent interfaces
  */
-export function convertAgents(records: MasterRecord[]): Agent[] {
+export function convertAgents(
+  records: MasterRecord[],
+  parseMetadata = true,
+): Agent[] {
   const existingRecords = filterExisting(records);
-  return existingRecords.map(masterRecordToAgent);
+  return existingRecords.map((record) =>
+    masterRecordToAgent(record, parseMetadata),
+  );
 }
 
 /**

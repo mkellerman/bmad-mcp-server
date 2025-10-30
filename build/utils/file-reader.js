@@ -60,7 +60,18 @@ export class FileReader {
         // Resolve path using master manifest
         const absolutePath = resolveFilePath(this.masterManifest, filePath);
         if (!absolutePath) {
-            throw new FileReadError(`File not found in master manifest: ${filePath}`);
+            const errorMsg = [
+                `❌ Resource File Not Found`,
+                ``,
+                `Expected: ${filePath}`,
+                `Reason: File not found in master manifest`,
+                ``,
+                `💡 Possible fixes:`,
+                `  1. Run *doctor to check installation health`,
+                `  2. Verify the file path is correct`,
+                `  3. Re-install BMAD: npx bmad-method install`,
+            ].join('\n');
+            throw new FileReadError(errorMsg);
         }
         // Read the resolved file
         try {
