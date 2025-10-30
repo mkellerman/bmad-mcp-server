@@ -4,6 +4,7 @@ export interface ResolveOptions {
     scope?: 'active-only' | 'all';
     prefer?: 'manifest' | 'filesystem';
     activeRoot?: string;
+    activeRoots?: string[];
 }
 export interface ConflictDetail {
     key: string;

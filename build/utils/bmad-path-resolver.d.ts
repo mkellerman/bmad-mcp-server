@@ -14,6 +14,7 @@ export interface BmadLocationInfo {
 }
 export interface BmadPathResolution {
     activeLocation: BmadLocationInfo;
+    activeLocations: BmadLocationInfo[];
     locations: BmadLocationInfo[];
     userBmadPath: string;
     projectRoot: string;

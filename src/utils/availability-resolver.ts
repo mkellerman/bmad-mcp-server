@@ -8,7 +8,8 @@ export interface ResolveOptions {
   originPriority?: BmadOriginSource[];
   scope?: 'active-only' | 'all';
   prefer?: 'manifest' | 'filesystem';
-  activeRoot?: string; // absolute path to the active origin root if using active-only
+  activeRoot?: string; // absolute path to the active origin root if using active-only (deprecated, use activeRoots)
+  activeRoots?: string[]; // absolute paths to all active origin roots if using active-only
 }
 
 export interface ConflictDetail {
@@ -57,10 +58,20 @@ export function resolveAvailableCatalog(
   master: MasterManifests,
   options: ResolveOptions = {},
 ): AvailableCatalog {
-  const scopeFilter = (rec: MasterRecord) =>
-    options.scope === 'active-only' && options.activeRoot
-      ? rec.origin.root === options.activeRoot
-      : true;
+  const scopeFilter = (rec: MasterRecord) => {
+    if (options.scope === 'active-only') {
+      // Support both activeRoots (plural, preferred) and activeRoot (singular, backward compat)
+      const roots =
+        options.activeRoots ?? (options.activeRoot ? [options.activeRoot] : []);
+
+      // If no roots specified, no filtering (show all)
+      if (roots.length === 0) return true;
+
+      // Filter to only records from the specified active roots
+      return roots.includes(rec.origin.root);
+    }
+    return true; // 'all' scope or no scope - show everything
+  };
 
   const conflicts: ConflictDetail[] = [];
 

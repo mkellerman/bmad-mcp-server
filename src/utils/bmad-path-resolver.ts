@@ -21,6 +21,7 @@ export interface BmadLocationInfo {
 
 export interface BmadPathResolution {
   activeLocation: BmadLocationInfo;
+  activeLocations: BmadLocationInfo[]; // All CLI-provided valid locations
   locations: BmadLocationInfo[];
   userBmadPath: string;
   projectRoot: string;
@@ -194,8 +195,16 @@ function resolveStrictPaths(
     throw new Error(errorMessage);
   }
 
+  // Collect all valid CLI locations for multi-root support
+  const activeLocations = candidates.filter(
+    (loc) =>
+      loc.status === 'valid' &&
+      (loc.manifestDir || loc.manifestPath || loc.version === 'unknown'),
+  );
+
   return {
     activeLocation,
+    activeLocations,
     locations: candidates,
     userBmadPath,
     projectRoot: options.cwd,
@@ -281,8 +290,22 @@ function resolveAutoPaths(
     throw new Error(errorMessage);
   }
 
+  // Collect all valid CLI locations for multi-root support in auto mode
+  const activeLocations = candidates.filter(
+    (loc) =>
+      loc.status === 'valid' &&
+      loc.source === 'cli' &&
+      (loc.manifestDir || loc.manifestPath || loc.version === 'unknown'),
+  );
+
+  // If no CLI args provided, use the single active location
+  if (activeLocations.length === 0) {
+    activeLocations.push(activeLocation);
+  }
+
   return {
     activeLocation,
+    activeLocations,
     locations: candidates,
     userBmadPath,
     projectRoot: options.cwd,

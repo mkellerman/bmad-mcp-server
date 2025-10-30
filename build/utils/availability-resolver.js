@@ -24,9 +24,19 @@ function selectWinner(candidates, options) {
     return sorted[0];
 }
 export function resolveAvailableCatalog(master, options = {}) {
-    const scopeFilter = (rec) => options.scope === 'active-only' && options.activeRoot
-        ? rec.origin.root === options.activeRoot
-        : true;
+    const scopeFilter = (rec) => {
+        if (options.scope === 'active-only') {
+            // Support both activeRoots (plural, preferred) and activeRoot (singular, backward compat)
+            const roots = options.activeRoots ??
+                (options.activeRoot ? [options.activeRoot] : []);
+            // If no roots specified, no filtering (show all)
+            if (roots.length === 0)
+                return true;
+            // Filter to only records from the specified active roots
+            return roots.includes(rec.origin.root);
+        }
+        return true; // 'all' scope or no scope - show everything
+    };
     const conflicts = [];
     function resolve(records) {
         const filtered = records.filter(scopeFilter);

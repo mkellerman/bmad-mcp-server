@@ -102,17 +102,20 @@ export class UnifiedBMADTool {
      * Handle list commands (*list-agents, *list-workflows, *list-tasks).
      *
      * Queries master manifest and formats results for display.
+     * Uses all CLI-provided active locations to support multi-root setups.
      *
      * @param cmd - List command string
      * @returns Formatted list result
      */
     handleListCommand(cmd) {
         const master = this.masterService.get();
-        const activeRoot = this.discovery.activeLocation.resolvedRoot ??
-            this.discovery.activeLocation.originalPath;
+        // Collect all active roots from CLI-provided locations
+        const activeRoots = this.discovery.activeLocations
+            .map((loc) => loc.resolvedRoot ?? loc.originalPath)
+            .filter((root) => root !== undefined);
         const resolved = resolveAvailableCatalog(master, {
             scope: 'active-only',
-            activeRoot: activeRoot ?? undefined,
+            activeRoots, // Use all CLI-provided roots, not just the first
         });
         return handleList(cmd, { resolved, master, discovery: this.discovery });
     }

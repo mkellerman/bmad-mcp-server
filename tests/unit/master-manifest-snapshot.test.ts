@@ -112,20 +112,20 @@ describe('Master Manifest Snapshot Test', () => {
       (a: any) => a.name === 'debug',
     );
     expect(debugAgent).toBeDefined();
-    expect((debugAgent as any)?.origin.version).toBe('unknown');
-    expect((debugAgent as any)?.origin.root).toContain('custom/debug');
-    expect((debugAgent as any)?.moduleName).toBe(''); // Flat structure has no module name
+    expect((debugAgent as any)?.origin.version).toBe('v6'); // Custom has _cfg/manifest.yaml so it's v6
+    expect((debugAgent as any)?.origin.root).toContain('custom');
+    expect((debugAgent as any)?.moduleName).toBe('debug'); // Module name is 'debug'
     expect((debugAgent as any)?.status).toBe('not-in-manifest'); // Filesystem-based discovery
   });
 
   it('should include workflows from custom debug installation', () => {
     const debugWorkflows = generatedManifest.workflows.filter((w: any) =>
-      w.origin.root.includes('custom/debug'),
+      w.origin.root.includes('custom'),
     );
     expect(debugWorkflows.length).toBeGreaterThan(0);
     expect(debugWorkflows.length).toBe(
       expectedManifest.workflows.filter((w: any) =>
-        w.origin.root.includes('custom/debug'),
+        w.origin.root.includes('custom'),
       ).length,
     );
   });

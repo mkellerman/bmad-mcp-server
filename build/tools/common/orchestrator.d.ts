@@ -30,6 +30,7 @@ export declare class UnifiedBMADTool {
      * Handle list commands (*list-agents, *list-workflows, *list-tasks).
      *
      * Queries master manifest and formats results for display.
+     * Uses all CLI-provided active locations to support multi-root setups.
      *
      * @param cmd - List command string
      * @returns Formatted list result

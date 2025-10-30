@@ -1,5 +1,5 @@
 & npm run build
-& npm run bmad -- "*export-master-manifest" .bmad/custom --mode=strict
+& npm run bmad -- "*export-master-manifest" .bmad/custom ./.bmad/6.0.0-alpha.0/bmad --mode=strict
 
 $master = Get-Content ./master-manifest.json | ConvertFrom-Json
 
