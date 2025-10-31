@@ -1,0 +1,74 @@
+{
+  "name": "bmad-mcp-server",
+  "version": "0.2.4",
+  "description": "Model Context Protocol server for BMAD methodology",
+  "type": "module",
+  "bin": {
+    "bmad-mcp-server": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js",
+    "prepare": "husky || true",
+    "start": "node build/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:llm": "vitest run --config vitest.config.llm.ts",
+    "test:e2e": "vitest run --config vitest.config.llm.ts",
+    "test:report": "npx playwright show-report playwright-report",
+    "e2e:start": "docker-compose -f tests/e2e/framework/docker-compose.yml up -d",
+    "e2e:stop": "docker-compose -f tests/e2e/framework/docker-compose.yml down",
+    "e2e:logs": "docker-compose -f tests/e2e/framework/docker-compose.yml logs -f",
+    "lint": "eslint . --ext .ts,.js,.mjs",
+    "lint:fix": "eslint . --ext .ts,.js,.mjs --fix",
+    "format": "prettier --write .",
+    "guard:src-js": "node scripts/guard-src-js.mjs",
+    "precommit": "npm run guard:src-js && npm run lint:fix && npm run format",
+    "litellm:docker:start": "docker run -d --name litellm-proxy -p 4000:4000 -v $(pwd)/tests/support/litellm-config.yaml:/app/config.yaml ghcr.io/berriai/litellm:main-latest --config /app/config.yaml --port 4000",
+    "litellm:docker:stop": "docker stop litellm-proxy && docker rm litellm-proxy",
+    "litellm:docker:logs": "docker logs -f litellm-proxy",
+    "litellm:docker:health": "curl -s http://localhost:4000/health/readiness | jq",
+    "doctor:show": "node scripts/show-doctor.mjs",
+    "bmad": "node scripts/run-bmad.mjs"
+  },
+  "files": [
+    "build/"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "csv-parse": "^6.1.0",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@eslint/js": "^9.38.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.9.1",
+    "@vitest/coverage-v8": "^4.0.3",
+    "@vitest/ui": "^4.0.3",
+    "eslint": "^9.17.0",
+    "globals": "^16.4.0",
+    "husky": "^9.1.7",
+    "openai": "^6.7.0",
+    "prettier": "^3.4.2",
+    "semantic-release": "^24.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^4.0.3"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "bmad",
+    "agile",
+    "ai-agents"
+  ],
+  "author": "",
+  "license": "ISC"
+}
