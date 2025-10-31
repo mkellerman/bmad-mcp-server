@@ -28,6 +28,7 @@ import {
 import { UnifiedBMADTool, buildToolDescription } from './tools/index.js';
 import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
+import { GitSourceResolver } from './utils/git-source-resolver.js';
 import logger from './utils/logger.js';
 
 // Compute __dirname - use import.meta.url when available (production)
@@ -499,9 +500,33 @@ export async function main(): Promise<void> {
 
   const mode: 'auto' | 'strict' = rawMode;
 
+  // Filter CLI args (exclude commands and flags)
   const cliArgs = allArgs.filter(
     (arg) => !arg.startsWith('*') && !arg.startsWith('--'),
   );
+
+  // Process CLI args to resolve git+ URLs to local paths
+  const gitResolver = new GitSourceResolver();
+  const processedCliArgs: string[] = [];
+
+  for (const arg of cliArgs) {
+    if (GitSourceResolver.isGitUrl(arg)) {
+      try {
+        const localPath = await gitResolver.resolve(arg);
+        processedCliArgs.push(localPath);
+        console.error(`✓ Resolved Git source: ${arg}`);
+      } catch (error) {
+        console.error(`❌ Failed to resolve Git URL: ${arg}`);
+        console.error(
+          `   ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
+    } else {
+      processedCliArgs.push(arg);
+    }
+  }
+
   const envVar = process.env.BMAD_ROOT;
   const userBmadPath = path.join(os.homedir(), '.bmad');
 
@@ -519,7 +544,7 @@ export async function main(): Promise<void> {
 
   const discovery = resolveBmadPaths({
     cwd,
-    cliArgs,
+    cliArgs: processedCliArgs,
     envVar,
     userBmadPath,
     mode,

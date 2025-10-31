@@ -19,6 +19,30 @@ export interface ServerConfig {
 }
 
 /**
+ * Git URL specification for git+ URLs
+ */
+export interface GitUrlSpec {
+  protocol: 'https' | 'ssh';
+  host: string;
+  org: string;
+  repo: string;
+  ref: string; // branch, tag, or commit
+  subpath?: string; // optional path within repo
+}
+
+/**
+ * Cache metadata for Git sources
+ */
+export interface GitCacheMetadata {
+  sourceUrl: string; // Original git+https://... URL
+  hash: string; // SHA256 of sourceUrl
+  ref: string; // Branch/tag/commit
+  subpath: string; // Subpath within repo (empty string if none)
+  lastPull: string; // ISO timestamp
+  currentCommit: string; // Git commit SHA
+}
+
+/**
  * Agent metadata from agent-manifest.csv
  */
 export interface Agent {

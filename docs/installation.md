@@ -300,6 +300,98 @@ Use `BMAD_ROOT` to point to any location:
 
 </details>
 
+### Option 4: Git Repository Sources
+
+**Best for:** Sharing BMAD modules across teams, version control, centralized updates
+
+Load BMAD modules directly from GitHub repositories using npm-style Git URLs.
+
+**Supported URL formats:**
+
+```bash
+# HTTPS with branch
+git+https://github.com/mkellerman/bmad-mcp-server.git#main:/.bmad/6.0.0-alpha.0/bmad
+
+# HTTPS with tag (pinned version)
+git+https://github.com/mkellerman/bmad-mcp-server.git#v1.0.0:/.bmad/6.0.0-alpha.0/bmad
+
+# HTTPS with specific commit
+git+https://github.com/mkellerman/bmad-mcp-server.git#abc123def:/.bmad/6.0.0-alpha.0/bmad
+
+# HTTPS with subpath within repo (pointing to BMAD installation)
+git+https://github.com/your-org/repo.git#main:/packages/bmad
+
+# SSH authentication
+git+ssh://git@github.com/mkellerman/bmad-mcp-server.git#main:/.bmad/6.0.0-alpha.0/bmad
+```
+
+**Configuration Examples:**
+
+<details>
+<summary><b>VS Code with Git Sources</b></summary>
+
+```json
+{
+  "github.copilot.chat.mcp.enabled": true,
+  "github.copilot.chat.mcp.servers": {
+    "bmad": {
+      "command": "node",
+      "args": [
+        "/path/to/bmad-mcp-server/build/index.js",
+        "git+https://github.com/mkellerman/bmad-mcp-server.git#main:/.bmad/6.0.0-alpha.0/bmad"
+      ]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Mix Local Paths and Git URLs</b></summary>
+
+```json
+{
+  "command": "node",
+  "args": [
+    "-y",
+    "git+https://github.com/mkellerman/bmad-mcp-server",
+    "${workspaceFolder}/.bmad/custom/bmad",
+    "git+https://github.com/mkellerman/bmad-mcp-server.git:/.bmad/6.0.0-alpha.0/bmad",
+    "git+https://github.com/your-team/workflows.git#main:/bmad"
+  ]
+}
+```
+
+</details>
+
+**How Git sources work:**
+
+1. **First startup:** Server clones repository to `~/.bmad/cache/git/`
+2. **Subsequent startups:** Server pulls latest changes (always up-to-date)
+3. **URL changes:** Changing branch/subpath creates new cache (old cache unused)
+4. **Cache location:** `~/.bmad/cache/git/github.com-org-repo-branch-hash/`
+
+**Benefits:**
+
+- ✅ **Always latest:** Automatic updates on server restart
+- ✅ **Version pinning:** Use tags/commits for stability
+- ✅ **Team sharing:** Point everyone to same repo
+- ✅ **Zero project files:** No Git submodules or local copies
+- ✅ **Fast startup:** Smart caching with integrity validation
+
+**Cache management:**
+
+Clear Git cache if needed:
+
+```bash
+rm -rf ~/.bmad/cache/git
+```
+
+The server will re-clone on next startup.
+
+</details>
+
 ### Option 4: Local Development
 
 **Best for:** Contributors working on the MCP Server itself

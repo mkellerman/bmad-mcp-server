@@ -14,6 +14,28 @@ export interface ServerConfig {
     discoveryMode: DiscoveryMode;
 }
 /**
+ * Git URL specification for git+ URLs
+ */
+export interface GitUrlSpec {
+    protocol: 'https' | 'ssh';
+    host: string;
+    org: string;
+    repo: string;
+    ref: string;
+    subpath?: string;
+}
+/**
+ * Cache metadata for Git sources
+ */
+export interface GitCacheMetadata {
+    sourceUrl: string;
+    hash: string;
+    ref: string;
+    subpath: string;
+    lastPull: string;
+    currentCommit: string;
+}
+/**
  * Agent metadata from agent-manifest.csv
  */
 export interface Agent {

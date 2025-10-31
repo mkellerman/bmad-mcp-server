@@ -26,6 +26,9 @@ test-results/
 playwright-report/
 test-output.log
 
+# Git source cache (BMAD MCP Server)
+.bmad/cache/
+
 # Environment variables (legacy - not used with Docker setup)
 .env
 .env.local

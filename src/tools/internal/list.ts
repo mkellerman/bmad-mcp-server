@@ -71,10 +71,10 @@ export function handleListCommand(
     // Sort modules for metadata
     const sortedModules = Array.from(agentsByModule.keys()).sort();
 
-    // Sort all agents alphabetically by display name
+    // Sort all agents alphabetically by command name (agent.name), not displayName
     const sortedAgents = allAgents.sort((a: any, b: any) => {
-      const nameA = (a.displayName || a.name || '').toLowerCase();
-      const nameB = (b.displayName || b.name || '').toLowerCase();
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
 
@@ -218,10 +218,10 @@ export function handleListCommand(
     // Sort modules for metadata
     const sortedModules = Array.from(workflowsByModule.keys()).sort();
 
-    // Sort all workflows alphabetically by display name
+    // Sort all workflows alphabetically by command name (workflow.name), not displayName
     const sortedWorkflows = allWorkflows.sort((a: any, b: any) => {
-      const nameA = (a.displayName || a.name || '').toLowerCase();
-      const nameB = (b.displayName || b.name || '').toLowerCase();
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
 

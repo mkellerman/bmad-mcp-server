@@ -33,10 +33,45 @@ describe('List commands', () => {
     expect(agents.content).toContain('BMAD Agents');
     expect(agents.content).toContain('analyst');
 
+    // Verify agents are sorted by command name (not display name)
+    const agentLines = (agents.content ?? '')
+      .split('\n')
+      .filter((l) => l.trim().startsWith('- '));
+    const agentNames = agentLines
+      .map((l) => {
+        const match = l.match(/`([^`]+)`/);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean);
+
+    // Check that agent names are in alphabetical order
+    const sortedNames = [...agentNames].sort();
+    expect(agentNames).toEqual(sortedNames);
+
+    // Verify ux-expert comes after analyst (alphabetically by command, not display name)
+    const analystIndex = agentNames.indexOf('analyst');
+    const uxIndex = agentNames.indexOf('ux-expert');
+    expect(uxIndex).toBeGreaterThan(analystIndex);
+
     const workflows = await tool.execute('*list-workflows');
     expect(workflows.success).toBe(true);
     expect(workflows.content).toContain('BMAD Workflows');
     expect(workflows.content).toContain('party-mode');
+
+    // Verify workflows are sorted by command name
+    const workflowLines = (workflows.content ?? '')
+      .split('\n')
+      .filter((l) => l.trim().startsWith('- '));
+    const workflowNames = workflowLines
+      .map((l) => {
+        const match = l.match(/`([^`]+)`/);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean);
+
+    // Check that workflow names are in alphabetical order
+    const sortedWorkflows = [...workflowNames].sort();
+    expect(workflowNames).toEqual(sortedWorkflows);
   });
 
   it('lists agents from multiple CLI roots (multi-root support)', async () => {

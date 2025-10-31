@@ -163,6 +163,40 @@ The MCP Server intelligently finds BMAD resources:
 - Special projects: Add `./bmad` folder with customizations
 - MCP Server uses project version when present, global otherwise
 
+**Git repository sources (NEW):**
+
+Load BMAD modules directly from GitHub repositories:
+
+```json
+{
+  "servers": {
+    "bmad": {
+      "command": "node",
+      "args": [
+        "-y",
+        "bmad-mcp-server",
+        "git+https://github.com/mkellerman/bmad-mcp-server.git#main:/.bmad/6.0.0-alpha.0/bmad",
+        "/path/to/your/bmad/folder"
+      ]
+    }
+  }
+}
+```
+
+**Supported Git URL formats:**
+
+- `git+https://github.com/org/repo.git#branch` - HTTPS with branch
+- `git+https://github.com/org/repo.git#v2.0.0` - Pinned to tag
+- `git+https://github.com/org/repo.git#main:/bmad/core` - Subpath within repo
+- `git+ssh://git@github.com/org/repo.git#main` - SSH authentication
+
+The server automatically:
+
+- Clones repositories to `~/.bmad/cache/git/`
+- Pulls latest changes on each startup
+- Validates cache integrity with URL/branch/subpath matching
+- Supports mixing local paths and Git URLs
+
 📖 **Advanced configuration:** See [Installation Guide](./docs/installation.md)
 
 ## 🌟 Real-World Scenarios
