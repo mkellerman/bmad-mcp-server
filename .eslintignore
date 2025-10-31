@@ -1,0 +1,13 @@
+node_modules
+build
+dist
+coverage
+*.log
+.git
+.DS_Store
+
+# Test fixtures should not be linted
+tests/support/fixtures/
+
+# BMAD sample installations should not be linted
+.bmad/

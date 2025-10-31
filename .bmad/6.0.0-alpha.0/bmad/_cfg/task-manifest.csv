@@ -1,0 +1,8 @@
+name,displayName,description,module,path
+"adv-elicit","Advanced Elicitation","","core","bmad/core/tasks/adv-elicit.md"
+"index-docs","Index Docs","","core","bmad/core/tasks/index-docs.md"
+"shard-doc","Shard Doc","","core","bmad/core/tasks/shard-doc.md"
+"validate-workflow","Validate Workflow Output","Run a checklist against a document with thorough analysis and produce a validation report","core","bmad/core/tasks/validate-workflow.md"
+"workflow","Execute Workflow","Execute given workflow by loading its configuration, following instructions, and producing output","core","bmad/core/tasks/workflow.md"
+"daily-standup","Daily Standup","","bmm","bmad/bmm/tasks/daily-standup.md"
+"retrospective","Team Retrospective","","bmm","bmad/bmm/tasks/retrospective.md"

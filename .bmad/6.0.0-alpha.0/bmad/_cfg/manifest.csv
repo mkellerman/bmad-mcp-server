@@ -1,0 +1,116 @@
+# BMAD Manifest
+# Generated: 2025-10-27T16:19:58.254Z
+
+## Installation Info
+Property,Value
+Version,6.0.0-alpha.0
+InstallDate,2025-10-27T16:19:58.237Z
+LastUpdated,2025-10-27T16:19:58.254Z
+
+## Modules
+Name,Version,ShortTitle
+core,,
+bmb,,
+bmm,,
+cis,,
+
+## Files
+Type,Path,Name,Title
+agent,bmad/core/agents/bmad-master.md,BMad Master,BMad Master Task Executor
+csv,bmad/core/tasks/adv-elicit-methods.csv,adv-elicit-methods,
+task,bmad/core/tasks/adv-elicit.md,Advanced Elicitation,
+task,bmad/core/tasks/index-docs.md,Index Docs,
+task,bmad/core/tasks/shard-doc.md,Shard Doc,
+task,bmad/core/tasks/validate-workflow.md,Validate Workflow Output,
+task,bmad/core/tasks/workflow.md,Execute Workflow,
+yaml,bmad/core/workflows/bmad-init/workflow.yaml,workflow,
+yaml,bmad/core/workflows/party-mode/workflow.yaml,workflow,
+yaml,bmad/bmb/workflows/convert-legacy/workflow.yaml,workflow,
+agent,bmad/bmb/workflows/create-agent/README.md,{{agent_name}},{{agent_title}}
+agent,bmad/bmb/workflows/create-agent/agent-architecture.md,Name,Title
+c,bmad/bmb/workflows/create-agent/agent-command-patterns.md,,
+agent,bmad/bmb/workflows/create-agent/agent-types.md,Helper,Simple Helper
+critical,bmad/bmb/workflows/create-agent/instructions.md,,
+yaml,bmad/bmb/workflows/create-agent/workflow.yaml,workflow,
+yaml,bmad/bmb/workflows/create-module/installer-templates/install-module-config.yaml,install-module-config,
+js,bmad/bmb/workflows/create-module/installer-templates/installer.js,installer,
+yaml,bmad/bmb/workflows/create-module/workflow.yaml,workflow,
+step,bmad/bmb/workflows/create-workflow/workflow-creation-guide.md,,
+yaml,bmad/bmb/workflows/create-workflow/workflow-template/workflow.yaml,workflow,
+yaml,bmad/bmb/workflows/create-workflow/workflow.yaml,workflow,
+yaml,bmad/bmb/workflows/edit-workflow/workflow.yaml,workflow,
+yaml,bmad/bmb/workflows/module-brief/workflow.yaml,workflow,
+yaml,bmad/bmb/workflows/redoc/workflow.yaml,workflow,
+agent,bmad/bmm/agents/analyst.md,Mary,Business Analyst
+agent,bmad/bmm/agents/architect.md,Winston,Architect
+agent,bmad/bmm/agents/dev.md,Amelia,Developer Agent
+agent,bmad/bmm/agents/game-architect.md,Cloud Dragonborn,Game Architect
+agent,bmad/bmm/agents/game-designer.md,Samus Shepard,Game Designer
+agent,bmad/bmm/agents/game-dev.md,Link Freeman,Game Developer
+agent,bmad/bmm/agents/pm.md,John,Product Manager
+agent,bmad/bmm/agents/po.md,Sarah,Product Owner
+agent,bmad/bmm/agents/sm.md,Bob,Scrum Master
+agent,bmad/bmm/agents/tea.md,Murat,Master Test Architect
+agent,bmad/bmm/agents/ux-expert.md,Sally,UX Expert
+task,bmad/bmm/tasks/daily-standup.md,Daily Standup,
+task,bmad/bmm/tasks/retrospective.md,Team Retrospective,
+yaml,bmad/bmm/teams/team-all.yaml,team-all,
+yaml,bmad/bmm/teams/team-dev.yaml,team-dev,
+yaml,bmad/bmm/teams/team-gamedev.yaml,team-gamedev,
+task,bmad/bmm/testarch/atdd.md,Acceptance Test Driven Development,
+task,bmad/bmm/testarch/automate.md,Automation Expansion,
+task,bmad/bmm/testarch/ci.md,CI/CD Enablement,
+task,bmad/bmm/testarch/framework.md,Test Framework Setup,
+task,bmad/bmm/testarch/nfr-assess.md,NFR Assessment,
+task,bmad/bmm/testarch/risk-profile.md,Risk Profile,
+csv,bmad/bmm/testarch/tea-commands.csv,tea-commands,
+task,bmad/bmm/testarch/tea-gate.md,Quality Gate,
+task,bmad/bmm/testarch/test-design.md,Test Design,
+task,bmad/bmm/testarch/trace-requirements.md,Requirements Traceability,
+csv,bmad/bmm/workflows/1-analysis/brainstorm-game/game-brain-methods.csv,game-brain-methods,
+critical,bmad/bmm/workflows/1-analysis/brainstorm-game/instructions.md,,
+yaml,bmad/bmm/workflows/1-analysis/brainstorm-game/workflow.yaml,workflow,
+critical,bmad/bmm/workflows/1-analysis/brainstorm-project/instructions.md,,
+yaml,bmad/bmm/workflows/1-analysis/brainstorm-project/workflow.yaml,workflow,
+yaml,bmad/bmm/workflows/1-analysis/game-brief/workflow.yaml,workflow,
+yaml,bmad/bmm/workflows/1-analysis/product-brief/workflow.yaml,workflow,
+yaml,bmad/bmm/workflows/1-analysis/research/claude-code/injections.yaml,injections,
+yaml,bmad/bmm/workflows/1-analysis/research/workflow.yaml,workflow,
+csv,bmad/bmm/workflows/2-plan/gdd/game-types.csv,game-types,
+yaml,bmad/bmm/workflows/2-plan/workflow.yaml,workflow,
+workflow,bmad/bmm/workflows/3-solutioning/instructions.md,solution-architecture,
+csv,bmad/bmm/workflows/3-solutioning/project-types/project-types.csv,project-types,
+checklist,bmad/bmm/workflows/3-solutioning/tech-spec/checklist.md,,
+critical,bmad/bmm/workflows/3-solutioning/tech-spec/instructions.md,,
+yaml,bmad/bmm/workflows/3-solutioning/tech-spec/workflow.yaml,workflow,
+csv,bmad/bmm/workflows/3-solutioning/templates/registry.csv,registry,
+yaml,bmad/bmm/workflows/3-solutioning/workflow.yaml,workflow,
+yaml,bmad/bmm/workflows/4-implementation/correct-course/workflow.yaml,workflow,
+critical,bmad/bmm/workflows/4-implementation/create-story/instructions.md,,
+yaml,bmad/bmm/workflows/4-implementation/create-story/workflow.yaml,workflow,
+critical,bmad/bmm/workflows/4-implementation/dev-story/instructions.md,,
+yaml,bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml,workflow,
+yaml,bmad/bmm/workflows/4-implementation/retrospective/workflow.yaml,workflow,
+critical,bmad/bmm/workflows/4-implementation/review-story/instructions.md,,
+yaml,bmad/bmm/workflows/4-implementation/review-story/workflow.yaml,workflow,
+storyContext,bmad/bmm/workflows/4-implementation/story-context/README.md,,
+checklist,bmad/bmm/workflows/4-implementation/story-context/checklist.md,,
+xml,bmad/bmm/workflows/4-implementation/story-context/context-template.xml,context-template,
+critical,bmad/bmm/workflows/4-implementation/story-context/instructions.md,,
+yaml,bmad/bmm/workflows/4-implementation/story-context/workflow.yaml,workflow,
+agent,bmad/cis/agents/brainstorming-coach.md,Carson,Elite Brainstorming Specialist
+agent,bmad/cis/agents/creative-problem-solver.md,Dr. Quinn,Master Problem Solver
+agent,bmad/cis/agents/design-thinking-coach.md,Maya,Design Thinking Maestro
+agent,bmad/cis/agents/innovation-strategist.md,Victor,Disruptive Innovation Oracle
+agent,bmad/cis/agents/storyteller.md,Sophia,Master Storyteller
+yaml,bmad/cis/teams/creative-squad.yaml,creative-squad,
+csv,bmad/cis/workflows/brainstorming/brain-methods.csv,brain-methods,
+yaml,bmad/cis/workflows/brainstorming/workflow.yaml,workflow,
+csv,bmad/cis/workflows/design-thinking/design-methods.csv,design-methods,
+yaml,bmad/cis/workflows/design-thinking/workflow.yaml,workflow,
+csv,bmad/cis/workflows/innovation-strategy/innovation-frameworks.csv,innovation-frameworks,
+yaml,bmad/cis/workflows/innovation-strategy/workflow.yaml,workflow,
+csv,bmad/cis/workflows/problem-solving/solving-methods.csv,solving-methods,
+yaml,bmad/cis/workflows/problem-solving/workflow.yaml,workflow,
+csv,bmad/cis/workflows/storytelling/story-types.csv,story-types,
+yaml,bmad/cis/workflows/storytelling/workflow.yaml,workflow,
