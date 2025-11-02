@@ -91,3 +91,4 @@ temp/
 pyproject.toml
 test-results/
 playwright-report/
+master-manifest.json

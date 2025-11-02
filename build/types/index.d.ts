@@ -98,6 +98,12 @@ export interface ValidationResult {
     errorMessage?: string;
     suggestions?: string[];
     exitCode: number;
+    requiresDisambiguation?: boolean;
+    disambiguationOptions?: Array<{
+        display: string;
+        value: string;
+        description?: string;
+    }>;
 }
 /**
  * BMAD tool execution result

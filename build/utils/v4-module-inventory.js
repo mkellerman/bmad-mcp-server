@@ -46,6 +46,45 @@ function classifyFilePath(filePath) {
     }
     return null;
 }
+/**
+ * Dynamically resolve file paths by trying multiple path strategies.
+ * Handles cases where manifest paths may not match actual directory structure.
+ */
+function resolveFilePath(installRoot, manifestPath, classification) {
+    // Strategy 1: Try the path exactly as specified in manifest
+    const exactPath = path.join(installRoot, manifestPath);
+    if (fs.existsSync(exactPath)) {
+        return { absolutePath: exactPath, exists: true };
+    }
+    // Strategy 2: Try removing the module name prefix from the path
+    // e.g., "bmad-2d-phaser-game-dev/agents/game-designer.md" -> "agents/game-designer.md"
+    const pathParts = manifestPath.split('/');
+    if (pathParts.length > 1) {
+        // Remove the first part (module name) and join the rest
+        const withoutModulePrefix = pathParts.slice(1).join('/');
+        const trimmedPath = path.join(installRoot, withoutModulePrefix);
+        if (fs.existsSync(trimmedPath)) {
+            return { absolutePath: trimmedPath, exists: true };
+        }
+    }
+    // Strategy 3: Try constructing path based on classification
+    // This handles cases where the directory structure is completely different
+    const categoryMap = {
+        agent: 'agents',
+        workflow: 'workflows',
+        task: 'tasks',
+    };
+    const category = categoryMap[classification.kind];
+    const fileName = path.basename(manifestPath);
+    if (category) {
+        const constructedPath = path.join(installRoot, category, fileName);
+        if (fs.existsSync(constructedPath)) {
+            return { absolutePath: constructedPath, exists: true };
+        }
+    }
+    // Strategy 4: Return the exact path even if it doesn't exist (for error reporting)
+    return { absolutePath: exactPath, exists: false };
+}
 function listFilesRecursive(dir, predicate) {
     const results = [];
     const stack = [dir];
@@ -136,8 +175,8 @@ export function inventoryOriginV4(origin) {
             const classification = classifyFilePath(file.path);
             if (!classification)
                 continue;
-            const absolutePath = path.join(installRoot, file.path);
-            const exists = fs.existsSync(absolutePath);
+            // Try multiple path resolution strategies for robust file detection
+            const { absolutePath, exists } = resolveFilePath(installRoot, file.path, classification);
             const moduleRelativePath = file.path;
             const bmadRelativePath = file.path;
             const record = {

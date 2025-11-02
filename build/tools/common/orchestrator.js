@@ -104,15 +104,14 @@ export class UnifiedBMADTool {
      * @returns Formatted list result
      */
     handleListCommand(cmd) {
+        console.error(`🔧 ORCHESTRATOR handleListCommand called with: "${cmd}"`);
         const master = this.masterService.get();
-        // Collect all active roots from CLI-provided locations
-        const activeRoots = this.discovery.activeLocations
-            .map((loc) => loc.resolvedRoot ?? loc.originalPath)
-            .filter((root) => root !== undefined);
+        // Use full resolved catalog that includes all discoverable agents (like diagnostic)
+        // This ensures consistent counts between *list-agents and *doctor commands
         const resolved = resolveAvailableCatalog(master, {
-            scope: 'active-only',
-            activeRoots, // Use all CLI-provided roots, not just the first
+            scope: 'all', // Show all discoverable agents, not just active-only
         });
+        console.error(`🔧 About to call handleList from internal/list.ts`);
         return handleList(cmd, { resolved, master, discovery: this.discovery });
     }
     /**
@@ -172,6 +171,32 @@ export class UnifiedBMADTool {
         });
     }
     formatErrorResponse(validation) {
+        // Handle disambiguation cases with numbered options
+        if (validation.requiresDisambiguation && validation.disambiguationOptions) {
+            const lines = [];
+            lines.push('**INSTRUCTIONS: Display the content below to the user EXACTLY as written. Do not summarize or paraphrase.**\n');
+            lines.push('---\n');
+            lines.push(`# 🤔 Multiple Agents Found\n`);
+            lines.push(`Multiple agents found with the same name. Please select which one you want to load:\n`);
+            validation.disambiguationOptions.forEach((option, index) => {
+                const description = option.description ? ` - ${option.description}` : '';
+                lines.push(`${index + 1}. **${option.display}**${description}`);
+            });
+            lines.push(`\n**Selection Options:**`);
+            lines.push(`- Type a number (1-${validation.disambiguationOptions.length}) to select`);
+            lines.push(`- Or use the full qualified name (e.g., \`bmad ${validation.disambiguationOptions[0].value}\`)`);
+            lines.push(`\n💡 **Tip:** You can avoid this prompt by using module-qualified names from the start!`);
+            lines.push('\n---');
+            return {
+                success: false,
+                type: 'help',
+                content: lines.join('\n'),
+                errorCode: validation.errorCode,
+                error: validation.errorMessage,
+                suggestions: validation.suggestions,
+                exitCode: validation.exitCode,
+            };
+        }
         return {
             success: false,
             errorCode: validation.errorCode,

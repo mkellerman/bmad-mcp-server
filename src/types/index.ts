@@ -109,6 +109,13 @@ export interface ValidationResult {
   errorMessage?: string;
   suggestions?: string[];
   exitCode: number;
+  // Disambiguation support
+  requiresDisambiguation?: boolean;
+  disambiguationOptions?: Array<{
+    display: string;
+    value: string;
+    description?: string;
+  }>;
 }
 
 /**

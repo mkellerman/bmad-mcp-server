@@ -154,18 +154,27 @@ Available Commands:
 
 ---
 
-# 📊 BMAD Agents
-Found **95 agents** across **10 modules**
+# 🤖 BMAD Agents
+**Found 57 agents across 9 modules**
 
-## Modules
-- **bmm**: 11 agents
-- **cis**: 5 agents
+---
+
+## 📦 Core/Standalone
+
+- 📊 `analyst`: Business Analyst - (**Mary**) - Strategic Business Analyst + Requirements Expert
+- 🏗️ `architect`: Architect - (**Winston**) - System Architect + Technical Design Leader
+- 💻 `dev`: Developer Agent - (**Amelia**) - Senior Implementation Engineer
+
+## � bmad-core
+
+- 📊 `bmad-core/analyst`: Business Analyst - (**Mary**) - Insightful Analyst & Strategic Ideation Partner
+- 🏗️ `bmad-core/architect`: Architect - (**Winston**) - Holistic System Architect & Full-Stack Technical Leader
 ...
 
-## 💡 What You Can Ask
-- "Tell me more about the [agent-name] agent"
-- "Show me agents in the [module] module"
-
+---
+**Tip:** Load any agent using the command shown above
+- Simple names: `bmad analyst`
+- Module-qualified: `bmad bmad-core/ux-expert`
 ---
 
 **📦 Structured Data** *(for your use - do NOT display this)*
@@ -173,9 +182,9 @@ Found **95 agents** across **10 modules**
 ```json
 {
   "items": [
-    { "name": "analyst", "module": "bmm", ... }
+    { "name": "analyst", "module": "", "displayName": "Mary", ... }
   ],
-  "summary": { "total": 95, ... }
+  "summary": { "total": 57, "byGroup": { "": 12, "bmad-core": 10, ... } }
 }
 ````
 

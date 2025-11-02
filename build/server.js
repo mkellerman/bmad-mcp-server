@@ -121,7 +121,7 @@ export class BMADMCPServer {
             });
             // Show final summary
             const masterData = this.masterService.get();
-            const hasErrors = discovery.locations.some(loc => loc.status !== 'valid');
+            const hasErrors = discovery.locations.some((loc) => loc.status !== 'valid');
             const errorSuffix = hasErrors ? ' (some sources failed)' : '';
             console.error(`\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`);
             console.error('📡 Server running on stdio');
@@ -472,7 +472,7 @@ export async function main() {
                 sourceResults.push({
                     type: 'git',
                     name: repoName,
-                    status: 'success'
+                    status: 'success',
                 });
             }
             catch (error) {
@@ -482,7 +482,7 @@ export async function main() {
                     type: 'git',
                     name: repoName,
                     status: 'error',
-                    error: error instanceof Error ? error.message : String(error)
+                    error: error instanceof Error ? error.message : String(error),
                 });
                 // Continue with other sources
             }
@@ -494,7 +494,7 @@ export async function main() {
             sourceResults.push({
                 type: 'local',
                 name: pathName,
-                status: 'success' // Will be updated after discovery
+                status: 'success', // Will be updated after discovery
             });
         }
     }
@@ -513,7 +513,8 @@ export async function main() {
             const index = parseInt(loc.displayName.match(/\d+/)?.[0] || '1') - 1;
             if (sourceResults[index]) {
                 if (loc.status !== 'valid') {
-                    sourceResults[index].status = loc.status === 'not-found' ? 'error' : 'warning';
+                    sourceResults[index].status =
+                        loc.status === 'not-found' ? 'error' : 'warning';
                     sourceResults[index].error = loc.details || `${loc.status}`;
                 }
             }
@@ -521,17 +522,22 @@ export async function main() {
     });
     // Display streamlined source results
     sourceResults.forEach((result) => {
-        const statusIcon = result.status === 'success' ? '✅' :
-            result.status === 'warning' ? '⚠️' : '❌';
+        const statusIcon = result.status === 'success'
+            ? '✅'
+            : result.status === 'warning'
+                ? '⚠️'
+                : '❌';
         if (result.type === 'git') {
             if (result.status === 'success') {
                 // Get version info from discovery
-                const location = discovery.locations.find(loc => loc.source === 'cli');
+                const location = discovery.locations.find((loc) => loc.source === 'cli');
                 const version = location?.version ? ` (${location.version})` : '';
                 console.error(`   ${statusIcon} Git: ${result.name}${version}`);
             }
             else {
-                const errorMsg = result.error?.includes('not found') ? 'Repository not found' : 'Failed to resolve';
+                const errorMsg = result.error?.includes('not found')
+                    ? 'Repository not found'
+                    : 'Failed to resolve';
                 console.error(`   ${statusIcon} Git: ${result.name} - ${errorMsg}`);
             }
         }
@@ -540,7 +546,9 @@ export async function main() {
                 console.error(`   ${statusIcon} Local: ${result.name}`);
             }
             else {
-                const errorMsg = result.error?.includes('not found') ? 'Path not found' : result.error || 'Invalid';
+                const errorMsg = result.error?.includes('not found')
+                    ? 'Path not found'
+                    : result.error || 'Invalid';
                 console.error(`   ${statusIcon} Local: ${result.name} - ${errorMsg}`);
             }
         }

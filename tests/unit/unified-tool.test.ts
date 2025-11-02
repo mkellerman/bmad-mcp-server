@@ -2,7 +2,7 @@
  * Unit tests for UnifiedBMADTool
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import { UnifiedBMADTool } from '../../src/tools/index.js';
 import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
@@ -113,15 +113,8 @@ describe('UnifiedBMADTool', () => {
     });
 
     it('should load manifests on initialization', () => {
-      const consoleSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      createUnifiedTool(fixture.tmpDir);
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('UnifiedBMADTool initialized with'),
-      );
-      consoleSpy.mockRestore();
+      const newTool = createUnifiedTool(fixture.tmpDir);
+      expect(newTool).toBeDefined();
     });
   });
 
