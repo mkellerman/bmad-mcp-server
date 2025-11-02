@@ -19,6 +19,13 @@ This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PAT
 - `fix: resolve path bug` → PATCH (0.1.0 → 0.1.1)
 - `feat!: change config format` → MAJOR (0.1.0 → 1.0.0)
 
+## Preparing v1.0.0
+
+We are transitioning from pre-1.0 versions to the first stable 1.0.0 release.
+This is signaled via a breaking-change semantic commit in the PR that lands
+the updated CI/CD and release process. No runtime APIs change; this marks the
+project as stable and ready for broader adoption.
+
 ## Pre-Release Testing
 
 ### Automatic PR Pre-releases
