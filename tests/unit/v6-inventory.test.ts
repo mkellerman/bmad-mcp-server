@@ -9,7 +9,7 @@ import { resolveAvailableCatalog } from '../../src/utils/availability-resolver.j
 import type { BmadOrigin } from '../../src/types/index.js';
 
 function sampleV6Root(): string {
-  const root = path.resolve(process.cwd(), '.bmad', '6.0.0-alpha.0', 'bmad');
+  const root = path.resolve(process.cwd(), 'tests', 'fixtures', 'bmad-core-v6');
   if (!fs.existsSync(root))
     throw new Error(`Sample v6 root not found at ${root}`);
   return root;
@@ -32,34 +32,32 @@ describe('v6 module inventory', () => {
     expect(v6).toBeDefined();
     expect(v6?.kind).toBe('v6');
     const names = (v6?.modules ?? []).map((m) => m.name).sort();
-    // Expect core modules present
+    // Expect core modules present (based on fixture)
     expect(names).toContain('core');
     expect(names).toContain('bmb');
-    expect(names).toContain('bmm');
-    expect(names).toContain('cis');
   });
 
   it('builds per-origin inventory with CSV, FS, and status flags', () => {
     const origin = makeOrigin();
     const inv = inventoryOriginV6(origin);
 
-    // Modules must include core/bmb/bmm/cis
+    // Modules must include core/bmb (based on fixture)
     const moduleNames = inv.modules.map((m) => m.name).sort();
-    expect(moduleNames).toEqual(['bmb', 'bmm', 'cis', 'core'].sort());
+    expect(moduleNames).toEqual(['bmb', 'core'].sort());
 
-    // bmb and bmm should have valid config.yaml
+    // bmb should have valid config.yaml
     const bmb = inv.modules.find((m) => m.name === 'bmb');
-    const bmm = inv.modules.find((m) => m.name === 'bmm');
     expect(bmb?.configValid).toBe(true);
-    expect(bmm?.configValid).toBe(true);
 
     // There should be CSV records for known entries and they should point inside bmad root
-    const analyst = inv.agents.find(
+    const bmadMaster = inv.agents.find(
       (r) =>
-        r.kind === 'agent' && r.moduleName === 'bmm' && r.name === 'analyst',
+        r.kind === 'agent' &&
+        r.moduleName === 'core' &&
+        r.name === 'bmad-master',
     );
-    expect(analyst).toBeDefined();
-    expect(analyst?.absolutePath.startsWith(origin.root)).toBe(true);
+    expect(bmadMaster).toBeDefined();
+    expect(bmadMaster?.absolutePath.startsWith(origin.root)).toBe(true);
 
     // Verify status flags are being set correctly
     // Items from manifest should have 'verified' or 'no-file-found' status
@@ -101,14 +99,14 @@ describe('master manifest aggregation and availability resolver', () => {
     });
 
     // Ensure a known agent exists and appears only once
-    const agentAnalyst = catalog.agents.filter(
-      (r) => r.kind === 'agent' && r.name === 'analyst',
+    const agentBmadMaster = catalog.agents.filter(
+      (r) => r.kind === 'agent' && r.name === 'bmad-master',
     );
-    expect(agentAnalyst.length).toBe(1);
+    expect(agentBmadMaster.length).toBe(1);
 
     // Since we deduplicate at inventory stage, manifest entries should be the source
-    if (agentAnalyst[0]) {
-      expect(agentAnalyst[0].source).toBe('manifest');
+    if (agentBmadMaster[0]) {
+      expect(agentBmadMaster[0].source).toBe('manifest');
     }
   });
 });

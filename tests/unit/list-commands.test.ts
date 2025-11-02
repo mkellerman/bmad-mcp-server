@@ -10,9 +10,9 @@ describe('List commands', () => {
     const projectRoot = process.cwd();
     const bmadRoot = path.resolve(
       projectRoot,
-      '.bmad',
-      '6.0.0-alpha.0',
-      'bmad',
+      'tests',
+      'fixtures',
+      'bmad-core-v6',
     );
     const discovery = resolveBmadPaths({
       cwd: projectRoot,
@@ -31,7 +31,7 @@ describe('List commands', () => {
     const agents = await tool.execute('*list-agents');
     expect(agents.success).toBe(true);
     expect(agents.content).toContain('BMAD Agents');
-    expect(agents.content).toContain('analyst');
+    expect(agents.content).toContain('bmad-master');
 
     // Verify agents are displayed with module grouping
     const agentLines = (agents.content ?? '')
@@ -49,9 +49,11 @@ describe('List commands', () => {
     // Verify that module grouping is present and agents are listed
     expect(agents.content).toContain('## '); // Has module headers
     expect(agentNames.length).toBeGreaterThan(0); // Has agents
-    // Check for any variant of analyst (analyst, bmad analyst, bmm/analyst, etc.)
-    const hasAnalyst = agentNames.some((name) => name?.includes('analyst'));
-    expect(hasAnalyst).toBe(true);
+    // Check for bmad-master agent
+    const hasBmadMaster = agentNames.some((name) =>
+      name?.includes('bmad-master'),
+    );
+    expect(hasBmadMaster).toBe(true);
 
     const workflows = await tool.execute('*list-workflows');
     expect(workflows.success).toBe(true);
@@ -76,8 +78,18 @@ describe('List commands', () => {
 
   it('lists agents from multiple CLI roots (multi-root support)', async () => {
     const projectRoot = process.cwd();
-    const customRoot = path.resolve(projectRoot, '.bmad', 'custom');
-    const v6Root = path.resolve(projectRoot, '.bmad', '6.0.0-alpha.0', 'bmad');
+    const customRoot = path.resolve(
+      projectRoot,
+      'tests',
+      'fixtures',
+      'bmad-core-v4',
+    );
+    const v6Root = path.resolve(
+      projectRoot,
+      'tests',
+      'fixtures',
+      'bmad-core-v6',
+    );
 
     const discovery = resolveBmadPaths({
       cwd: projectRoot,
@@ -101,24 +113,22 @@ describe('List commands', () => {
     expect(agents.content).toContain('Found');
 
     // Should contain agents from both roots
-    expect(agents.content).toContain('debug'); // from custom
-    expect(agents.content).toContain('analyst'); // from v6
+    expect(agents.content).toContain('analyst'); // from v4
+    expect(agents.content).toContain('bmad-master'); // from v6
 
     // Verify activeLocations has both roots
     expect(discovery.activeLocations).toHaveLength(2);
-    expect(discovery.activeLocations[0].resolvedRoot).toContain('custom');
-    expect(discovery.activeLocations[1].resolvedRoot).toContain(
-      '6.0.0-alpha.0',
-    );
+    expect(discovery.activeLocations[0].resolvedRoot).toContain('bmad-core-v4');
+    expect(discovery.activeLocations[1].resolvedRoot).toContain('bmad-core-v6');
   });
 
   it('backward compatibility: single root still works', async () => {
     const projectRoot = process.cwd();
     const bmadRoot = path.resolve(
       projectRoot,
-      '.bmad',
-      '6.0.0-alpha.0',
-      'bmad',
+      'tests',
+      'fixtures',
+      'bmad-core-v6',
     );
 
     const discovery = resolveBmadPaths({
@@ -139,7 +149,7 @@ describe('List commands', () => {
 
     const agents = await tool.execute('*list-agents');
     expect(agents.success).toBe(true);
-    expect(agents.content).toContain('analyst');
+    expect(agents.content).toContain('bmad-master');
 
     // Should have 1 active location
     expect(discovery.activeLocations).toHaveLength(1);

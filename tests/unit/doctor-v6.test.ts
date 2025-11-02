@@ -6,14 +6,14 @@ import { MasterManifestService } from '../../src/services/master-manifest-servic
 import { doctor } from '../../src/tools/internal/doctor.js';
 
 function sampleProjectRoot(): string {
-  // Use the directory containing the 'bmad' folder as the project root
-  return path.resolve(process.cwd(), '.bmad', '6.0.0-alpha.0');
+  // Use the fixtures directory as the project root
+  return path.resolve(process.cwd(), 'tests', 'fixtures');
 }
 
 describe('doctor v6 integration', () => {
   it('reports inventory and supports --reload and --conflicts', () => {
     const projectRoot = sampleProjectRoot();
-    const bmadRoot = path.join(projectRoot, 'bmad');
+    const bmadRoot = path.join(projectRoot, 'bmad-core-v6');
     const discovery = resolveBmadPaths({
       cwd: projectRoot,
       cliArgs: [bmadRoot],
