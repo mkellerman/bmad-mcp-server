@@ -108,8 +108,14 @@ export class BMADMCPServer {
   private agents: Agent[];
   private server: Server;
   private discovery: BmadPathResolution;
+  private version: string;
 
-  constructor(bmadRoot: string, discovery: BmadPathResolution) {
+  constructor(
+    bmadRoot: string,
+    discovery: BmadPathResolution,
+    version: string = 'unknown',
+  ) {
+    this.version = version;
     this.discovery = discovery;
     this.bmadRoot = path.resolve(bmadRoot);
     this.projectRoot = this.bmadRoot;
@@ -134,6 +140,7 @@ export class BMADMCPServer {
     try {
       const masterData = this.masterService.get();
       this.agents = convertAgents(masterData.agents);
+      console.error(`Loaded ${this.agents.length} agents from master manifest`);
     } catch (error) {
       console.error('❌ Failed to process agents');
       console.error(
@@ -159,6 +166,7 @@ export class BMADMCPServer {
       );
       const errorSuffix = hasErrors ? ' (some sources failed)' : '';
 
+      console.error('BMAD MCP Server initialized successfully');
       console.error(
         `\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`,
       );
@@ -177,7 +185,7 @@ export class BMADMCPServer {
     this.server = new Server(
       {
         name: 'bmad-mcp-server',
-        version: '0.1.0',
+        version: this.version,
       },
       {
         capabilities: {
@@ -680,7 +688,7 @@ export async function main(): Promise<void> {
   }
 
   try {
-    const server = new BMADMCPServer(activeRoot, discovery);
+    const server = new BMADMCPServer(activeRoot, discovery, version);
     await server.run();
   } catch (error) {
     console.error('\n❌ Server Initialization Failed');

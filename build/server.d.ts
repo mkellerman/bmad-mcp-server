@@ -25,7 +25,8 @@ export declare class BMADMCPServer {
     private agents;
     private server;
     private discovery;
-    constructor(bmadRoot: string, discovery: BmadPathResolution);
+    private version;
+    constructor(bmadRoot: string, discovery: BmadPathResolution, version?: string);
     /**
      * Setup MCP server request handlers
      */

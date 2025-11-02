@@ -55,13 +55,15 @@ export function validateName(name, type, agents, workflows) {
             found = agents.some((a) => a.module === parsed.module && a.name === parsed.name);
             if (!found) {
                 // Debug module-qualified search
-                const matchingAgents = agents.filter(a => a.name === parsed.name);
-                const allModules = [...new Set(agents.map(a => a.module))].filter(Boolean).sort();
+                const matchingAgents = agents.filter((a) => a.name === parsed.name);
+                const allModules = [...new Set(agents.map((a) => a.module))]
+                    .filter(Boolean)
+                    .sort();
                 let errorMessage = `❌ Agent Not Found: '${name}'`;
                 errorMessage += `\n\n🔍 Module-qualified search: Looking for "${parsed.name}" in module "${parsed.module}"`;
                 errorMessage += `\nFound ${matchingAgents.length} agents with name "${parsed.name}":`;
                 if (matchingAgents.length > 0) {
-                    matchingAgents.forEach(a => {
+                    matchingAgents.forEach((a) => {
                         errorMessage += `\n  • ${a.name} in module "${a.module || '(no module)'}"`;
                     });
                 }
@@ -73,7 +75,7 @@ export function validateName(name, type, agents, workflows) {
                 const suggestions = [];
                 if (matchingAgents.length > 0) {
                     // Suggest available modules for this agent name
-                    matchingAgents.forEach(a => {
+                    matchingAgents.forEach((a) => {
                         if (a.module) {
                             suggestions.push(`${a.module}/${a.name}`);
                         }
@@ -84,7 +86,7 @@ export function validateName(name, type, agents, workflows) {
                 }
                 if (suggestions.length > 0) {
                     errorMessage += `\n\nDid you mean one of these?`;
-                    suggestions.forEach(s => {
+                    suggestions.forEach((s) => {
                         errorMessage += `\n  • ${s}`;
                     });
                 }
@@ -111,22 +113,24 @@ export function validateName(name, type, agents, workflows) {
             else {
                 // Multiple matches - require disambiguation
                 const disambiguationOptions = matchingAgents
-                    .map(a => ({
+                    .map((a) => ({
                     display: a.module ? `${a.module}/${a.name}` : a.name,
                     value: a.module ? `${a.module}/${a.name}` : a.name,
-                    description: a.title || a.role || ''
+                    description: a.title || a.role || '',
                 }))
-                    .filter((item, index, arr) => arr.findIndex(x => x.value === item.value) === index) // Remove duplicates
+                    .filter((item, index, arr) => arr.findIndex((x) => x.value === item.value) === index) // Remove duplicates
                     .sort((a, b) => a.display.localeCompare(b.display));
                 const errorMessage = `❌ Multiple agents found with name '${parsed.name}'\n\n` +
                     `Please select which agent you want to load:\n\n` +
-                    disambiguationOptions.map((opt, index) => `${index + 1}. ${opt.display}${opt.description ? ` - ${opt.description}` : ''}`).join('\n') +
+                    disambiguationOptions
+                        .map((opt, index) => `${index + 1}. ${opt.display}${opt.description ? ` - ${opt.description}` : ''}`)
+                        .join('\n') +
                     `\n\n💡 Type the number (1-${disambiguationOptions.length}) or use the full qualified name`;
                 return {
                     valid: false,
                     errorCode: ErrorCode.UNKNOWN_AGENT,
                     errorMessage,
-                    suggestions: disambiguationOptions.map(opt => opt.value),
+                    suggestions: disambiguationOptions.map((opt) => opt.value),
                     requiresDisambiguation: true,
                     disambiguationOptions,
                     exitCode: 1,
@@ -141,11 +145,11 @@ export function validateName(name, type, agents, workflows) {
             // Build enhanced error message with debug info for module-qualified names
             let errorMessage = `❌ Agent Not Found: '${name}'`;
             if (parsed.module) {
-                const matchingAgents = agents.filter(a => a.name === parsed.name);
-                const allModules = [...new Set(agents.map(a => a.module))].sort();
+                const matchingAgents = agents.filter((a) => a.name === parsed.name);
+                const allModules = [...new Set(agents.map((a) => a.module))].sort();
                 errorMessage += `\n\n🔍 Debug: Looking for "${parsed.name}" in module "${parsed.module}"`;
                 errorMessage += `\nFound ${matchingAgents.length} agents with name "${parsed.name}":`;
-                matchingAgents.forEach(a => {
+                matchingAgents.forEach((a) => {
                     errorMessage += `\n  • ${a.name} in module "${a.module}"`;
                 });
                 errorMessage += `\n\nAvailable modules: ${allModules.join(', ')}`;

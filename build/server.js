@@ -86,7 +86,9 @@ export class BMADMCPServer {
     agents;
     server;
     discovery;
-    constructor(bmadRoot, discovery) {
+    version;
+    constructor(bmadRoot, discovery, version = 'unknown') {
+        this.version = version;
         this.discovery = discovery;
         this.bmadRoot = path.resolve(bmadRoot);
         this.projectRoot = this.bmadRoot;
@@ -106,6 +108,7 @@ export class BMADMCPServer {
         try {
             const masterData = this.masterService.get();
             this.agents = convertAgents(masterData.agents);
+            console.error(`Loaded ${this.agents.length} agents from master manifest`);
         }
         catch (error) {
             console.error('❌ Failed to process agents');
@@ -123,6 +126,7 @@ export class BMADMCPServer {
             const masterData = this.masterService.get();
             const hasErrors = discovery.locations.some((loc) => loc.status !== 'valid');
             const errorSuffix = hasErrors ? ' (some sources failed)' : '';
+            console.error('BMAD MCP Server initialized successfully');
             console.error(`\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`);
             console.error('📡 Server running on stdio');
         }
@@ -134,7 +138,7 @@ export class BMADMCPServer {
         // Create MCP server with protocol handlers
         this.server = new Server({
             name: 'bmad-mcp-server',
-            version: '0.1.0',
+            version: this.version,
         }, {
             capabilities: {
                 tools: {},
@@ -560,7 +564,7 @@ export async function main() {
         throw new Error('Unable to determine valid BMAD root');
     }
     try {
-        const server = new BMADMCPServer(activeRoot, discovery);
+        const server = new BMADMCPServer(activeRoot, discovery, version);
         await server.run();
     }
     catch (error) {

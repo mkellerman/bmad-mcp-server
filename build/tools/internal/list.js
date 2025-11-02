@@ -4,7 +4,7 @@ export function handleListCommand(cmd, ctx) {
     const { resolved, master, discovery } = ctx;
     const lines = [];
     if (cmd === '*list-agents') {
-        // Build structured data  
+        // Build structured data
         const agentsByModule = new Map();
         const allAgents = [];
         // Use ALL agents from master manifest for complete discoverability
@@ -56,8 +56,9 @@ export function handleListCommand(cmd, ctx) {
                 // This ensures complete discoverability - users see every loadable option
                 for (const agent of group) {
                     const agentTyped = agent;
-                    agentTyped.loadCommand = agentTyped.module ?
-                        `${agentTyped.module}/${name}` : name;
+                    agentTyped.loadCommand = agentTyped.module
+                        ? `${agentTyped.module}/${name}`
+                        : name;
                     agentTyped.isDuplicate = true;
                     agentTyped.variantInfo = `(${agentTyped.module || 'core'})`;
                     uniqueAgents.push(agentTyped);
@@ -111,9 +112,7 @@ export function handleListCommand(cmd, ctx) {
                     segments.push(role);
                 }
                 // Join segments and combine with prefix
-                const agentLine = segments.length > 0 ?
-                    `${prefix} ${segments.join(' - ')}` :
-                    prefix;
+                const agentLine = segments.length > 0 ? `${prefix} ${segments.join(' - ')}` : prefix;
                 markdown.push(agentLine);
             }
             markdown.push(''); // Add spacing between modules
