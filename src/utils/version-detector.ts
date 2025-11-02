@@ -4,7 +4,9 @@ import * as yaml from 'js-yaml';
 
 export interface V6RootManifest {
   installation?: { version?: string };
-  modules?: Array<string | { name: string; version?: string; shortTitle?: string }>;
+  modules?: Array<
+    string | { name: string; version?: string; shortTitle?: string }
+  >;
 }
 
 export interface DetectedV6 {

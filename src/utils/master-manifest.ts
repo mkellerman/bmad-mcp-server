@@ -27,7 +27,7 @@ export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
     tasks: [],
     modules: [],
   };
-  
+
   for (const origin of origins) {
     try {
       // Use pre-detected version if available, otherwise detect
@@ -82,12 +82,11 @@ export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
           // Both failed - skip this origin silently
         }
       }
-      
     } catch {
       // Continue processing other origins silently
     }
   }
-  
+
   return master;
 }
 

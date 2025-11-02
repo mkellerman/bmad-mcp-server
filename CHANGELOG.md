@@ -1,22 +1,18 @@
 # 1.0.0 (2025-11-02)
 
-
-* feat!: prepare stable 1.0.0 release ([#14](https://github.com/mkellerman/bmad-mcp-server/issues/14)) ([419b723](https://github.com/mkellerman/bmad-mcp-server/commit/419b7231f765c841d3c3eeccd7d1c0c795944feb))
-
+- feat!: prepare stable 1.0.0 release ([#14](https://github.com/mkellerman/bmad-mcp-server/issues/14)) ([419b723](https://github.com/mkellerman/bmad-mcp-server/commit/419b7231f765c841d3c3eeccd7d1c0c795944feb))
 
 ### BREAKING CHANGES
 
-* mark project stable; begin v1.x series
+- mark project stable; begin v1.x series
 
 # 1.0.0 (2025-11-02)
 
-
-* feat!: prepare stable 1.0.0 release ([#14](https://github.com/mkellerman/bmad-mcp-server/issues/14)) ([419b723](https://github.com/mkellerman/bmad-mcp-server/commit/419b7231f765c841d3c3eeccd7d1c0c795944feb))
-
+- feat!: prepare stable 1.0.0 release ([#14](https://github.com/mkellerman/bmad-mcp-server/issues/14)) ([419b723](https://github.com/mkellerman/bmad-mcp-server/commit/419b7231f765c841d3c3eeccd7d1c0c795944feb))
 
 ### BREAKING CHANGES
 
-* mark project stable; begin v1.x series
+- mark project stable; begin v1.x series
 
 ## [0.2.4](https://github.com/mkellerman/bmad-mcp-server/compare/v0.2.3...v0.2.4) (2025-10-26)
 

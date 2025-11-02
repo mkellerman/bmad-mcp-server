@@ -90,4 +90,3 @@ This document lists high‑impact automations to further improve our release pro
 If you’d like, we can stage these in small PRs: (1) semantic PR titles, (2) branch channels,
 (3) label‑gated pre‑releases + TTL sweeper, (4) action pinning, (5) Node matrix + E2E gate,
 (6) release notes template + summary outputs.
-

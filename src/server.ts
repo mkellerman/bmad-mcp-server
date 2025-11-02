@@ -121,8 +121,12 @@ export class BMADMCPServer {
       this.masterService.generate();
     } catch (error) {
       console.error('❌ Failed to build master manifest');
-      console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
-      throw new Error(`Master manifest generation failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `   Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new Error(
+        `Master manifest generation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Convert master manifest agents to legacy Agent interface
@@ -132,8 +136,12 @@ export class BMADMCPServer {
       this.agents = convertAgents(masterData.agents);
     } catch (error) {
       console.error('❌ Failed to process agents');
-      console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
-      throw new Error(`Agent processing failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `   Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new Error(
+        `Agent processing failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Initialize unified tool with master manifest service
@@ -143,19 +151,26 @@ export class BMADMCPServer {
         discovery,
         masterManifestService: this.masterService,
       });
-      
+
       // Show final summary
       const masterData = this.masterService.get();
-      const hasErrors = discovery.locations.some(loc => loc.status !== 'valid');
+      const hasErrors = discovery.locations.some(
+        (loc) => loc.status !== 'valid',
+      );
       const errorSuffix = hasErrors ? ' (some sources failed)' : '';
-      
-      console.error(`\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`);
+
+      console.error(
+        `\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`,
+      );
       console.error('📡 Server running on stdio');
-      
     } catch (error) {
       console.error('❌ Failed to initialize unified tool');
-      console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
-      throw new Error(`Unified tool initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `   Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new Error(
+        `Unified tool initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Create MCP server with protocol handlers
@@ -556,42 +571,42 @@ export async function main(): Promise<void> {
 
   for (let i = 0; i < cliArgs.length; i++) {
     const arg = cliArgs[i];
-    
+
     if (GitSourceResolver.isGitUrl(arg)) {
       try {
         const localPath = await gitResolver.resolve(arg);
         processedCliArgs.push(localPath);
-        
+
         // Extract repo name for display
         const match = arg.match(/github\.com\/([^/]+\/[^#]+)/);
         const repoName = match ? match[1].replace('.git', '') : 'git-repo';
-        
+
         sourceResults.push({
           type: 'git',
           name: repoName,
-          status: 'success'
+          status: 'success',
         });
       } catch (error) {
         const match = arg.match(/github\.com\/([^/]+\/[^#]+)/);
         const repoName = match ? match[1].replace('.git', '') : 'git-repo';
-        
+
         sourceResults.push({
           type: 'git',
           name: repoName,
           status: 'error',
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
         // Continue with other sources
       }
     } else {
       processedCliArgs.push(arg);
-      
+
       // Extract meaningful name from path
       const pathName = path.basename(arg);
       sourceResults.push({
         type: 'local',
         name: pathName,
-        status: 'success' // Will be updated after discovery
+        status: 'success', // Will be updated after discovery
       });
     }
   }
@@ -613,7 +628,8 @@ export async function main(): Promise<void> {
       const index = parseInt(loc.displayName.match(/\d+/)?.[0] || '1') - 1;
       if (sourceResults[index]) {
         if (loc.status !== 'valid') {
-          sourceResults[index].status = loc.status === 'not-found' ? 'error' : 'warning';
+          sourceResults[index].status =
+            loc.status === 'not-found' ? 'error' : 'warning';
           sourceResults[index].error = loc.details || `${loc.status}`;
         }
       }
@@ -622,24 +638,34 @@ export async function main(): Promise<void> {
 
   // Display streamlined source results
   sourceResults.forEach((result) => {
-    const statusIcon = result.status === 'success' ? '✅' : 
-                      result.status === 'warning' ? '⚠️' : '❌';
-    
+    const statusIcon =
+      result.status === 'success'
+        ? '✅'
+        : result.status === 'warning'
+          ? '⚠️'
+          : '❌';
+
     if (result.type === 'git') {
       if (result.status === 'success') {
         // Get version info from discovery
-        const location = discovery.locations.find(loc => loc.source === 'cli');
+        const location = discovery.locations.find(
+          (loc) => loc.source === 'cli',
+        );
         const version = location?.version ? ` (${location.version})` : '';
         console.error(`   ${statusIcon} Git: ${result.name}${version}`);
       } else {
-        const errorMsg = result.error?.includes('not found') ? 'Repository not found' : 'Failed to resolve';
+        const errorMsg = result.error?.includes('not found')
+          ? 'Repository not found'
+          : 'Failed to resolve';
         console.error(`   ${statusIcon} Git: ${result.name} - ${errorMsg}`);
       }
     } else {
       if (result.status === 'success') {
         console.error(`   ${statusIcon} Local: ${result.name}`);
       } else {
-        const errorMsg = result.error?.includes('not found') ? 'Path not found' : result.error || 'Invalid';
+        const errorMsg = result.error?.includes('not found')
+          ? 'Path not found'
+          : result.error || 'Invalid';
         console.error(`   ${statusIcon} Local: ${result.name} - ${errorMsg}`);
       }
     }
@@ -659,7 +685,10 @@ export async function main(): Promise<void> {
   } catch (error) {
     console.error('\n❌ Server Initialization Failed');
     console.error('━'.repeat(60));
-    console.error('Error Details:', error instanceof Error ? error.message : String(error));
+    console.error(
+      'Error Details:',
+      error instanceof Error ? error.message : String(error),
+    );
     if (error instanceof Error && error.stack) {
       console.error('\nStack Trace:');
       console.error(error.stack);

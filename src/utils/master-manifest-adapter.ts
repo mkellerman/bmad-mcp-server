@@ -11,11 +11,7 @@
 
 import type { MasterRecord } from '../types/index.js';
 import { parseAgentMetadata } from './agent-metadata-parser.js';
-import {
-  type Agent,
-  type Workflow,
-  type Task,
-} from '../types/index.js';
+import { type Agent, type Workflow, type Task } from '../types/index.js';
 
 /**
  * Filter master records to only include files that physically exist.
