@@ -110,8 +110,35 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
   const workflowRecords: MasterRecord[] = [];
   const taskRecords: MasterRecord[] = [];
 
+  if (!detected.modules || !Array.isArray(detected.modules)) {
+    console.warn('No modules found or modules is not an array');
+    // Return empty inventory but valid structure
+    return {
+      agents: agentRecords,
+      workflows: workflowRecords,
+      tasks: taskRecords,
+      modules,
+    };
+  }
+
   for (const mod of detected.modules) {
-    const moduleName = mod.name;
+    // Handle both string and object formats defensively
+    let moduleName: string;
+    if (typeof mod === 'string') {
+      moduleName = mod;
+    } else if (mod && typeof mod === 'object' && 'name' in mod) {
+      moduleName = mod.name;
+    } else {
+      console.warn(`Skipping invalid module:`, mod);
+      continue;
+    }
+    
+    // Skip modules with invalid names
+    if (!moduleName || typeof moduleName !== 'string') {
+      console.warn(`Skipping invalid module name:`, moduleName);
+      continue;
+    }
+    
     const modulePath = path.join(origin.root, moduleName);
     const configPath = path.join(modulePath, 'config.yaml');
     const configExists = fs.existsSync(configPath);
@@ -126,8 +153,7 @@ export function inventoryOriginV6(origin: BmadOrigin): OriginInventoryResult {
       errors: configExists ? [] : ['Missing config.yaml'],
       moduleVersion:
         (config && (config.version || config.moduleVersion)) ||
-        mod.version ||
-        'v6.x',
+        'v6.x', // No version available from string format
       bmadVersion: detected.installationVersion || 'v6.x',
       origin,
     };

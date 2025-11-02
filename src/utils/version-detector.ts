@@ -40,10 +40,18 @@ export function detectV6(root: string): DetectedV6 | undefined {
     if (!fs.existsSync(manifestPath)) return undefined;
     const content = fs.readFileSync(manifestPath, 'utf-8');
     const parsed = yaml.load(content) as V6RootManifest;
-    const modules = (parsed.modules ?? []).map((m) => ({
-      name: m.name,
-      version: m.version,
-    }));
+    const modules = (parsed.modules ?? []).map((m) => {
+      if (typeof m === 'string') {
+        // Handle simple string format: ["core", "bmb"]
+        return { name: m, version: undefined };
+      } else if (m && typeof m === 'object' && m.name) {
+        // Handle object format: [{name: "core", version: "1.0"}, ...]
+        return { name: m.name, version: m.version };
+      } else {
+        // Invalid module format, skip
+        return { name: '', version: undefined };
+      }
+    }).filter(m => m.name); // Filter out invalid modules
     return {
       kind: 'v6',
       root: bmadRoot,

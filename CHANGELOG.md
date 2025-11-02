@@ -1,3 +1,32 @@
+# 1.0.1 (2025-11-02)
+
+### Fixed
+- **Git URL Loading**: Fixed module detection for Git URLs with both string and object module formats
+  - `bmad-source-detector.ts`: Enhanced module parsing to handle both `["core", "bmb"]` (string) and `[{name: "core"}]` (object) formats
+  - `version-detector.ts`: Fixed string vs object module format conversion with proper filtering
+  - `v6-module-inventory.ts`: Added defensive module handling and type safety for undefined module names
+- **Branch-Specific Caching**: Git URL caching now properly isolates different branches (`main` vs `v6-alpha`)
+- **Module Format Compatibility**: Full compatibility with official BMAD-METHOD repository module formats
+
+### Added
+- **Comprehensive Validation Tools**: Created extensive validation infrastructure for both v4 and v6 BMAD formats
+  - `validate-bmad-v4.mjs`: v4 BMAD installation validation with MCP compatibility testing
+  - `validate-bmad-v6.mjs`: v6 BMAD installation validation with CSV manifest support
+  - `validate-bmad-v6-enhanced.mjs`: Dual-format validation supporting both official YAML and MCP Markdown
+  - `validate-bmad-git-url.mjs`: Comprehensive Git URL functionality validation with 16/17 tests passing
+- **Documentation**: Created comprehensive validation guides and troubleshooting documentation
+  - `docs/validate-bmad-core-v4.md`: v4 validation requirements and best practices
+  - `docs/validate-bmad-core-v6.md`: v6 validation requirements and manifest structure
+  - `docs/bmad-v6-format-comparison.md`: Format comparison between official YAML and MCP Markdown
+  - `docs/bmad-git-url-integration.md`: Git URL integration guide with caching and troubleshooting
+
+### Technical Details
+- All changes are backward compatible with no breaking changes
+- Git URL functionality fully tested and validated
+- Module detection now supports both official repository formats and custom installations
+- Enhanced error handling and logging for Git URL resolution
+- Improved path resolution with proper branch isolation
+
 # 1.0.0 (2025-11-02)
 
 

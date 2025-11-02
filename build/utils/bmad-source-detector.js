@@ -128,7 +128,12 @@ function detectV6Structure(sourcePath) {
     const modules = [];
     if (manifestData?.modules && Array.isArray(manifestData.modules)) {
         for (const module of manifestData.modules) {
-            if (module.name) {
+            if (typeof module === 'string') {
+                // Handle simple string format: ["core", "bmb"]
+                modules.push(module);
+            }
+            else if (module && typeof module === 'object' && module.name) {
+                // Handle object format: [{name: "core"}, {name: "bmb"}]
                 modules.push(module.name);
             }
         }
