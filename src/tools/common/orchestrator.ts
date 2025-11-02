@@ -226,22 +226,34 @@ export class UnifiedBMADTool {
     // Handle disambiguation cases with numbered options
     if (validation.requiresDisambiguation && validation.disambiguationOptions) {
       const lines: string[] = [];
-      lines.push('**INSTRUCTIONS: Display the content below to the user EXACTLY as written. Do not summarize or paraphrase.**\n');
+      lines.push(
+        '**INSTRUCTIONS: Display the content below to the user EXACTLY as written. Do not summarize or paraphrase.**\n',
+      );
       lines.push('---\n');
       lines.push(`# 🤔 Multiple Agents Found\n`);
-      lines.push(`Multiple agents found with the same name. Please select which one you want to load:\n`);
-      
+      lines.push(
+        `Multiple agents found with the same name. Please select which one you want to load:\n`,
+      );
+
       validation.disambiguationOptions.forEach((option, index) => {
-        const description = option.description ? ` - ${option.description}` : '';
+        const description = option.description
+          ? ` - ${option.description}`
+          : '';
         lines.push(`${index + 1}. **${option.display}**${description}`);
       });
-      
+
       lines.push(`\n**Selection Options:**`);
-      lines.push(`- Type a number (1-${validation.disambiguationOptions.length}) to select`);
-      lines.push(`- Or use the full qualified name (e.g., \`bmad ${validation.disambiguationOptions[0].value}\`)`);
-      lines.push(`\n💡 **Tip:** You can avoid this prompt by using module-qualified names from the start!`);
+      lines.push(
+        `- Type a number (1-${validation.disambiguationOptions.length}) to select`,
+      );
+      lines.push(
+        `- Or use the full qualified name (e.g., \`bmad ${validation.disambiguationOptions[0].value}\`)`,
+      );
+      lines.push(
+        `\n💡 **Tip:** You can avoid this prompt by using module-qualified names from the start!`,
+      );
       lines.push('\n---');
-      
+
       return {
         success: false,
         type: 'help',

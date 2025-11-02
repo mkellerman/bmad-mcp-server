@@ -16,7 +16,7 @@ export function handleListCommand(
   const lines: string[] = [];
 
   if (cmd === '*list-agents') {
-    // Build structured data  
+    // Build structured data
     const agentsByModule = new Map<string, unknown[]>();
     const allAgents: unknown[] = [];
 
@@ -68,7 +68,7 @@ export function handleListCommand(
         const agent = group[0] as any;
         agent.loadCommand = name;
         uniqueAgents.push(agent);
-        
+
         const moduleList = agentsByModule.get(agent.module) ?? [];
         moduleList.push(agent);
         agentsByModule.set(agent.module, moduleList);
@@ -77,12 +77,13 @@ export function handleListCommand(
         // This ensures complete discoverability - users see every loadable option
         for (const agent of group) {
           const agentTyped = agent as any;
-          agentTyped.loadCommand = agentTyped.module ? 
-            `${agentTyped.module}/${name}` : name;
+          agentTyped.loadCommand = agentTyped.module
+            ? `${agentTyped.module}/${name}`
+            : name;
           agentTyped.isDuplicate = true;
           agentTyped.variantInfo = `(${agentTyped.module || 'core'})`;
           uniqueAgents.push(agentTyped);
-          
+
           const moduleList = agentsByModule.get(agentTyped.module) ?? [];
           moduleList.push(agentTyped);
           agentsByModule.set(agentTyped.module, moduleList);
@@ -112,9 +113,9 @@ export function handleListCommand(
     for (const moduleName of sortedModules) {
       const moduleAgents = agentsByModule.get(moduleName) || [];
       const displayModuleName = moduleName || 'Core/Standalone';
-      
+
       markdown.push(`## 📦 ${displayModuleName}\n`);
-      
+
       // Sort agents within each module
       const sortedModuleAgents = moduleAgents.sort((a: any, b: any) => {
         const nameA = (a.loadCommand || a.name || '').toLowerCase();
@@ -162,20 +163,17 @@ export function handleListCommand(
         }
 
         // Join segments and combine with prefix
-        const agentLine = segments.length > 0 ? 
-          `${prefix} ${segments.join(' - ')}` : 
-          prefix;
+        const agentLine =
+          segments.length > 0 ? `${prefix} ${segments.join(' - ')}` : prefix;
         markdown.push(agentLine);
       }
-      
+
       markdown.push(''); // Add spacing between modules
     }
 
     markdown.push('');
     markdown.push('---');
-    markdown.push(
-      '**Tip:** Load any agent using the command shown above',
-    );
+    markdown.push('**Tip:** Load any agent using the command shown above');
     markdown.push('- Simple names: `bmad analyst`');
     markdown.push('- Module-qualified: `bmad bmad-core/ux-expert`');
     markdown.push('---');

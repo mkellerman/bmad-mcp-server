@@ -1,1 +1,2 @@
-npm run precommit
+npm run guard:src-js
+npx lint-staged

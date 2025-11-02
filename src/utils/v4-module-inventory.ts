@@ -111,7 +111,7 @@ function resolveFilePath(
   // This handles cases where the directory structure is completely different
   const categoryMap: Record<string, string> = {
     agent: 'agents',
-    workflow: 'workflows', 
+    workflow: 'workflows',
     task: 'tasks',
   };
   const category = categoryMap[classification.kind];
@@ -231,7 +231,11 @@ export function inventoryOriginV4(origin: BmadOrigin): OriginInventoryResult {
       if (!classification) continue;
 
       // Try multiple path resolution strategies for robust file detection
-      const { absolutePath, exists } = resolveFilePath(installRoot, file.path, classification);
+      const { absolutePath, exists } = resolveFilePath(
+        installRoot,
+        file.path,
+        classification,
+      );
       const moduleRelativePath = file.path;
       const bmadRelativePath = file.path;
 
