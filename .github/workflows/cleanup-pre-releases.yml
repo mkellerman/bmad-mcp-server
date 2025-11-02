@@ -22,18 +22,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
+          set -euo pipefail
+          BRANCH_NAME=${{ github.event.pull_request.head.ref }}
+          MERGED=${{ github.event.pull_request.merged }}
+          HEAD_REPO=${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO=${{ github.repository }}
 
-          echo "Cleaning up pre-releases for PR #$PR_NUMBER"
+          # Sanitize the branch name to match the tag used in pre-release workflow
+          SANITIZED_TAG=$(echo "$BRANCH_NAME" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's|[^a-z0-9._-]+|-|g' \
+            | sed -E 's|-{2,}|-|g; s|^[-.]+||; s|[-.]+$||')
+          if [ -z "$SANITIZED_TAG" ]; then SANITIZED_TAG="pr-${{ github.event.pull_request.number }}"; fi
 
-          # Find and delete all releases matching this PR
-          gh release list --limit 100 | \
-            grep "^pr-${PR_NUMBER}-" | \
-            awk '{print $1}' | \
-            while read tag; do
-              echo "Deleting release and tag: $tag"
-              gh release delete "$tag" --yes 2>/dev/null || true
-              git push origin ":refs/tags/$tag" 2>/dev/null || true
-            done
+          echo "Cleaning up pre-release for branch: $BRANCH_NAME -> tag: $SANITIZED_TAG (merged=$MERGED)"
+
+          # Delete the GitHub Release matching the branch tag if it exists
+          if gh release view "$SANITIZED_TAG" >/dev/null 2>&1; then
+            echo "Deleting GitHub release: $SANITIZED_TAG"
+            gh release delete "$SANITIZED_TAG" --yes 2>/dev/null || true
+          fi
+
+          # Delete the tag matching the branch name if it exists
+          echo "Deleting tag: $SANITIZED_TAG"
+          git push origin ":refs/tags/$SANITIZED_TAG" 2>/dev/null || true
+
+          # Optionally delete the branch in the same repository after merge
+          if [ "$MERGED" = "true" ] && [ "$HEAD_REPO" = "$BASE_REPO" ]; then
+            if [ "$BRANCH_NAME" != "main" ] && [ "$BRANCH_NAME" != "v2-node" ]; then
+              echo "Deleting merged branch: $BRANCH_NAME"
+              git push origin --delete "$BRANCH_NAME" 2>/dev/null || true
+            else
+              echo "Skip deleting protected/base branch: $BRANCH_NAME"
+            fi
+          else
+            echo "Skip branch deletion (not merged or from fork): merged=$MERGED head_repo=$HEAD_REPO base_repo=$BASE_REPO"
+          fi
 
           echo "Cleanup complete"
