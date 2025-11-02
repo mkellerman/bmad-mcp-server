@@ -112,36 +112,51 @@ export class BMADMCPServer {
   constructor(bmadRoot: string, discovery: BmadPathResolution) {
     this.discovery = discovery;
     this.bmadRoot = path.resolve(bmadRoot);
-    logger.info(`Initializing BMAD MCP Server with root: ${this.bmadRoot}`);
-
     this.projectRoot = this.bmadRoot;
-    logger.info(`Project root: ${this.projectRoot}`);
 
-    // Build master manifest at startup
+    // Build master manifest at startup with error handling
     // This inventories all BMAD resources from all discovered locations
-    logger.info('Building master manifest...');
-    this.masterService = new MasterManifestService(discovery);
-    this.masterService.generate();
+    try {
+      this.masterService = new MasterManifestService(discovery);
+      this.masterService.generate();
+    } catch (error) {
+      console.error('❌ Failed to build master manifest');
+      console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Master manifest generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     // Convert master manifest agents to legacy Agent interface
     // This enables backward compatibility with existing code
-    const masterData = this.masterService.get();
-    this.agents = convertAgents(masterData.agents);
-
-    logger.info(
-      `Loaded ${this.agents.length} agents from master manifest ` +
-        `(${masterData.agents.length} total records, ` +
-        `${this.agents.length} existing files)`,
-    );
+    try {
+      const masterData = this.masterService.get();
+      this.agents = convertAgents(masterData.agents);
+    } catch (error) {
+      console.error('❌ Failed to process agents');
+      console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Agent processing failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     // Initialize unified tool with master manifest service
-    this.unifiedTool = new UnifiedBMADTool({
-      bmadRoot: this.projectRoot,
-      discovery,
-      masterManifestService: this.masterService,
-    });
-
-    logger.info('BMAD MCP Server initialized successfully');
+    try {
+      this.unifiedTool = new UnifiedBMADTool({
+        bmadRoot: this.projectRoot,
+        discovery,
+        masterManifestService: this.masterService,
+      });
+      
+      // Show final summary
+      const masterData = this.masterService.get();
+      const hasErrors = discovery.locations.some(loc => loc.status !== 'valid');
+      const errorSuffix = hasErrors ? ' (some sources failed)' : '';
+      
+      console.error(`\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`);
+      console.error('📡 Server running on stdio');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize unified tool');
+      console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Unified tool initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     // Create MCP server with protocol handlers
     this.server = new Server(
@@ -512,31 +527,6 @@ export async function main(): Promise<void> {
     (arg) => !arg.startsWith('*') && !arg.startsWith('--'),
   );
 
-  // Process CLI args to resolve git+ URLs to local paths
-  const gitResolver = new GitSourceResolver();
-  const processedCliArgs: string[] = [];
-
-  for (const arg of cliArgs) {
-    if (GitSourceResolver.isGitUrl(arg)) {
-      try {
-        const localPath = await gitResolver.resolve(arg);
-        processedCliArgs.push(localPath);
-        console.error(`✓ Resolved Git source: ${arg}`);
-      } catch (error) {
-        console.error(`❌ Failed to resolve Git URL: ${arg}`);
-        console.error(
-          `   ${error instanceof Error ? error.message : String(error)}`,
-        );
-        throw error;
-      }
-    } else {
-      processedCliArgs.push(arg);
-    }
-  }
-
-  const envVar = process.env.BMAD_ROOT;
-  const userBmadPath = path.join(os.homedir(), '.bmad');
-
   // Read version from package.json
   let version = 'unknown';
   try {
@@ -549,6 +539,66 @@ export async function main(): Promise<void> {
     // Silently fall back to 'unknown' if package.json can't be read
   }
 
+  console.error(`🚀 BMAD MCP Server v${version}\n`);
+
+  // Process CLI args to resolve git+ URLs to local paths
+  const gitResolver = new GitSourceResolver();
+  const processedCliArgs: string[] = [];
+  const sourceResults: Array<{
+    type: 'git' | 'local';
+    name: string;
+    status: 'success' | 'error' | 'warning';
+    error?: string;
+    agentCount?: number;
+  }> = [];
+
+  console.error('📦 Loading sources...');
+
+  for (let i = 0; i < cliArgs.length; i++) {
+    const arg = cliArgs[i];
+    
+    if (GitSourceResolver.isGitUrl(arg)) {
+      try {
+        const localPath = await gitResolver.resolve(arg);
+        processedCliArgs.push(localPath);
+        
+        // Extract repo name for display
+        const match = arg.match(/github\.com\/([^/]+\/[^#]+)/);
+        const repoName = match ? match[1].replace('.git', '') : 'git-repo';
+        
+        sourceResults.push({
+          type: 'git',
+          name: repoName,
+          status: 'success'
+        });
+      } catch (error) {
+        const match = arg.match(/github\.com\/([^/]+\/[^#]+)/);
+        const repoName = match ? match[1].replace('.git', '') : 'git-repo';
+        
+        sourceResults.push({
+          type: 'git',
+          name: repoName,
+          status: 'error',
+          error: error instanceof Error ? error.message : String(error)
+        });
+        // Continue with other sources
+      }
+    } else {
+      processedCliArgs.push(arg);
+      
+      // Extract meaningful name from path
+      const pathName = path.basename(arg);
+      sourceResults.push({
+        type: 'local',
+        name: pathName,
+        status: 'success' // Will be updated after discovery
+      });
+    }
+  }
+
+  const envVar = process.env.BMAD_ROOT;
+  const userBmadPath = path.join(os.homedir(), '.bmad');
+
   const discovery = resolveBmadPaths({
     cwd,
     cliArgs: processedCliArgs,
@@ -557,84 +607,68 @@ export async function main(): Promise<void> {
     mode,
   });
 
-  console.error(`BMAD MCP Server v${version}`);
-  console.error(`Discovery Mode: ${mode}`);
-  console.error('Starting BMAD MCP Server...');
-
-  // Validate locations and show warnings (only for explicitly provided paths)
-  // Only warn about CLI args and ENV vars, not defaults (project, user)
-  const invalidLocations = discovery.locations.filter(
-    (loc) =>
-      loc.status !== 'valid' &&
-      loc.originalPath !== undefined &&
-      (loc.source === 'cli' || loc.source === 'env'),
-  );
-  if (invalidLocations.length > 0) {
-    for (const loc of invalidLocations) {
-      if (loc.status === 'not-found') {
-        console.error(
-          `⚠️  BMAD path not found: ${loc.originalPath} (${loc.displayName})`,
-        );
-      } else if (loc.status === 'missing') {
-        console.error(
-          `⚠️  BMAD path exists but missing required files: ${loc.originalPath} (${loc.displayName})`,
-        );
-        console.error(
-          `   Expected: _cfg/manifest.yaml (v6) or install-manifest.yaml (v4)`,
-        );
-      } else if (loc.status === 'invalid') {
-        console.error(
-          `⚠️  BMAD path is invalid: ${loc.originalPath} (${loc.displayName})`,
-        );
-        if (loc.details) console.error(`   ${loc.details}`);
+  // Update source results based on discovery
+  discovery.locations.forEach((loc) => {
+    if (loc.source === 'cli') {
+      const index = parseInt(loc.displayName.match(/\d+/)?.[0] || '1') - 1;
+      if (sourceResults[index]) {
+        if (loc.status !== 'valid') {
+          sourceResults[index].status = loc.status === 'not-found' ? 'error' : 'warning';
+          sourceResults[index].error = loc.details || `${loc.status}`;
+        }
       }
     }
-  }
+  });
+
+  // Display streamlined source results
+  sourceResults.forEach((result) => {
+    const statusIcon = result.status === 'success' ? '✅' : 
+                      result.status === 'warning' ? '⚠️' : '❌';
+    
+    if (result.type === 'git') {
+      if (result.status === 'success') {
+        // Get version info from discovery
+        const location = discovery.locations.find(loc => loc.source === 'cli');
+        const version = location?.version ? ` (${location.version})` : '';
+        console.error(`   ${statusIcon} Git: ${result.name}${version}`);
+      } else {
+        const errorMsg = result.error?.includes('not found') ? 'Repository not found' : 'Failed to resolve';
+        console.error(`   ${statusIcon} Git: ${result.name} - ${errorMsg}`);
+      }
+    } else {
+      if (result.status === 'success') {
+        console.error(`   ${statusIcon} Local: ${result.name}`);
+      } else {
+        const errorMsg = result.error?.includes('not found') ? 'Path not found' : result.error || 'Invalid';
+        console.error(`   ${statusIcon} Local: ${result.name} - ${errorMsg}`);
+      }
+    }
+  });
 
   const activeRoot = discovery.activeLocation.resolvedRoot;
 
   if (!activeRoot || discovery.activeLocation.status !== 'valid') {
-    console.error(`\n❌ BMAD Installation Not Found\n`);
-    console.error(
-      `We searched these locations but couldn't find a valid installation:`,
-    );
-    discovery.locations.forEach((loc) => {
-      const status = loc.status === 'valid' ? '✅' : '✗';
-      const reason =
-        loc.status === 'not-found'
-          ? 'not found'
-          : loc.status === 'missing'
-            ? 'missing required files'
-            : loc.status === 'invalid'
-              ? 'invalid structure'
-              : '';
-      const detail = reason ? ` — ${reason}` : '';
-      console.error(
-        `  ${status} ${loc.displayName} (${loc.originalPath || 'not provided'})${detail}`,
-      );
-    });
-    console.error(`\nTo fix this, ensure your BMAD path contains:`);
-    console.error(`  • v6: bmad/_cfg/manifest.yaml`);
-    console.error(`  • v4: install-manifest.yaml`);
-    console.error(`\nNeed help? Run: npx bmad-method install`);
+    console.error('\n💥 Fatal: No valid BMAD sources found');
+    console.error('   See: https://docs.bmad.dev/troubleshooting');
     throw new Error('Unable to determine valid BMAD root');
   }
-
-  // Detect version for success message
-  const activeVersion = discovery.activeLocation.version || 'unknown';
-  const versionDisplay =
-    activeVersion !== 'unknown' ? ` (${activeVersion})` : '';
-
-  console.error(`\n✅ BMAD Installation Ready\n`);
-  console.error(
-    `Active Location: ${activeRoot}${versionDisplay}\nSource: ${discovery.activeLocation.displayName}`,
-  );
 
   try {
     const server = new BMADMCPServer(activeRoot, discovery);
     await server.run();
   } catch (error) {
-    console.error('Server error:', error);
+    console.error('\n❌ Server Initialization Failed');
+    console.error('━'.repeat(60));
+    console.error('Error Details:', error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.stack) {
+      console.error('\nStack Trace:');
+      console.error(error.stack);
+    }
+    console.error('\n💡 Troubleshooting Tips:');
+    console.error('   • Verify BMAD installation is complete');
+    console.error('   • Check file permissions');
+    console.error('   • Ensure manifest files are valid YAML');
+    console.error('   • Try running with --mode=auto for more flexibility');
     throw error;
   }
 }

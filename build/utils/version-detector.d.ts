@@ -2,7 +2,7 @@ export interface V6RootManifest {
     installation?: {
         version?: string;
     };
-    modules?: Array<{
+    modules?: Array<string | {
         name: string;
         version?: string;
         shortTitle?: string;

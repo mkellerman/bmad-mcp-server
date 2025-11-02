@@ -12,10 +12,16 @@ export function detectV6(root) {
             return undefined;
         const content = fs.readFileSync(manifestPath, 'utf-8');
         const parsed = yaml.load(content);
-        const modules = (parsed.modules ?? []).map((m) => ({
-            name: m.name,
-            version: m.version,
-        }));
+        const modules = (parsed.modules ?? []).map((m) => {
+            // Handle both string and object formats dynamically
+            if (typeof m === 'string') {
+                return { name: m, version: undefined };
+            }
+            return {
+                name: m.name,
+                version: m.version,
+            };
+        });
         return {
             kind: 'v6',
             root: bmadRoot,

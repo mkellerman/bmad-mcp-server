@@ -8,7 +8,6 @@
  * - Master manifest (new inventory system)
  * - Legacy interfaces (existing tool code)
  */
-import logger from './logger.js';
 import { parseAgentMetadata } from './agent-metadata-parser.js';
 /**
  * Filter master records to only include files that physically exist.
@@ -21,7 +20,6 @@ import { parseAgentMetadata } from './agent-metadata-parser.js';
  */
 export function filterExisting(records) {
     const existingRecords = records.filter((r) => r.exists === true);
-    logger.info(`Filtered ${records.length} records to ${existingRecords.length} existing files`);
     return existingRecords;
 }
 /**

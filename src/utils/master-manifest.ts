@@ -27,60 +27,67 @@ export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
     tasks: [],
     modules: [],
   };
+  
   for (const origin of origins) {
-    // Use pre-detected version if available, otherwise detect
-    const version = origin.version || detectVersion(origin.root);
+    try {
+      // Use pre-detected version if available, otherwise detect
+      const version = origin.version || detectVersion(origin.root);
 
-    if (version === 'v6') {
-      const inv = inventoryOriginV6(origin);
-      master.modules.push(...inv.modules);
-      master.agents.push(...inv.agents);
-      master.workflows.push(...inv.workflows);
-      master.tasks.push(...inv.tasks);
-      continue;
-    }
-
-    if (version === 'v4') {
-      const inv = inventoryOriginV4(origin);
-      master.modules.push(...inv.modules);
-      master.agents.push(...inv.agents);
-      master.workflows.push(...inv.workflows);
-      master.tasks.push(...inv.tasks);
-      continue;
-    }
-
-    if (version === 'unknown') {
-      // Custom installation - try both v6 and v4 patterns
-      // Try v6 filesystem scan first (more flexible)
-      try {
+      if (version === 'v6') {
         const inv = inventoryOriginV6(origin);
-        if (
-          inv.agents.length > 0 ||
-          inv.workflows.length > 0 ||
-          inv.tasks.length > 0
-        ) {
-          master.modules.push(...inv.modules);
-          master.agents.push(...inv.agents);
-          master.workflows.push(...inv.workflows);
-          master.tasks.push(...inv.tasks);
-          continue;
-        }
-      } catch {
-        // v6 failed, try v4
+        master.modules.push(...inv.modules);
+        master.agents.push(...inv.agents);
+        master.workflows.push(...inv.workflows);
+        master.tasks.push(...inv.tasks);
+        continue;
       }
 
-      // Try v4 pattern
-      try {
+      if (version === 'v4') {
         const inv = inventoryOriginV4(origin);
         master.modules.push(...inv.modules);
         master.agents.push(...inv.agents);
         master.workflows.push(...inv.workflows);
         master.tasks.push(...inv.tasks);
-      } catch {
-        // Both failed - skip this origin
+        continue;
       }
+
+      if (version === 'unknown') {
+        // Custom installation - try both v6 and v4 patterns
+        // Try v6 filesystem scan first (more flexible)
+        try {
+          const inv = inventoryOriginV6(origin);
+          if (
+            inv.agents.length > 0 ||
+            inv.workflows.length > 0 ||
+            inv.tasks.length > 0
+          ) {
+            master.modules.push(...inv.modules);
+            master.agents.push(...inv.agents);
+            master.workflows.push(...inv.workflows);
+            master.tasks.push(...inv.tasks);
+            continue;
+          }
+        } catch {
+          // v6 failed, try v4
+        }
+
+        // Try v4 pattern
+        try {
+          const inv = inventoryOriginV4(origin);
+          master.modules.push(...inv.modules);
+          master.agents.push(...inv.agents);
+          master.workflows.push(...inv.workflows);
+          master.tasks.push(...inv.tasks);
+        } catch {
+          // Both failed - skip this origin silently
+        }
+      }
+      
+    } catch {
+      // Continue processing other origins silently
     }
   }
+  
   return master;
 }
 

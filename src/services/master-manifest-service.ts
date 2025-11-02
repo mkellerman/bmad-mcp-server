@@ -15,6 +15,11 @@ export class MasterManifestService {
 
   generate(): MasterManifests {
     const origins = originsFromResolution(this.discovery);
+    
+    if (origins.length === 0) {
+      throw new Error('No valid BMAD origins available');
+    }
+    
     this.cache = buildMasterManifests(origins);
     return this.cache;
   }

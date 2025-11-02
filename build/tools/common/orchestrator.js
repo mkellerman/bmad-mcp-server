@@ -53,8 +53,6 @@ export class UnifiedBMADTool {
         // This maintains backward compatibility with existing loader code
         this.agents = convertAgents(masterData.agents);
         this.workflows = convertWorkflows(masterData.workflows);
-        logger.info(`UnifiedBMADTool initialized with ${this.agents.length} agents ` +
-            `and ${this.workflows.length} workflows from master manifest`);
     }
     execute(command) {
         const normalized = command.trim();

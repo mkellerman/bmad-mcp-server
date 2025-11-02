@@ -9,9 +9,13 @@
  * - Legacy interfaces (existing tool code)
  */
 
-import type { MasterRecord, Agent, Workflow, Task } from '../types/index.js';
-import logger from './logger.js';
+import type { MasterRecord } from '../types/index.js';
 import { parseAgentMetadata } from './agent-metadata-parser.js';
+import {
+  type Agent,
+  type Workflow,
+  type Task,
+} from '../types/index.js';
 
 /**
  * Filter master records to only include files that physically exist.
@@ -24,11 +28,6 @@ import { parseAgentMetadata } from './agent-metadata-parser.js';
  */
 export function filterExisting(records: MasterRecord[]): MasterRecord[] {
   const existingRecords = records.filter((r) => r.exists === true);
-
-  logger.info(
-    `Filtered ${records.length} records to ${existingRecords.length} existing files`,
-  );
-
   return existingRecords;
 }
 
