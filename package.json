@@ -71,4 +71,13 @@
   ],
   "author": "",
   "license": "ISC"
+  ,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mkellerman/bmad-mcp-server"
+  },
+  "bugs": {
+    "url": "https://github.com/mkellerman/bmad-mcp-server/issues"
+  },
+  "homepage": "https://github.com/mkellerman/bmad-mcp-server#readme"
 }
