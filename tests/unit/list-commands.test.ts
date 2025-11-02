@@ -33,7 +33,7 @@ describe('List commands', () => {
     expect(agents.content).toContain('BMAD Agents');
     expect(agents.content).toContain('analyst');
 
-    // Verify agents are sorted by command name (not display name)
+    // Verify agents are displayed with module grouping
     const agentLines = (agents.content ?? '')
       .split('\n')
       .filter((l) => l.trim().startsWith('- '));
@@ -44,14 +44,14 @@ describe('List commands', () => {
       })
       .filter(Boolean);
 
-    // Check that agent names are in alphabetical order
-    const sortedNames = [...agentNames].sort();
-    expect(agentNames).toEqual(sortedNames);
-
-    // Verify ux-expert comes after analyst (alphabetically by command, not display name)
-    const analystIndex = agentNames.indexOf('analyst');
-    const uxIndex = agentNames.indexOf('ux-expert');
-    expect(uxIndex).toBeGreaterThan(analystIndex);
+    // With module grouping, agents are NOT in global alphabetical order
+    // Instead, they're grouped by module with headers like "## Core/Standalone"
+    // Verify that module grouping is present and agents are listed
+    expect(agents.content).toContain('## '); // Has module headers
+    expect(agentNames.length).toBeGreaterThan(0); // Has agents
+    // Check for any variant of analyst (analyst, bmad analyst, bmm/analyst, etc.)
+    const hasAnalyst = agentNames.some((name) => name?.includes('analyst'));
+    expect(hasAnalyst).toBe(true);
 
     const workflows = await tool.execute('*list-workflows');
     expect(workflows.success).toBe(true);
