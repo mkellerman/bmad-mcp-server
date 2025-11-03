@@ -446,7 +446,7 @@ bmad install {{module_code}}
 
 ## Configuration
 
-The module can be configured in `bmad/{{module_code}}/config.yaml`
+The module can be configured in `bmad/bmb/config.yaml`
 
 Key settings:
 {{configuration_options}}

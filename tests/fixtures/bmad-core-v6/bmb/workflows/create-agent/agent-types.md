@@ -216,7 +216,7 @@ agent:
     communication_style: '...'
     principles: ['...']
   critical_actions:
-    - 'Load config from {project-root}/bmad/{module}/config.yaml'
+    - 'Load config from {project-root}/bmad/bmb/config.yaml'
   menu:
     - trigger: create-prd
       workflow: '{project-root}/bmad/bmm/workflows/prd/workflow.yaml'
@@ -237,7 +237,7 @@ agent:
     <principles>...</principles>
   </persona>
   <critical-actions>
-    <i>Load config from {project-root}/bmad/{module}/config.yaml</i>
+    <i>Load config from {project-root}/bmad/bmb/config.yaml</i>
   </critical-actions>
   <menu>
     <item cmd="*help">Show numbered menu</item>

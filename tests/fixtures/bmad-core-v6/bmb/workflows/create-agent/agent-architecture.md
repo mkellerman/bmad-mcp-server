@@ -60,7 +60,7 @@ _LLM-Optimized Technical Documentation for Agent Building_
 
 ```xml
 <critical-actions>
-  <i>Load into memory {project-root}/bmad/{module}/config.yaml and set variables</i>
+  <i>Load into memory {project-root}/bmad/bmb/config.yaml and set variables</i>
   <i>Remember the users name is {user_name}</i>
   <i>ALWAYS communicate in {communication_language}</i>
   <!-- Custom initialization actions -->
@@ -77,7 +77,7 @@ _LLM-Optimized Technical Documentation for Agent Building_
   <i critical="MANDATORY">You MUST follow all rules in instructions.md on EVERY interaction</i>
 
   <!-- Standard initialization -->
-  <i>Load into memory {project-root}/bmad/{module}/config.yaml and set variables</i>
+  <i>Load into memory {project-root}/bmad/bmb/config.yaml and set variables</i>
   <i>Remember the users name is {user_name}</i>
   <i>ALWAYS communicate in {communication_language}</i>
 
@@ -395,7 +395,7 @@ When building agents:
 
 ```xml
 <critical-actions>
-  <i>Load into memory {project-root}/bmad/{module}/config.yaml</i>
+  <i>Load into memory {project-root}/bmad/bmb/config.yaml</i>
   <i>Remember the users name is {user_name}</i>
   <i>ALWAYS communicate in {communication_language}</i>
 </critical-actions>
