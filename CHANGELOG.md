@@ -1,4 +1,4 @@
-# [1.3.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.1.0...v1.3.0) (2025-11-02)
+# [1.3.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.2.0...v1.3.0) (2025-11-03)
 
 ### Features
 
@@ -68,6 +68,26 @@
 - LLM setup instructions
 - Reporter usage guide
 - Test case YAML format specification
+
+# [1.2.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.1.0...v1.2.0) (2025-11-03)
+
+### Bug Fixes
+
+- **tests:** resolve git cache concurrency issues in CI ([dde14e7](https://github.com/mkellerman/bmad-mcp-server/commit/dde14e71aaae72dc31ad39f8a99ac792522d0dac))
+
+### Features
+
+- add remote module loading support ([bd4cd0d](https://github.com/mkellerman/bmad-mcp-server/commit/bd4cd0dbaaea03c65eb314b56f308b92883a1d1f))
+
+# [1.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.0.2...v1.1.0) (2025-11-02)
+
+### Bug Fixes
+
+- **server:** restore production logs and use dynamic version from package.json ([4e62613](https://github.com/mkellerman/bmad-mcp-server/commit/4e62613b93b1636158d1c183b11976a7a6cbc108))
+
+### Features
+
+- **list:** add module-grouped agent listing for better UX ([b372218](https://github.com/mkellerman/bmad-mcp-server/commit/b37221801f73c914d287f43479974e3081f77414))
 
 # [1.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.0.2...v1.1.0) (2025-11-02)
 
