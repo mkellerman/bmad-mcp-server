@@ -9,7 +9,6 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
 import path from 'node:path';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { resolveBmadPaths, } from './utils/bmad-path-resolver.js';
@@ -19,6 +18,7 @@ import { convertAgents } from './utils/master-manifest-adapter.js';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
 import logger from './utils/logger.js';
 import { parseRemoteArgs, } from './utils/remote-registry.js';
+import loadConfig from './config.js';
 // Compute __dirname - use import.meta.url when available (production)
 // Fall back to build directory for test environments
 function getDirname() {
@@ -436,21 +436,21 @@ export async function main() {
     // Support multiple paths as CLI arguments (argv[2], argv[3], ...)
     // Filter out commands (starting with * or --) to only keep paths
     const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
+    const config = loadConfig({ argv: allArgs });
     // Parse --remote arguments for dynamic agent loading
     const remoteRegistry = parseRemoteArgs(allArgs);
     console.error(`🌐 Registered ${remoteRegistry.remotes.size} remote(s)`);
-    // Parse --mode flag
+    // Parse --mode flag (preserve validation behavior)
     const modeArg = allArgs.find((arg) => arg.startsWith('--mode='));
     const modeValue = modeArg?.split('=')[1];
     const envMode = process.env.BMAD_DISCOVERY_MODE;
     const rawMode = modeValue || envMode || 'auto';
-    // Validate mode
     if (rawMode !== 'auto' && rawMode !== 'strict') {
         console.error(`❌ Invalid discovery mode: ${rawMode}`);
         console.error('   Valid modes: auto, strict');
         throw new Error(`Invalid BMAD_DISCOVERY_MODE: ${rawMode}`);
     }
-    const mode = rawMode;
+    const mode = config.discovery.mode;
     // Filter CLI args (exclude commands and flags)
     const cliArgs = allArgs.filter((arg) => !arg.startsWith('*') && !arg.startsWith('--'));
     // Read version from package.json
@@ -467,7 +467,7 @@ export async function main() {
     }
     console.error(`🚀 BMAD MCP Server v${version}\n`);
     // Process CLI args to resolve git+ URLs to local paths
-    const gitResolver = new GitSourceResolver();
+    const gitResolver = new GitSourceResolver(config.git.cacheDir);
     const processedCliArgs = [];
     const sourceResults = [];
     console.error('📦 Loading sources...');
@@ -509,13 +509,12 @@ export async function main() {
             });
         }
     }
-    const envVar = process.env.BMAD_ROOT;
-    const userBmadPath = path.join(os.homedir(), '.bmad');
+    const envVar = config.discovery.envRoot;
     const discovery = resolveBmadPaths({
         cwd,
         cliArgs: processedCliArgs,
         envVar,
-        userBmadPath,
+        userBmadPath: config.discovery.userBmadPath,
         mode,
     });
     // Update source results based on discovery

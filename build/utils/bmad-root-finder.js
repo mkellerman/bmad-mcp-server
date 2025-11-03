@@ -106,7 +106,7 @@ function isCustomRoot(dirPath) {
  * @returns Array of all found BMAD roots
  */
 export function findBmadRootsRecursive(startPath, options = {}) {
-    const maxDepth = options.maxDepth ?? 3;
+    const maxDepth = options.maxDepth ?? 1;
     const currentDepth = options.currentDepth ?? 0;
     const results = [];
     try {

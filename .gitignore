@@ -89,3 +89,4 @@ pyproject.toml
 test-results/
 playwright-report/
 master-manifest.json
+bin/graph
