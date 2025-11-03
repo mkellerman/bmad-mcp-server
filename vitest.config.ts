@@ -12,6 +12,8 @@ export default defineConfig({
       '**/coverage/**',
       '**/tests/e2e/framework/runner.spec.ts', // LLM-based tests require LiteLLM proxy
     ],
+    // Run tests sequentially to avoid git cache conflicts in E2E tests
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

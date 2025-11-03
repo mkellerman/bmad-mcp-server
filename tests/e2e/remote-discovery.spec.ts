@@ -4,6 +4,9 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { rm } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import {
   MCPClientFixture,
   createMCPClient,
@@ -13,6 +16,14 @@ describe('Remote Discovery E2E', () => {
   let mcpClient: MCPClientFixture;
 
   beforeAll(async () => {
+    // Clean git cache to avoid concurrent access issues in CI
+    const gitCachePath = join(homedir(), '.bmad', 'cache', 'git');
+    try {
+      await rm(gitCachePath, { recursive: true, force: true });
+    } catch {
+      // Ignore if doesn't exist
+    }
+
     mcpClient = await createMCPClient();
   });
 
