@@ -10,7 +10,7 @@
 import { GitSourceResolver } from './git-source-resolver.js';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { getAgentInstructions } from '../tools/common/agent-instructions.js';
 /**
  * In-memory cache for loaded remote agents

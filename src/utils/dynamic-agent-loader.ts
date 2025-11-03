@@ -12,7 +12,7 @@ import { GitSourceResolver } from './git-source-resolver.js';
 import type { RemoteRegistry } from './remote-registry.js';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import type { BMADToolResult, MasterRecord } from '../types/index.js';
 import { getAgentInstructions } from '../tools/common/agent-instructions.js';
 
