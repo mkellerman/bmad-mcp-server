@@ -1,3 +1,22 @@
+# [2.0.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.2.0...v2.0.0) (2025-11-03)
+
+
+### Bug Fixes
+
+* **docs:** update config source paths in workflow instructions to use bmb directory [skip ci] ([d09917a](https://github.com/mkellerman/bmad-mcp-server/commit/d09917a5dab37637cac703c1bf6f6f48e357ffc5))
+* **tests:** add null safety to afterAll cleanup in LLM tests ([68a4654](https://github.com/mkellerman/bmad-mcp-server/commit/68a46540a7bd1ec8d99fc70346e36f499888f1fb))
+* **tests:** skip LLM tests in CI environment ([34b994c](https://github.com/mkellerman/bmad-mcp-server/commit/34b994cd35dc9e7305606805c189583286d17ee2))
+
+
+### Features
+
+* **testing:** add comprehensive E2E testing framework with LLM integration ([cb7c3e6](https://github.com/mkellerman/bmad-mcp-server/commit/cb7c3e62f9d855476aeef921501b04fffdd1c83a))
+
+
+### BREAKING CHANGES
+
+* **testing:** None - backward compatible feature addition
+
 # [1.3.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.2.0...v1.3.0) (2025-11-03)
 
 ### Features
