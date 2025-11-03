@@ -180,7 +180,6 @@ export function buildToolDescription(
   lines.push(
     '- Without the asterisk, the tool will try to load an agent with that name',
   );
-  lines.push('- Use only ONE argument at a time');
   lines.push('- Discovery commands are built-in and work independently\n');
 
   // Examples

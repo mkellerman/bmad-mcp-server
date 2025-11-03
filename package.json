@@ -8,7 +8,9 @@
   },
   "scripts": {
     "build": "tsc && chmod +x build/index.js",
-    "prepare": "husky || true",
+    "clean": "rm -rf build/ coverage/ test-results/ playwright-report/ master-manifest.json bin/graph .bmad/cache/",
+    "clean:all": "npm run clean && rm -rf node_modules/ package-lock.json",
+    "prepare": "npm run build || true",
     "start": "node build/index.js",
     "dev": "tsx src/index.ts",
     "test": "vitest run",

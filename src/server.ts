@@ -133,13 +133,24 @@ export class BMADMCPServer {
       this.masterService = new MasterManifestService(discovery);
       this.masterService.generate();
     } catch (error) {
-      console.error('❌ Failed to build master manifest');
-      console.error(
-        `   Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw new Error(
-        `Master manifest generation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // If no valid BMAD installations, create empty manifest
+      // This allows the server to run with only remote agents
+      const hasValidInstallations = discovery.activeLocations.length > 0;
+      if (!hasValidInstallations) {
+        console.error(
+          '⚠️  No local BMAD installations - running in remote-only mode',
+        );
+        this.masterService = new MasterManifestService(discovery);
+        // The service will handle empty installations gracefully
+      } else {
+        console.error('❌ Failed to build master manifest');
+        console.error(
+          `   Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw new Error(
+          `Master manifest generation failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     // Convert master manifest agents to legacy Agent interface
@@ -147,7 +158,12 @@ export class BMADMCPServer {
     try {
       const masterData = this.masterService.get();
       this.agents = convertAgents(masterData.agents);
-      console.error(`Loaded ${this.agents.length} agents from master manifest`);
+      const agentCount = this.agents.length;
+      if (agentCount > 0) {
+        console.error(`Loaded ${agentCount} agents from master manifest`);
+      } else {
+        console.error('No local agents loaded - use remotes to load agents');
+      }
     } catch (error) {
       console.error('❌ Failed to process agents');
       console.error(
@@ -175,9 +191,15 @@ export class BMADMCPServer {
       const errorSuffix = hasErrors ? ' (some sources failed)' : '';
 
       console.error('BMAD MCP Server initialized successfully');
-      console.error(
-        `\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`,
-      );
+
+      if (this.agents.length > 0) {
+        console.error(
+          `\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`,
+        );
+      } else {
+        console.error('\n📊 Ready: Remote-only mode (no local agents)');
+        console.error(`💡 Load agents with: bmad *list-agents @awesome`);
+      }
       console.error('📡 Server running on stdio');
     } catch (error) {
       console.error('❌ Failed to initialize unified tool');
@@ -339,7 +361,7 @@ export class BMADMCPServer {
               command: {
                 type: 'string',
                 description:
-                  "Command to execute: empty string for default, 'agent-name' for agents, '*workflow-name' for workflows",
+                  "The complete BMAD command string exactly as provided by the user. DO NOT parse, modify, or strip any part of this string - pass it through verbatim. Examples: '', 'analyst', '*party-mode', '*list-agents @awesome'",
               },
             },
             required: ['command'],
@@ -638,6 +660,37 @@ export async function main(): Promise<void> {
     }
   }
 
+  // Check if all sources failed in strict mode
+  const hasGitErrors = sourceResults.some(
+    (r) => r.type === 'git' && r.status === 'error',
+  );
+  const hasAnySources = cliArgs.length > 0;
+  const allSourcesFailed =
+    hasAnySources && processedCliArgs.length === 0 && mode === 'strict';
+
+  if (allSourcesFailed && hasGitErrors) {
+    console.error('\n💥 Fatal: All git sources failed to load');
+    console.error('━'.repeat(60));
+    console.error('\nFailed sources:');
+    sourceResults
+      .filter((r) => r.status === 'error')
+      .forEach((r) => {
+        console.error(`   ✗ ${r.name}`);
+        if (r.error) {
+          console.error(`     → ${r.error}`);
+        }
+      });
+    console.error('\n💡 Troubleshooting tips:');
+    console.error('   • Check your internet connection');
+    console.error('   • Verify repository URLs are correct');
+    console.error('   • Ensure you have access to private repositories');
+    console.error('   • Try running with --mode=auto for local discovery');
+    console.error(
+      '\n   See: https://docs.bmad.dev/troubleshooting#git-sources',
+    );
+    throw new Error('All configured sources failed to load');
+  }
+
   const envVar = config.discovery.envRoot;
 
   const discovery = resolveBmadPaths({
@@ -730,9 +783,40 @@ export async function main(): Promise<void> {
   const activeRoot = discovery.activeLocation.resolvedRoot;
 
   if (!activeRoot || discovery.activeLocation.status !== 'valid') {
-    console.error('\n💥 Fatal: No valid BMAD sources found');
-    console.error('   See: https://docs.bmad.dev/troubleshooting');
-    throw new Error('Unable to determine valid BMAD root');
+    console.error('\n⚠️  Warning: No BMAD installations found');
+    console.error('━'.repeat(60));
+    console.error('\n� You can load agents dynamically using remotes:');
+    console.error('   bmad *list-agents @awesome');
+    console.error('   bmad *list-workflows @awesome');
+    console.error('\n📚 Or provide BMAD sources:');
+    console.error('   • Git: git+https://github.com/org/repo#branch:/path');
+    console.error('   • Local: /path/to/bmad/installation');
+    console.error('\n🔧 Configuration modes:');
+    console.error('   • --mode=auto   : Auto-discover from project/user dirs');
+    console.error('   • --mode=strict : Use only explicitly provided sources');
+    console.error('\n   See: https://docs.bmad.dev/configuration\n');
+
+    // Create a minimal server with no BMAD root
+    // This allows remote agent loading to work
+    const emptyRoot = process.cwd();
+    try {
+      const server = new BMADMCPServer(
+        emptyRoot,
+        discovery,
+        remoteRegistry,
+        version,
+      );
+      await server.run();
+    } catch (error) {
+      console.error('\n❌ Server Initialization Failed');
+      console.error('━'.repeat(60));
+      console.error(
+        'Error Details:',
+        error instanceof Error ? error.message : String(error),
+      );
+      throw error;
+    }
+    return;
   }
 
   try {
