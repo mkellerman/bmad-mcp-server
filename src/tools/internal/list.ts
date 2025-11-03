@@ -7,10 +7,7 @@ import { GitSourceResolver } from '../../utils/git-source-resolver.js';
 import {
   discoverAgents,
   discoverModules,
-  formatAgentList,
-  formatModuleList,
 } from '../../utils/remote-discovery.js';
-import { paginationState } from '../../utils/pagination-state.js';
 
 interface ListContext {
   resolved: any;
@@ -19,121 +16,123 @@ interface ListContext {
   remoteRegistry?: RemoteRegistry;
 }
 
+/**
+ * Format a list of agents grouped by module
+ */
+function formatAgentsByModule(
+  agents: Array<{
+    name: string;
+    module: string;
+    displayName: string;
+    title: string;
+    role?: string;
+    loadCommand: string;
+    isDuplicate?: boolean;
+  }>,
+  title: string,
+  totalCount: number,
+  moduleCount: number,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${title}\n`);
+  lines.push(`**Found ${totalCount} agents across ${moduleCount} modules**\n`);
+  lines.push('---\n');
+
+  // Group agents by module
+  const agentsByModule = new Map<string, typeof agents>();
+  for (const agent of agents) {
+    const moduleList = agentsByModule.get(agent.module) || [];
+    moduleList.push(agent);
+    agentsByModule.set(agent.module, moduleList);
+  }
+
+  // Sort modules
+  const sortedModules = Array.from(agentsByModule.keys()).sort();
+
+  // Display each module group
+  for (const moduleName of sortedModules) {
+    const moduleAgents = agentsByModule.get(moduleName) || [];
+    const displayModuleName = moduleName || 'Core/Standalone';
+
+    lines.push(`## 📦 ${displayModuleName}\n`);
+
+    // Sort agents within module by load command
+    const sortedAgents = moduleAgents.sort((a, b) =>
+      a.loadCommand.localeCompare(b.loadCommand),
+    );
+
+    for (const agent of sortedAgents) {
+      // Build line segments
+      const segments: string[] = [];
+
+      // Format: "- `load-command`: Title (**DisplayName**) Role"
+      const prefix = `- \`${agent.loadCommand}\`:`;
+
+      if (agent.title) {
+        segments.push(agent.title);
+      }
+
+      // Always show display name for clarity
+      segments.push(`(**${agent.displayName}**)`);
+
+      if (agent.role) {
+        segments.push(agent.role);
+      }
+
+      // Join segments and combine with prefix
+      const agentLine =
+        segments.length > 0 ? `${prefix} ${segments.join(' - ')}` : prefix;
+      lines.push(agentLine);
+    }
+
+    lines.push(''); // Add spacing between modules
+  }
+
+  lines.push('---');
+
+  return lines.join('\n');
+}
+
+/**
+ * Simple formatter for module lists
+ */
+function formatModulesList(
+  modules: Array<{
+    name: string;
+    description?: string;
+    agentCount: number;
+    workflowCount: number;
+  }>,
+  remoteName: string,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`# 🌐 Remote Modules: @${remoteName}\n`);
+  lines.push(`**Found ${modules.length} modules**\n`);
+  lines.push('---\n');
+
+  for (const mod of modules) {
+    lines.push(`## 📦 ${mod.name}\n`);
+    if (mod.description) {
+      lines.push(`${mod.description}\n`);
+    }
+    lines.push(
+      `**Content:** ${mod.agentCount} agents, ${mod.workflowCount} workflows\n`,
+    );
+  }
+
+  lines.push('---');
+
+  return lines.join('\n');
+}
+
 export async function handleListCommand(
   cmd: string,
   ctx: ListContext,
 ): Promise<BMADToolResult> {
   const { resolved, master, discovery } = ctx;
   const lines: string[] = [];
-
-  // Handle *more command
-  if (cmd === '*more') {
-    // Try to get next page from any active pagination state
-    // Priority: local-agents, remote-agents-*, remote-modules-*
-    const keys = [
-      'local-agents',
-      'local-workflows',
-      'local-remotes',
-      // Will also check for remote keys dynamically
-    ];
-
-    let page = null;
-    let usedKey = '';
-
-    // Try local keys first
-    for (const key of keys) {
-      page = paginationState.getNextPage(key);
-      if (page) {
-        usedKey = key;
-        break;
-      }
-    }
-
-    // If no local pagination found, it might be a remote list
-    // We don't have a way to track which remote was last used,
-    // so we'll return an error suggesting to use the list command again
-    if (!page) {
-      return {
-        success: false,
-        exitCode: 1,
-        error:
-          'No active list to paginate. Please run a list command first (*list-agents, *list-workflows, *list-remotes, etc.)',
-      };
-    }
-
-    // Determine what type of list this is
-    const listType = usedKey.includes('agents')
-      ? 'agents'
-      : usedKey.includes('workflows')
-        ? 'workflows'
-        : usedKey.includes('remotes')
-          ? 'remotes'
-          : 'items';
-
-    // Format output based on type
-    const title = usedKey.includes('remote-agents')
-      ? '🌐 Remote Agents (continued)'
-      : usedKey.includes('remote-modules')
-        ? '🌐 Remote Modules (continued)'
-        : listType === 'agents'
-          ? '🤖 BMAD Agents (continued)'
-          : listType === 'workflows'
-            ? '🔄 BMAD Workflows (continued)'
-            : '📋 Items (continued)';
-
-    lines.push(`# ${title}\n`);
-    lines.push(`Showing ${page.start}-${page.end} of ${page.total}\n`);
-
-    for (const item of page.items as any[]) {
-      const num = item.number || 0;
-      const name = item.displayName || item.name || 'Unknown';
-      const moduleInfo = item.module ? ` (${item.module})` : '';
-
-      lines.push(`${num}. **${name}**${moduleInfo}`);
-
-      if (item.title) {
-        lines.push(`   ${item.title}`);
-      } else if (item.description) {
-        lines.push(`   ${item.description}`);
-      }
-
-      if (item.loadCommand) {
-        lines.push(`   Load: \`bmad ${item.loadCommand}\``);
-      }
-
-      lines.push('');
-    }
-
-    if (page.hasMore) {
-      lines.push('---');
-      lines.push('📄 **More available**');
-      lines.push('Type `*more` to see the next page\n');
-    } else {
-      lines.push('---');
-      lines.push('✅ End of list\n');
-    }
-
-    return {
-      success: true,
-      type: 'list',
-      listType,
-      count: page.total,
-      content: lines.join('\n'),
-      exitCode: 0,
-      structuredData: {
-        items: page.items,
-        summary: {
-          total: page.total,
-          message: `Page ${page.currentPage} of ${page.totalPages}`,
-        },
-        metadata: {
-          currentPage: page.currentPage,
-          totalPages: page.totalPages,
-          hasMore: page.hasMore,
-        },
-      },
-    };
-  }
 
   if (cmd === '*list-agents') {
     // Build structured data
@@ -144,14 +143,15 @@ export async function handleListCommand(
       masterRecordToAgent(record, true),
     );
 
-    // Process agents and build simple list
+    // Process agents and build list
     const agents: Array<{
-      number: number;
       name: string;
       module: string;
       displayName: string;
       title: string;
+      role?: string;
       loadCommand: string;
+      isDuplicate?: boolean;
     }> = [];
 
     const seenNames = new Map<string, number>();
@@ -165,9 +165,10 @@ export async function handleListCommand(
 
       const displayName = agent.displayName || agent.title || agent.name;
       const title = agent.title || '';
+      const role = agent.role || '';
       const module = agent.module || '';
 
-      // Determine load command
+      // Determine load command - use module prefix for collisions
       let loadCommand = name;
       const nameCount = seenNames.get(name) || 0;
       seenNames.set(name, nameCount + 1);
@@ -181,67 +182,60 @@ export async function handleListCommand(
       }
 
       agents.push({
-        number: agents.length + 1,
         name: agent.name || '',
         module,
         displayName,
         title,
+        role,
         loadCommand,
+        isDuplicate: nameCount > 0,
       });
     }
 
     // Sort alphabetically by load command
     agents.sort((a, b) => a.loadCommand.localeCompare(b.loadCommand));
 
-    // Reassign numbers after sorting
-    agents.forEach((agent, idx) => {
-      agent.number = idx + 1;
-    });
+    // Count unique modules
+    const moduleCount = new Set(agents.map((a) => a.module)).size;
 
-    // Get first page
-    const page = paginationState.getFirstPage('local-agents', agents, 'agents');
+    // Format using shared function
+    const content = formatAgentsByModule(
+      agents,
+      '🤖 BMAD Agents',
+      agents.length,
+      moduleCount,
+    );
 
-    // Build simple numbered list
-    const lines: string[] = [];
-    lines.push('# 🤖 BMAD Agents\n');
-    lines.push(`Showing ${page.start}-${page.end} of ${page.total} agents\n`);
-
-    for (const agent of page.items as typeof agents) {
-      const moduleInfo = agent.module ? ` (${agent.module})` : '';
-      lines.push(`${agent.number}. **${agent.displayName}**${moduleInfo}`);
-      if (agent.title) {
-        lines.push(`   ${agent.title}`);
-      }
-      lines.push(`   Load: \`bmad ${agent.loadCommand}\``);
-      lines.push('');
+    // Build summary for structured data
+    const agentsByModule = new Map<string, typeof agents>();
+    for (const agent of agents) {
+      const moduleList = agentsByModule.get(agent.module) || [];
+      moduleList.push(agent);
+      agentsByModule.set(agent.module, moduleList);
     }
 
-    if (page.hasMore) {
-      lines.push('---');
-      lines.push('📄 **More agents available**');
-      lines.push('Type `*more` to see the next page\n');
-    } else {
-      lines.push('---');
-      lines.push('✅ End of list\n');
+    const byGroup: Record<string, number> = {};
+    for (const [mod, list] of agentsByModule) {
+      byGroup[mod] = list.length;
     }
 
     return {
       success: true,
       type: 'list',
       listType: 'agents',
-      count: page.total,
-      content: lines.join('\n'),
+      count: agents.length,
+      content,
       exitCode: 0,
       structuredData: {
-        items: page.items,
+        items: agents,
         summary: {
-          total: page.total,
-          message: `Found ${page.total} agents (page ${page.currentPage}/${page.totalPages})`,
+          total: agents.length,
+          byGroup,
+          message: `Found ${agents.length} agents across ${moduleCount} modules`,
         },
         metadata: {
-          currentPage: page.currentPage,
-          totalPages: page.totalPages,
-          hasMore: page.hasMore,
+          modules: Array.from(agentsByModule.keys()).sort(),
+          timestamp: new Date().toISOString(),
         },
       },
     };
@@ -499,8 +493,83 @@ export async function handleListCommand(
       installedAgents,
     );
 
-    // Format and return
-    const content = formatAgentList(result);
+    if (result.error) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: result.error,
+      };
+    }
+
+    const discoveredAgents = result.agents || [];
+
+    // Transform discovered agents to the same format as local agents
+    const agents: Array<{
+      name: string;
+      module: string;
+      displayName: string;
+      title: string;
+      role?: string;
+      loadCommand: string;
+      isDuplicate?: boolean;
+    }> = [];
+
+    // Track seen names for collision detection
+    const seenNames = new Map<string, number>();
+
+    for (const agent of discoveredAgents) {
+      // Extract module from path (e.g., "bmad-2d-phaser-v4" from path)
+      const module =
+        agent.path
+          .split('/')
+          .find((p) => p.startsWith('bmad-') || p.startsWith('debug-')) || '';
+
+      const name = agent.name.toLowerCase().replace(/\s+/g, '-');
+      const displayName = agent.displayName || agent.name;
+      const title = agent.title || agent.description || '';
+
+      // Determine load command - always use module prefix for remote
+      const loadCommand = module ? `${module}/${name}` : name;
+
+      const nameCount = seenNames.get(name) || 0;
+      seenNames.set(name, nameCount + 1);
+
+      agents.push({
+        name: agent.name,
+        module,
+        displayName,
+        title,
+        loadCommand,
+        isDuplicate: nameCount > 0,
+      });
+    }
+
+    // Sort alphabetically by load command
+    agents.sort((a, b) => a.loadCommand.localeCompare(b.loadCommand));
+
+    // Count unique modules
+    const moduleCount = new Set(agents.map((a) => a.module)).size;
+
+    // Format using shared function
+    const content = formatAgentsByModule(
+      agents,
+      `🌐 Remote Agents: @${remoteName}`,
+      agents.length,
+      moduleCount,
+    );
+
+    // Build summary for structured data
+    const agentsByModule = new Map<string, typeof agents>();
+    for (const agent of agents) {
+      const moduleList = agentsByModule.get(agent.module) || [];
+      moduleList.push(agent);
+      agentsByModule.set(agent.module, moduleList);
+    }
+
+    const byGroup: Record<string, number> = {};
+    for (const [mod, list] of agentsByModule) {
+      byGroup[mod] = list.length;
+    }
 
     return {
       success: true,
@@ -509,18 +578,17 @@ export async function handleListCommand(
       content,
       exitCode: 0,
       structuredData: {
-        items: result.agents || [],
+        items: agents,
         summary: {
-          total: result.agents?.length || 0,
-          message:
-            result.error ||
-            `Found ${result.agents?.length || 0} agents from @${result.remote}`,
+          total: agents.length,
+          byGroup,
+          message: `Found ${agents.length} agents from @${remoteName}`,
         },
         metadata: {
           remote: result.remote,
           url: result.url,
           localPath: result.localPath,
-          error: result.error,
+          modules: Array.from(agentsByModule.keys()).sort(),
         },
       },
     };
@@ -564,8 +632,16 @@ export async function handleListCommand(
       installedModules,
     );
 
+    if (result.error) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: result.error,
+      };
+    }
+
     // Format and return
-    const content = formatModuleList(result);
+    const content = formatModulesList(result.modules || [], remoteName);
 
     return {
       success: true,
