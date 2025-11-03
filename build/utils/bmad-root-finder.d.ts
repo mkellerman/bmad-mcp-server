@@ -12,6 +12,7 @@ export interface FoundBmadRoot {
 interface SearchOptions {
     maxDepth?: number;
     currentDepth?: number;
+    excludeDirs?: string[];
 }
 /**
  * Recursively search for BMAD installations in subdirectories

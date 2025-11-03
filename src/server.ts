@@ -28,7 +28,7 @@ import { UnifiedBMADTool, buildToolDescription } from './tools/index.js';
 import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
-import logger from './utils/logger.js';
+import logger, { configureLogger } from './utils/logger.js';
 import {
   parseRemoteArgs,
   type RemoteRegistry,
@@ -539,6 +539,12 @@ export async function main(): Promise<void> {
   const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
   const config = loadConfig({ argv: allArgs });
 
+  // Configure logger with settings from config
+  configureLogger({
+    debug: config.logging.debug,
+    level: config.logging.level,
+  });
+
   // Parse --remote arguments for dynamic agent loading
   const remoteRegistry = parseRemoteArgs(allArgs);
   console.error(`🌐 Registered ${remoteRegistry.remotes.size} remote(s)`);
@@ -574,8 +580,13 @@ export async function main(): Promise<void> {
 
   console.error(`🚀 BMAD MCP Server v${version}\n`);
 
+  console.error('📦 Loading sources...');
+
   // Process CLI args to resolve git+ URLs to local paths
-  const gitResolver = new GitSourceResolver(config.git.cacheDir);
+  const gitResolver = new GitSourceResolver(
+    config.git.cacheDir,
+    config.git.autoUpdate,
+  );
   const processedCliArgs: string[] = [];
   const sourceResults: Array<{
     type: 'git' | 'local';
@@ -584,8 +595,6 @@ export async function main(): Promise<void> {
     error?: string;
     agentCount?: number;
   }> = [];
-
-  console.error('📦 Loading sources...');
 
   for (let i = 0; i < cliArgs.length; i++) {
     const arg = cliArgs[i];
@@ -638,6 +647,8 @@ export async function main(): Promise<void> {
     userBmadPath: config.discovery.userBmadPath,
     mode,
     rootSearchMaxDepth: config.discovery.rootSearchMaxDepth,
+    includeUserBmad: config.discovery.includeUserBmad,
+    excludeDirs: config.discovery.excludeDirs,
   });
 
   // Update source results based on discovery

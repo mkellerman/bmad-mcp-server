@@ -16,7 +16,7 @@ import { UnifiedBMADTool, buildToolDescription } from './tools/index.js';
 import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
-import logger from './utils/logger.js';
+import logger, { configureLogger } from './utils/logger.js';
 import { parseRemoteArgs, } from './utils/remote-registry.js';
 import loadConfig from './config.js';
 // Compute __dirname - use import.meta.url when available (production)
@@ -437,6 +437,11 @@ export async function main() {
     // Filter out commands (starting with * or --) to only keep paths
     const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
     const config = loadConfig({ argv: allArgs });
+    // Configure logger with settings from config
+    configureLogger({
+        debug: config.logging.debug,
+        level: config.logging.level,
+    });
     // Parse --remote arguments for dynamic agent loading
     const remoteRegistry = parseRemoteArgs(allArgs);
     console.error(`🌐 Registered ${remoteRegistry.remotes.size} remote(s)`);
@@ -466,11 +471,11 @@ export async function main() {
         // Silently fall back to 'unknown' if package.json can't be read
     }
     console.error(`🚀 BMAD MCP Server v${version}\n`);
+    console.error('📦 Loading sources...');
     // Process CLI args to resolve git+ URLs to local paths
-    const gitResolver = new GitSourceResolver(config.git.cacheDir);
+    const gitResolver = new GitSourceResolver(config.git.cacheDir, config.git.autoUpdate);
     const processedCliArgs = [];
     const sourceResults = [];
-    console.error('📦 Loading sources...');
     for (let i = 0; i < cliArgs.length; i++) {
         const arg = cliArgs[i];
         if (GitSourceResolver.isGitUrl(arg)) {
@@ -517,6 +522,8 @@ export async function main() {
         userBmadPath: config.discovery.userBmadPath,
         mode,
         rootSearchMaxDepth: config.discovery.rootSearchMaxDepth,
+        includeUserBmad: config.discovery.includeUserBmad,
+        excludeDirs: config.discovery.excludeDirs,
     });
     // Update source results based on discovery
     discovery.locations.forEach((loc) => {

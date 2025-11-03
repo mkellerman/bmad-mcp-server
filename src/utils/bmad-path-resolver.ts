@@ -34,6 +34,8 @@ export interface ResolveBmadPathsOptions {
   userBmadPath?: string;
   mode?: DiscoveryMode;
   rootSearchMaxDepth?: number;
+  includeUserBmad?: boolean;
+  excludeDirs?: string[];
 }
 
 const PRIORITY_ORDER: BmadLocationSource[] = ['project', 'cli', 'env', 'user'];
@@ -220,22 +222,38 @@ function resolveAutoPaths(
 ): BmadPathResolution {
   const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
   const maxDepth = options.rootSearchMaxDepth ?? 3;
+  const includeUserBmad = options.includeUserBmad ?? true;
+  const excludeDirs = options.excludeDirs;
 
   const candidates: BmadLocationInfo[] = [
-    ...buildCandidate('project', 'Local project', options.cwd, maxDepth),
+    ...buildCandidate(
+      'project',
+      'Local project',
+      options.cwd,
+      maxDepth,
+      excludeDirs,
+    ),
     ...buildCandidate(
       'env',
       'BMAD_ROOT environment variable',
       options.envVar,
       maxDepth,
-    ),
-    ...buildCandidate(
-      'user',
-      'User defaults (~/.bmad)',
-      userBmadPath,
-      maxDepth,
+      excludeDirs,
     ),
   ];
+
+  // Conditionally add user BMAD path
+  if (includeUserBmad) {
+    candidates.push(
+      ...buildCandidate(
+        'user',
+        'User defaults (~/.bmad)',
+        userBmadPath,
+        maxDepth,
+        excludeDirs,
+      ),
+    );
+  }
 
   // Add all CLI arguments as candidates with priority based on order
   if (options.cliArgs && options.cliArgs.length > 0) {
@@ -245,6 +263,7 @@ function resolveAutoPaths(
         `CLI argument #${index + 1}`,
         cliArg,
         maxDepth,
+        excludeDirs,
       );
       // Insert CLI candidates at the beginning (highest priority)
       candidates.splice(index + 1, 0, ...cliCandidates);
@@ -332,6 +351,7 @@ function resolveAutoPaths(
 function resolveCandidate(
   candidate?: string,
   maxDepth?: number,
+  excludeDirs?: string[],
 ): BmadLocationInfo[] {
   if (!candidate) {
     return [];
@@ -361,6 +381,7 @@ function resolveCandidate(
   // Search for BMAD installations recursively
   const foundRoots = findBmadRootsRecursive(resolvedPath, {
     maxDepth: maxDepth ?? 3,
+    excludeDirs,
   });
 
   if (foundRoots.length === 0) {
@@ -515,6 +536,7 @@ function buildCandidate(
   displayName: string,
   candidatePath?: string,
   maxDepth?: number,
+  excludeDirs?: string[],
 ): BmadLocationInfo[] {
   if (!candidatePath) {
     return [
@@ -528,7 +550,11 @@ function buildCandidate(
     ];
   }
 
-  const resolvedLocations = resolveCandidate(candidatePath, maxDepth);
+  const resolvedLocations = resolveCandidate(
+    candidatePath,
+    maxDepth,
+    excludeDirs,
+  );
 
   // Enrich each location with source metadata
   return resolvedLocations.map((location, index) => {

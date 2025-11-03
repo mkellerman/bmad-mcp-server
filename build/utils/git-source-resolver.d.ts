@@ -42,7 +42,8 @@ export interface CacheMetadata {
  */
 export declare class GitSourceResolver {
     private cacheDir;
-    constructor(cacheDir?: string);
+    private autoUpdate;
+    constructor(cacheDir?: string, autoUpdate?: boolean);
     /**
      * Helper: Check if path exists
      */

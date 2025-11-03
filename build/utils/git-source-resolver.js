@@ -28,9 +28,11 @@ const execAsync = promisify(exec);
  */
 export class GitSourceResolver {
     cacheDir;
-    constructor(cacheDir) {
+    autoUpdate;
+    constructor(cacheDir, autoUpdate = true) {
         this.cacheDir =
             cacheDir || path.join(os.homedir(), '.bmad', 'cache', 'git');
+        this.autoUpdate = autoUpdate;
     }
     /**
      * Helper: Check if path exists
@@ -77,9 +79,16 @@ export class GitSourceResolver {
         if (cacheExists) {
             const metadata = await this.loadMetadata(cachePath);
             if (this.isValidCache(metadata, gitUrl, spec)) {
-                // Cache exists and URL matches → PULL LATEST
-                logger.info(`Updating cached repo: ${spec.org}/${spec.repo}#${spec.ref}`);
-                await this.updateRepository(spec, cachePath, gitUrl);
+                // Cache exists and URL matches
+                if (this.autoUpdate) {
+                    // Auto-update enabled → PULL LATEST
+                    logger.info(`Updating cached repo: ${spec.org}/${spec.repo}#${spec.ref}`);
+                    await this.updateRepository(spec, cachePath, gitUrl);
+                }
+                else {
+                    // Auto-update disabled → USE CACHED VERSION
+                    logger.info(`Using cached repo (auto-update disabled): ${spec.org}/${spec.repo}#${spec.ref}`);
+                }
             }
             else {
                 // URL changed (different subpath/branch) → DELETE & RECLONE
