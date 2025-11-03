@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.1.0...v1.2.0) (2025-11-03)
+
+
+### Bug Fixes
+
+* **tests:** resolve git cache concurrency issues in CI ([dde14e7](https://github.com/mkellerman/bmad-mcp-server/commit/dde14e71aaae72dc31ad39f8a99ac792522d0dac))
+
+
+### Features
+
+* add remote module loading support ([bd4cd0d](https://github.com/mkellerman/bmad-mcp-server/commit/bd4cd0dbaaea03c65eb314b56f308b92883a1d1f))
+
 # [1.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.0.2...v1.1.0) (2025-11-02)
 
 
