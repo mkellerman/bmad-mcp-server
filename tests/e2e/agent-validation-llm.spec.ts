@@ -298,12 +298,6 @@ describe('Agent Validation with LLM', () => {
   let llmClient: LLMClient;
 
   beforeAll(async () => {
-    // Skip LLM tests in CI environment (no LiteLLM available)
-    if (process.env.CI) {
-      console.log('⏭️  Skipping LLM tests in CI environment');
-      return;
-    }
-
     mcpClient = await createMCPClient();
     llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
 
@@ -314,9 +308,7 @@ describe('Agent Validation with LLM', () => {
   });
 
   afterAll(async () => {
-    if (mcpClient) {
-      await mcpClient.cleanup();
-    }
+    await mcpClient.cleanup();
 
     // Generate reports
     console.log('\n📝 Generating test reports...');
@@ -337,18 +329,10 @@ describe('Agent Validation with LLM', () => {
 
   describe('Dynamic Agent Tests', () => {
     it('should have discovered agents', () => {
-      if (process.env.CI) {
-        console.log('⏭️  Skipping in CI');
-        return;
-      }
       expect(discoveredAgents.length).toBeGreaterThan(0);
     });
 
     it('should load all discovered agents', async () => {
-      if (process.env.CI) {
-        console.log('⏭️  Skipping in CI');
-        return;
-      }
       // Group agents by category
       const agentsByCategory = new Map<string, string[]>();
 

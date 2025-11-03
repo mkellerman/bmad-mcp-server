@@ -333,12 +333,6 @@ describe('Workflow Validation with LLM', () => {
   let discoveredWorkflows: string[] = [];
 
   beforeAll(async () => {
-    // Skip LLM tests in CI environment (no LiteLLM available)
-    if (process.env.CI) {
-      console.log('⏭️  Skipping LLM tests in CI environment');
-      return;
-    }
-
     // Initialize MCP client
     mcpClient = await createMCPClient();
 
@@ -375,11 +369,6 @@ describe('Workflow Validation with LLM', () => {
 
   describe('Dynamic Workflow Tests', () => {
     it('should load all discovered workflows', async () => {
-      if (process.env.CI) {
-        console.log('⏭️  Skipping in CI');
-        return;
-      }
-
       // Group workflows by category
       const workflowsByCategory = new Map<string, string[]>();
 
@@ -402,10 +391,6 @@ describe('Workflow Validation with LLM', () => {
     }, 300000); // 5 minute timeout for all workflows
 
     it('should have discovered at least one workflow', () => {
-      if (process.env.CI) {
-        console.log('⏭️  Skipping in CI');
-        return;
-      }
       expect(discoveredWorkflows.length).toBeGreaterThan(0);
     });
   });

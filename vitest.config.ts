@@ -10,7 +10,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/build/**',
       '**/coverage/**',
-      '**/tests/e2e/framework/runner.spec.ts', // LLM-based tests require LiteLLM proxy
+      '**/tests/e2e/**', // E2E/LLM tests are for manual developer testing only
     ],
     // Run tests sequentially to avoid git cache conflicts in E2E tests
     fileParallelism: false,

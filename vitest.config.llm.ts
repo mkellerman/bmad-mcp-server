@@ -1,16 +1,15 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Vitest configuration for LLM-based tests that require external LiteLLM proxy.
- * These tests are excluded from the main test suite to prevent failures when
- * the proxy is not running.
+ * Vitest configuration for E2E/LLM-based tests that require external LiteLLM proxy.
+ * These tests are excluded from CI and are for manual developer testing only.
  *
- * Run with: npm run test:llm
+ * Run with: npm run test:e2e
  * Prerequisites: npm run litellm:docker:start
  */
 export default defineConfig({
   test: {
-    include: ['tests/e2e/framework/runner.spec.ts'],
+    include: ['tests/e2e/**/*.spec.ts'],
     globals: true,
     environment: 'node',
     testTimeout: 30000,
