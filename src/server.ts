@@ -637,6 +637,7 @@ export async function main(): Promise<void> {
     envVar,
     userBmadPath: config.discovery.userBmadPath,
     mode,
+    rootSearchMaxDepth: config.discovery.rootSearchMaxDepth,
   });
 
   // Update source results based on discovery

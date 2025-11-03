@@ -75,7 +75,7 @@ export function loadConfig(options?: {
 
   const userBmadPath = env.BMAD_USER_PATH || path.join(os.homedir(), '.bmad');
   const includeUserBmad = !toBool(env.BMAD_DISABLE_USER_BMAD, false);
-  const rootSearchMaxDepth = parseNumber(env.BMAD_ROOT_SEARCH_MAX_DEPTH, 1);
+  const rootSearchMaxDepth = parseNumber(env.BMAD_ROOT_SEARCH_MAX_DEPTH, 3);
   const excludeDirs = splitList(env.BMAD_EXCLUDE_DIRS, [
     '.git',
     'git',

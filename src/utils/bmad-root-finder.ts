@@ -140,7 +140,7 @@ export function findBmadRootsRecursive(
   startPath: string,
   options: SearchOptions = {},
 ): FoundBmadRoot[] {
-  const maxDepth = options.maxDepth ?? 1;
+  const maxDepth = options.maxDepth ?? 3;
   const currentDepth = options.currentDepth ?? 0;
   const results: FoundBmadRoot[] = [];
 

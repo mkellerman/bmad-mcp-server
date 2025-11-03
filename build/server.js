@@ -516,6 +516,7 @@ export async function main() {
         envVar,
         userBmadPath: config.discovery.userBmadPath,
         mode,
+        rootSearchMaxDepth: config.discovery.rootSearchMaxDepth,
     });
     // Update source results based on discovery
     discovery.locations.forEach((loc) => {

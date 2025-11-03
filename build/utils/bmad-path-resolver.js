@@ -149,15 +149,16 @@ function resolveStrictPaths(options) {
  */
 function resolveAutoPaths(options) {
     const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
+    const maxDepth = options.rootSearchMaxDepth ?? 3;
     const candidates = [
-        ...buildCandidate('project', 'Local project', options.cwd),
-        ...buildCandidate('env', 'BMAD_ROOT environment variable', options.envVar),
-        ...buildCandidate('user', 'User defaults (~/.bmad)', userBmadPath),
+        ...buildCandidate('project', 'Local project', options.cwd, maxDepth),
+        ...buildCandidate('env', 'BMAD_ROOT environment variable', options.envVar, maxDepth),
+        ...buildCandidate('user', 'User defaults (~/.bmad)', userBmadPath, maxDepth),
     ];
     // Add all CLI arguments as candidates with priority based on order
     if (options.cliArgs && options.cliArgs.length > 0) {
         options.cliArgs.forEach((cliArg, index) => {
-            const cliCandidates = buildCandidate('cli', `CLI argument #${index + 1}`, cliArg);
+            const cliCandidates = buildCandidate('cli', `CLI argument #${index + 1}`, cliArg, maxDepth);
             // Insert CLI candidates at the beginning (highest priority)
             candidates.splice(index + 1, 0, ...cliCandidates);
         });
@@ -225,7 +226,7 @@ function resolveAutoPaths(options) {
  * Resolve manifests for an individual candidate path.
  * Returns an array since one path may contain multiple BMAD installations.
  */
-function resolveCandidate(candidate) {
+function resolveCandidate(candidate, maxDepth) {
     if (!candidate) {
         return [];
     }
@@ -249,7 +250,9 @@ function resolveCandidate(candidate) {
         ];
     }
     // Search for BMAD installations recursively
-    const foundRoots = findBmadRootsRecursive(resolvedPath);
+    const foundRoots = findBmadRootsRecursive(resolvedPath, {
+        maxDepth: maxDepth ?? 3,
+    });
     if (foundRoots.length === 0) {
         // No BMAD installations found - return as valid directory but no manifests
         return [
@@ -374,7 +377,7 @@ function findManifestDirectory(candidateRoot) {
 export function detectManifestDirectory(candidatePath) {
     return findManifestDirectory(path.resolve(candidatePath));
 }
-function buildCandidate(source, displayName, candidatePath) {
+function buildCandidate(source, displayName, candidatePath, maxDepth) {
     if (!candidatePath) {
         return [
             enrichCandidate({
@@ -386,7 +389,7 @@ function buildCandidate(source, displayName, candidatePath) {
             }),
         ];
     }
-    const resolvedLocations = resolveCandidate(candidatePath);
+    const resolvedLocations = resolveCandidate(candidatePath, maxDepth);
     // Enrich each location with source metadata
     return resolvedLocations.map((location, index) => {
         // Preserve location properties, override only source metadata

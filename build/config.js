@@ -35,7 +35,7 @@ export function loadConfig(options) {
     const envRoot = env.BMAD_ROOT || undefined;
     const userBmadPath = env.BMAD_USER_PATH || path.join(os.homedir(), '.bmad');
     const includeUserBmad = !toBool(env.BMAD_DISABLE_USER_BMAD, false);
-    const rootSearchMaxDepth = parseNumber(env.BMAD_ROOT_SEARCH_MAX_DEPTH, 1);
+    const rootSearchMaxDepth = parseNumber(env.BMAD_ROOT_SEARCH_MAX_DEPTH, 3);
     const excludeDirs = splitList(env.BMAD_EXCLUDE_DIRS, [
         '.git',
         'git',
@@ -49,7 +49,10 @@ export function loadConfig(options) {
     const gitAutoUpdate = toBool(env.BMAD_AUTO_UPDATE_GIT, true);
     const debug = toBool(env.BMAD_DEBUG, false);
     const levelEnv = (env.BMAD_LOG_LEVEL || '').toLowerCase();
-    const level = levelEnv === 'debug' || levelEnv === 'info' || levelEnv === 'warn' || levelEnv === 'error'
+    const level = levelEnv === 'debug' ||
+        levelEnv === 'info' ||
+        levelEnv === 'warn' ||
+        levelEnv === 'error'
         ? levelEnv
         : debug
             ? 'debug'

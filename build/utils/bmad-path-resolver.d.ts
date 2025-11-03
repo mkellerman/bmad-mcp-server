@@ -25,6 +25,7 @@ export interface ResolveBmadPathsOptions {
     envVar?: string;
     userBmadPath?: string;
     mode?: DiscoveryMode;
+    rootSearchMaxDepth?: number;
 }
 export interface ManifestInfo {
     resolvedRoot: string;
