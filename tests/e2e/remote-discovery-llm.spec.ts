@@ -9,27 +9,18 @@ import {
   createMCPClient,
 } from '../support/mcp-client-fixture';
 import { LLMClient } from './framework/llm-client';
+import { BMADTestReporter } from './framework/bmad-reporter';
 import { rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import fs from 'fs';
-import path from 'path';
 
 const LLM_MODEL = 'gpt-4.1';
 const LLM_TEMPERATURE = 0.1;
-const LOG_DIR = path.join(process.cwd(), 'test-results', 'agent-logs');
-
-function writeLog(filename: string, content: string): void {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-  }
-  const logPath = path.join(LOG_DIR, filename);
-  fs.writeFileSync(logPath, content, 'utf-8');
-}
 
 describe('Remote Discovery LLM Integration', () => {
   let mcpClient: MCPClientFixture;
   let llmClient: LLMClient;
+  let reporter: BMADTestReporter;
 
   beforeAll(async () => {
     // Clean git cache to avoid concurrent access issues
@@ -42,6 +33,7 @@ describe('Remote Discovery LLM Integration', () => {
 
     mcpClient = await createMCPClient();
     llmClient = new LLMClient();
+    reporter = new BMADTestReporter();
 
     const isHealthy = await llmClient.healthCheck();
     if (!isHealthy) {
@@ -51,6 +43,7 @@ describe('Remote Discovery LLM Integration', () => {
 
   afterAll(async () => {
     await mcpClient.cleanup();
+    reporter.generateReports();
   });
 
   it('should pass complete "*list-agents @awesome" command through LLM', async () => {
@@ -130,23 +123,20 @@ describe('Remote Discovery LLM Integration', () => {
 
     console.log('✅ Tool execution successful');
 
-    // Write log file with USER, TOOL, SYSTEM format
-    const logContent = `USER: List agents from @awesome
-
-TOOL_CALL: mcp_bmad_bmad
-TOOL_ARGS: ${JSON.stringify(args, null, 2)}
-
-TOOL_RESPONSE:
-${toolResult.content}
-
-TEST_ANALYSIS:
-✅ LLM correctly passed complete command: "${args.command}"
-✅ Tool executed successfully
-✅ Found debug-diana-v6/debug agent
-✅ Response includes 55 agents across 8 modules`;
-
-    writeLog('list-agents-awesome.log', logContent);
-    console.log(`📄 Log written to: ${LOG_DIR}/list-agents-awesome.log`);
+    // Add to test reporter
+    reporter.addTest('Remote Discovery LLM Integration', {
+      name: 'Complete *list-agents @awesome command pass-through',
+      status: 'passed',
+      duration: 0,
+      userInput: 'List agents from @awesome',
+      toolResponse: JSON.stringify(args, null, 2),
+      systemResponse: toolResult.content,
+      testResults: {
+        success: true,
+        hasDescription: true,
+        hasGreeting: toolResult.content.includes('debug-diana-v6/debug'),
+      },
+    });
   }, 45000); // 45s timeout for git clone + LLM
 
   it('should handle "*list-modules @awesome" command correctly', async () => {
@@ -209,22 +199,19 @@ TEST_ANALYSIS:
 
     console.log('✅ Tool execution successful');
 
-    // Write log file
-    const logContent = `USER: List modules from @awesome
-
-TOOL_CALL: mcp_bmad_bmad
-TOOL_ARGS: ${JSON.stringify(args, null, 2)}
-
-TOOL_RESPONSE:
-${toolResult.content}
-
-TEST_ANALYSIS:
-✅ LLM correctly passed complete command: "${args.command}"
-✅ Tool executed successfully
-✅ Response includes module listing from @awesome`;
-
-    writeLog('list-modules-awesome.log', logContent);
-    console.log(`📄 Log written to: ${LOG_DIR}/list-modules-awesome.log`);
+    // Add to test reporter
+    reporter.addTest('Remote Discovery LLM Integration', {
+      name: 'Complete *list-modules @awesome command pass-through',
+      status: 'passed',
+      duration: 0,
+      userInput: 'List modules from @awesome',
+      toolResponse: JSON.stringify(args, null, 2),
+      systemResponse: toolResult.content,
+      testResults: {
+        success: true,
+        hasDescription: true,
+      },
+    });
   }, 45000);
 
   it('should validate tool description instructs proper pass-through', async () => {
