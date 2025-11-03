@@ -140,26 +140,12 @@ export function buildToolDescription(
   // Pattern 4: Discovery commands
   lines.push('4. Discovery commands (built-in):');
   lines.push('   - Input: "*list-agents" → Show all available BMAD agents');
-  lines.push('   - Input: "*list-workflows" → Show all available workflows');
-  lines.push(
-    '   - Input: "*list-remotes" → Show all registered remote repositories',
-  );
-  lines.push('   - Input: "*list-modules" → Show all installed BMAD modules');
-  lines.push('   - Input: "*doctor" → System diagnostics and health check');
-  lines.push('   - Input: "*init" → Initialize BMAD system configuration\n');
-
-  // Pattern 5: Remote discovery commands
-  lines.push('5. Remote discovery commands:');
   lines.push(
     '   - Input: "*list-agents @<remote>" → Discover agents from remote repository',
   );
-  lines.push(
-    '   - Input: "*list-modules @<remote>" → Discover modules from remote repository',
-  );
-  lines.push('   - Example: "*list-agents @awesome", "*list-modules @awesome"');
-  lines.push(
-    '   - Built-in remote: "@awesome" → awesome-bmad-agents GitHub repository\n',
-  );
+  lines.push('   - Input: "*list-workflows" → Show all available workflows');
+  lines.push('   - Input: "*doctor" → System diagnostics and health check');
+  lines.push('   - Input: "*init" → Initialize BMAD system configuration\n');
 
   // Naming rules
   lines.push('**Naming Rules:**');
@@ -167,18 +153,20 @@ export function buildToolDescription(
     '- Agent names: lowercase letters and hyphens only (e.g., "analyst", "bmad-master")',
   );
   lines.push(
-    '- Workflow names: lowercase letters, numbers, and hyphens (e.g., "party-mode", "dev-story")',
+    '- Workflow names: starts with *, lowercase letters, numbers, and hyphens (e.g., "*party-mode", "*dev-story")',
   );
-  lines.push('- Names must be 2-50 characters');
+  lines.push(
+    '- Remote names: starts with @, lowercase letters, numbers, and hyphens (e.g., "@awesome", "@myorg")',
+  );
+  lines.push(
+    '- Names must be 2-50 characters and can be combined (e.g., "*list-agents @awesome/bmad-master")',
+  );
   lines.push('- Case-sensitive matching\n');
 
   // Important notes
   lines.push('**Important:**');
   lines.push(
-    '- To execute a workflow, you MUST prefix the name with an asterisk (*)',
-  );
-  lines.push(
-    '- Without the asterisk, the tool will try to load an agent with that name',
+    '- When in doubt, use the full command with prefixes to { command: "*<workflow-name>" }',
   );
   lines.push('- Discovery commands are built-in and work independently\n');
 
@@ -186,17 +174,12 @@ export function buildToolDescription(
   lines.push('**Examples:**');
   lines.push('- bmad → Load bmad-master (default orchestrator)');
   lines.push('- bmad analyst → Load Mary the Business Analyst');
-  lines.push('- bmad debug → Load Diana the Debug Specialist');
   lines.push('- bmad *party-mode → Execute party-mode workflow');
-  lines.push('- bmad *debug-quick → Execute quick debug workflow');
   lines.push('- bmad *list-agents → See all available agents');
-  lines.push('- bmad *list-workflows → See all workflows you can run');
   lines.push(
     '- bmad *list-agents @awesome → Discover agents from awesome-bmad-agents repository',
   );
-  lines.push(
-    '- bmad *list-modules @awesome → Discover modules from remote repository',
-  );
+  lines.push('- bmad *list-workflows → See all workflows you can run');
   lines.push('- bmad *doctor → Run system diagnostics\n');
 
   // Error handling
