@@ -453,9 +453,7 @@ export async function loadRemoteAgent(ref, registry) {
     // Parse metadata from frontmatter
     const metadata = parseAgentFrontmatter(agentContent);
     const agentName = path.basename(ref.agentPath);
-    const displayName = metadata.displayName ||
-        metadata.name ||
-        agentName;
+    const displayName = metadata.displayName || metadata.name || agentName;
     const title = metadata.title || 'BMAD Agent';
     // Build result
     const contentParts = [];

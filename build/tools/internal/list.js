@@ -365,7 +365,8 @@ export async function handleListCommand(cmd, ctx) {
                 items: result.agents || [],
                 summary: {
                     total: result.agents?.length || 0,
-                    message: result.error || `Found ${result.agents?.length || 0} agents from @${result.remote}`,
+                    message: result.error ||
+                        `Found ${result.agents?.length || 0} agents from @${result.remote}`,
                 },
                 metadata: {
                     remote: result.remote,
@@ -414,7 +415,8 @@ export async function handleListCommand(cmd, ctx) {
                 items: result.modules || [],
                 summary: {
                     total: result.modules?.length || 0,
-                    message: result.error || `Found ${result.modules?.length || 0} modules from @${result.remote}`,
+                    message: result.error ||
+                        `Found ${result.modules?.length || 0} modules from @${result.remote}`,
                 },
                 metadata: {
                     remote: result.remote,

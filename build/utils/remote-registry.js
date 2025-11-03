@@ -116,7 +116,7 @@ export function resolveRemotePath(input, registry) {
     const baseUrl = registry.remotes.get(remote);
     if (!baseUrl) {
         const available = Array.from(registry.remotes.keys())
-            .map(k => `@${k}`)
+            .map((k) => `@${k}`)
             .join(', ');
         throw new Error(`Remote '@${remote}' not found.\n\n` +
             `Available remotes: ${available}\n\n` +

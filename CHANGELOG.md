@@ -1,14 +1,83 @@
-# [1.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.0.2...v1.1.0) (2025-11-02)
-
-
-### Bug Fixes
-
-* **server:** restore production logs and use dynamic version from package.json ([4e62613](https://github.com/mkellerman/bmad-mcp-server/commit/4e62613b93b1636158d1c183b11976a7a6cbc108))
-
+# [1.2.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.1.0...v1.2.0) (2025-11-02)
 
 ### Features
 
-* **list:** add module-grouped agent listing for better UX ([b372218](https://github.com/mkellerman/bmad-mcp-server/commit/b37221801f73c914d287f43479974e3081f77414))
+- **testing:** add comprehensive E2E testing framework with LLM integration ([#TBD](https://github.com/mkellerman/bmad-mcp-server/issues/TBD))
+
+#### Comprehensive E2E Test Suite
+
+- **Dynamic Agent Discovery**: Tests automatically discover and validate all agents from master manifest
+- **LLM Integration**: Real LLM interaction testing via LiteLLM proxy (gpt-4.1)
+- **Workflow Validation**: Complete workflow loading and structure validation
+- **Structured Reporting**: JSON and HTML reports with detailed test metrics
+
+#### Test Coverage
+
+- **Agent Validation** (`agent-validation-llm.spec.ts`):
+  - Validates persona adoption for all discovered agents
+  - Tests menu/command display
+  - Captures user input, tool response, and LLM response
+  - Dynamic test generation from master manifest
+  - Module filtering (only loaded modules)
+  - 100% pass rate (3 agents tested)
+
+- **Workflow Validation** (`workflow-validation-llm.spec.ts`):
+  - Validates workflow loading and structure
+  - Tests step detection and counting
+  - Validates description presence
+  - Enhanced detection heuristics for diverse LLM responses
+  - 100% pass rate (18 workflows tested)
+
+#### Test Infrastructure
+
+- **Custom Reporter** (`bmad-reporter.ts`):
+  - Generates JSON reports with full test data
+  - Creates interactive HTML dashboards
+  - Filtering by test status (passed/failed/skipped)
+  - Expandable test details with metrics
+  - Suite grouping and summary statistics
+
+- **LLM Client** (`llm-client.ts`):
+  - Wrapper for LiteLLM API communication
+  - Health check functionality
+  - Tool call extraction
+  - Response text parsing
+
+- **MCP Client Fixture** (`mcp-client-fixture.ts`):
+  - Manages MCP server lifecycle
+  - Tool invocation support
+  - Cleanup and resource management
+
+#### Test Metrics
+
+- Agent validation metrics: `personaLoaded`, `menuProvided`, `menuItemCount`, `hasGreeting`
+- Workflow validation metrics: `workflowLoaded`, `hasSteps`, `stepCount`, `hasDescription`
+- All tests include timing, status, and detailed response data
+
+#### Development Benefits
+
+- Validates all agents and workflows through actual LLM interaction
+- Detects breaking changes in agent/workflow loading
+- Provides visual test reports for debugging
+- Enables regression testing across BMAD ecosystem
+- Supports continuous integration with structured output
+
+#### Documentation
+
+- Added test framework documentation
+- LLM setup instructions
+- Reporter usage guide
+- Test case YAML format specification
+
+# [1.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.0.2...v1.1.0) (2025-11-02)
+
+### Bug Fixes
+
+- **server:** restore production logs and use dynamic version from package.json ([4e62613](https://github.com/mkellerman/bmad-mcp-server/commit/4e62613b93b1636158d1c183b11976a7a6cbc108))
+
+### Features
+
+- **list:** add module-grouped agent listing for better UX ([b372218](https://github.com/mkellerman/bmad-mcp-server/commit/b37221801f73c914d287f43479974e3081f77414))
 
 # 1.0.0 (2025-11-02)
 

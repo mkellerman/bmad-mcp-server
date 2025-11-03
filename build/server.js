@@ -18,7 +18,7 @@ import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
 import logger from './utils/logger.js';
-import { parseRemoteArgs } from './utils/remote-registry.js';
+import { parseRemoteArgs, } from './utils/remote-registry.js';
 // Compute __dirname - use import.meta.url when available (production)
 // Fall back to build directory for test environments
 function getDirname() {
