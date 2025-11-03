@@ -10,6 +10,8 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { findBmadRootsRecursive } from './bmad-root-finder.js';
+import { buildMasterManifests } from './master-manifest.js';
 /**
  * Clone or pull a remote repository to local cache
  *
@@ -60,47 +62,57 @@ export function parseAgentMetadata(filePath) {
     }
 }
 /**
- * Scan a directory for BMAD agents
+ * Scan a directory for BMAD agents using proper BMAD discovery
  *
- * Looks for .md files in agents/ directory and parses their metadata.
+ * Discovers agents in the same way as when providing a BMAD root path:
+ * - Searches for v6 BMAD installations (contains _cfg/manifest.yaml)
+ * - Searches for v4 BMAD installations (contains install-manifest.yaml)
+ * - Discovers agents in modules and agents directories
  *
- * @param repoPath - Path to local repository
+ * @param repoPath - Path to local repository (cloned remote)
  * @param installedAgents - Set of installed agent names for comparison
  * @returns Array of discovered agents
  */
 export function scanAgents(repoPath, installedAgents = new Set()) {
-    const agentsPath = path.join(repoPath, 'agents');
-    if (!existsSync(agentsPath)) {
-        return [];
-    }
-    const agents = [];
     try {
-        const entries = readdirSync(agentsPath);
-        for (const entry of entries) {
-            const fullPath = path.join(agentsPath, entry);
-            const stat = statSync(fullPath);
-            // Only process .md files
-            if (stat.isFile() && entry.endsWith('.md')) {
-                const metadata = parseAgentMetadata(fullPath);
-                // Use filename (without .md) as fallback name
-                const fileName = entry.replace(/\.md$/, '');
-                const agentName = metadata?.name || fileName;
-                agents.push({
-                    name: agentName,
-                    displayName: metadata?.displayName,
-                    title: metadata?.title,
-                    description: metadata?.description,
-                    path: fullPath,
-                    installed: installedAgents.has(agentName),
-                });
-            }
+        // Use BMAD discovery to find all BMAD installations in the repository
+        const foundRoots = findBmadRootsRecursive(repoPath, {
+            maxDepth: 3,
+            excludeDirs: ['.git', 'node_modules', 'cache', 'build', 'dist'],
+        });
+        if (foundRoots.length === 0) {
+            return [];
         }
+        // Convert found roots to BmadOrigin format
+        const origins = foundRoots.map((root, index) => ({
+            kind: 'cli',
+            root: root.root,
+            version: root.version,
+            displayName: `Remote: ${path.basename(repoPath)}`,
+            manifestDir: root.manifestDir || path.join(root.root, '_cfg'),
+            priority: index + 1,
+        }));
+        // Build master manifests from discovered BMAD installations
+        const masterData = buildMasterManifests(origins);
+        // Convert master manifest agents to DiscoveredAgent format
+        const agents = masterData.agents
+            .filter((record) => record.exists) // Only include existing files
+            .map((record) => ({
+            name: record.name || '',
+            displayName: record.displayName,
+            title: record.description, // Use description as title
+            description: record.description,
+            path: record.absolutePath,
+            installed: installedAgents.has(record.name || ''),
+        }))
+            .filter((agent) => agent.name); // Remove any entries without names
+        return agents.sort((a, b) => a.name.localeCompare(b.name));
     }
-    catch {
-        // Return empty array if scan fails
+    catch (error) {
+        // Return empty array if discovery fails
+        console.error(`[remote-discovery] Failed to scan agents in ${repoPath}:`, error);
         return [];
     }
-    return agents.sort((a, b) => a.name.localeCompare(b.name));
 }
 /**
  * Parse module manifest from manifest.yaml

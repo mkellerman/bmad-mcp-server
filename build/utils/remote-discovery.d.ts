@@ -67,11 +67,14 @@ export declare function parseAgentMetadata(filePath: string): {
     description?: string;
 } | null;
 /**
- * Scan a directory for BMAD agents
+ * Scan a directory for BMAD agents using proper BMAD discovery
  *
- * Looks for .md files in agents/ directory and parses their metadata.
+ * Discovers agents in the same way as when providing a BMAD root path:
+ * - Searches for v6 BMAD installations (contains _cfg/manifest.yaml)
+ * - Searches for v4 BMAD installations (contains install-manifest.yaml)
+ * - Discovers agents in modules and agents directories
  *
- * @param repoPath - Path to local repository
+ * @param repoPath - Path to local repository (cloned remote)
  * @param installedAgents - Set of installed agent names for comparison
  * @returns Array of discovered agents
  */

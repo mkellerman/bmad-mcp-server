@@ -579,10 +579,15 @@ export async function main() {
             const isActive = loc.resolvedRoot === discovery.activeLocation.resolvedRoot;
             const marker = isActive ? '→' : ' ';
             const versionStr = loc.version ? ` (${loc.version})` : '';
-            const sourceStr = loc.source === 'cli' ? 'CLI' :
-                loc.source === 'env' ? 'ENV' :
-                    loc.source === 'user' ? 'User' :
-                        loc.source === 'project' ? 'Project' : loc.source;
+            const sourceStr = loc.source === 'cli'
+                ? 'CLI'
+                : loc.source === 'env'
+                    ? 'ENV'
+                    : loc.source === 'user'
+                        ? 'User'
+                        : loc.source === 'project'
+                            ? 'Project'
+                            : loc.source;
             console.error(`   ${marker} [${sourceStr}] ${loc.resolvedRoot}${versionStr}`);
         });
     }
