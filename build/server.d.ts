@@ -6,6 +6,7 @@
  * The LLM processes files according to BMAD methodology instructions.
  */
 import { type BmadPathResolution } from './utils/bmad-path-resolver.js';
+import { type RemoteRegistry } from './utils/remote-registry.js';
 /**
  * MCP Server for BMAD methodology with unified tool interface.
  *
@@ -26,7 +27,8 @@ export declare class BMADMCPServer {
     private server;
     private discovery;
     private version;
-    constructor(bmadRoot: string, discovery: BmadPathResolution, version?: string);
+    private remoteRegistry;
+    constructor(bmadRoot: string, discovery: BmadPathResolution, remoteRegistry: RemoteRegistry, version?: string);
     /**
      * Setup MCP server request handlers
      */

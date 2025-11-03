@@ -123,7 +123,14 @@ export interface ValidationResult {
  */
 export interface BMADToolResult {
   success: boolean;
-  type?: 'agent' | 'workflow' | 'list' | 'help' | 'diagnostic' | 'init';
+  type?:
+    | 'agent'
+    | 'workflow'
+    | 'list'
+    | 'help'
+    | 'diagnostic'
+    | 'init'
+    | 'module';
   content?: string;
   error?: string;
   errorCode?: string;

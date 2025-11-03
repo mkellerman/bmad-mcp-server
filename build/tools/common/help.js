@@ -12,6 +12,14 @@ export function getHelpResult() {
     lines.push('- `bmad core/architect` — Load architect from core module (module-qualified)\n');
     lines.push('**Not sure which agent?** Try: `*list-agents`\n');
     lines.push('---\n');
+    // Load Remote Agent
+    lines.push('## 🌐 Load Remote Agent\n');
+    lines.push('**Format:** `bmad @<remote>:agents/<path-to-agent>`\n');
+    lines.push('**Examples:**');
+    lines.push('- `bmad @awesome:agents/debug-diana-v6/agents/debug` — Load debug agent from awesome-bmad-agents');
+    lines.push('- `bmad @myorg:agents/custom-agent` — Load custom agent from registered remote\n');
+    lines.push('**Discover remote agents:** Try: `*list-agents @awesome`\n');
+    lines.push('---\n');
     // Execute a Workflow
     lines.push('## 🔄 Execute a Workflow\n');
     lines.push('**Format:** `bmad *<workflow-name>` or `bmad *<module>/<workflow-name>`\n');
@@ -28,6 +36,10 @@ export function getHelpResult() {
     lines.push('| `*doctor` | System health check (paths, versions, inventory) |');
     lines.push('| `*list-agents` | Browse all available agents |');
     lines.push('| `*list-workflows` | Browse all available workflows |');
+    lines.push('| `*list-remotes` | Show all registered remote repositories |');
+    lines.push('| `*list-modules` | Show all installed BMAD modules |');
+    lines.push('| `*list-agents @remote` | Discover agents from remote repository |');
+    lines.push('| `*list-modules @remote` | Discover modules from remote repository |');
     lines.push('| `*help` | Show this help guide |\n');
     lines.push('**Pro Tip:** Add `--full` to `*doctor` for detailed debug output\n');
     lines.push('---\n');
@@ -81,8 +93,16 @@ export function buildToolDescription(agents, workflows) {
     lines.push('4. Discovery commands (built-in):');
     lines.push('   - Input: "*list-agents" → Show all available BMAD agents');
     lines.push('   - Input: "*list-workflows" → Show all available workflows');
+    lines.push('   - Input: "*list-remotes" → Show all registered remote repositories');
+    lines.push('   - Input: "*list-modules" → Show all installed BMAD modules');
     lines.push('   - Input: "*doctor" → System diagnostics and health check');
     lines.push('   - Input: "*init" → Initialize BMAD system configuration\n');
+    // Pattern 5: Remote discovery commands
+    lines.push('5. Remote discovery commands:');
+    lines.push('   - Input: "*list-agents @<remote>" → Discover agents from remote repository');
+    lines.push('   - Input: "*list-modules @<remote>" → Discover modules from remote repository');
+    lines.push('   - Example: "*list-agents @awesome", "*list-modules @awesome"');
+    lines.push('   - Built-in remote: "@awesome" → awesome-bmad-agents GitHub repository\n');
     // Naming rules
     lines.push('**Naming Rules:**');
     lines.push('- Agent names: lowercase letters and hyphens only (e.g., "analyst", "bmad-master")');
@@ -104,6 +124,8 @@ export function buildToolDescription(agents, workflows) {
     lines.push('- bmad *debug-quick → Execute quick debug workflow');
     lines.push('- bmad *list-agents → See all available agents');
     lines.push('- bmad *list-workflows → See all workflows you can run');
+    lines.push('- bmad *list-agents @awesome → Discover agents from awesome-bmad-agents repository');
+    lines.push('- bmad *list-modules @awesome → Discover modules from remote repository');
     lines.push('- bmad *doctor → Run system diagnostics\n');
     // Error handling
     lines.push('**Error Handling:**');

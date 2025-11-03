@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import { masterRecordToAgent } from '../../utils/master-manifest-adapter.js';
-export function handleListCommand(cmd, ctx) {
+import { listRemotes } from '../../utils/remote-registry.js';
+import { GitSourceResolver } from '../../utils/git-source-resolver.js';
+import { discoverAgents, discoverModules, formatAgentList, formatModuleList, } from '../../utils/remote-discovery.js';
+export async function handleListCommand(cmd, ctx) {
     const { resolved, master, discovery } = ctx;
     const lines = [];
     if (cmd === '*list-agents') {
@@ -279,6 +282,148 @@ export function handleListCommand(cmd, ctx) {
                 error: `Failed to write file: ${e?.message || String(e)}`,
             };
         }
+    }
+    if (cmd === '*list-remotes') {
+        if (!ctx.remoteRegistry) {
+            return {
+                success: false,
+                exitCode: 1,
+                error: 'Remote registry not available',
+            };
+        }
+        const remotes = listRemotes(ctx.remoteRegistry);
+        if (remotes.length === 0) {
+            lines.push('# No Remotes Registered\n');
+            lines.push('Add remotes via mcp.json:');
+            lines.push('```json');
+            lines.push('"args": [');
+            lines.push('  "bmad-mcp-server",');
+            lines.push('  "--remote=myremote,git+https://github.com/org/repo#main"');
+            lines.push(']');
+            lines.push('```');
+        }
+        else {
+            lines.push('# Registered Remotes\n');
+            for (const remote of remotes) {
+                const badge = remote.isBuiltin ? ' (built-in)' : ' (custom)';
+                const friendlyUrl = remote.url
+                    .replace('git+https://github.com/', '')
+                    .replace('#main', '');
+                lines.push(`**@${remote.name}**${badge}`);
+                lines.push(`  └─ ${friendlyUrl}\n`);
+            }
+            lines.push('\n## Usage\n');
+            lines.push('List agents from remote:');
+            lines.push('```');
+            lines.push('bmad *list-agents @<remote>');
+            lines.push('```\n');
+            lines.push('Load agent dynamically:');
+            lines.push('```');
+            lines.push('bmad @<remote>:agents/<agent-name>');
+            lines.push('```');
+        }
+        return {
+            success: true,
+            type: 'list',
+            listType: 'remotes',
+            content: lines.join('\n'),
+            exitCode: 0,
+        };
+    }
+    // Handle *list-agents @remote
+    if (cmd.startsWith('*list-agents @')) {
+        if (!ctx.remoteRegistry) {
+            return {
+                success: false,
+                exitCode: 1,
+                error: 'Remote registry not available',
+            };
+        }
+        // Extract remote name from command
+        const remoteName = cmd.replace('*list-agents @', '').trim();
+        if (!remoteName) {
+            return {
+                success: false,
+                exitCode: 1,
+                error: 'Remote name is required. Usage: *list-agents @<remote>',
+            };
+        }
+        // Get installed agents for comparison
+        const installedAgents = new Set(master.agents.map((a) => a.name).filter(Boolean));
+        // Discover agents from remote
+        const gitResolver = new GitSourceResolver();
+        const result = await discoverAgents(remoteName, ctx.remoteRegistry, gitResolver, installedAgents);
+        // Format and return
+        const content = formatAgentList(result);
+        return {
+            success: true,
+            type: 'list',
+            listType: 'remote-agents',
+            content,
+            exitCode: 0,
+            structuredData: {
+                items: result.agents || [],
+                summary: {
+                    total: result.agents?.length || 0,
+                    message: result.error || `Found ${result.agents?.length || 0} agents from @${result.remote}`,
+                },
+                metadata: {
+                    remote: result.remote,
+                    url: result.url,
+                    localPath: result.localPath,
+                    error: result.error,
+                },
+            },
+        };
+    }
+    // Handle *list-modules @remote
+    if (cmd.startsWith('*list-modules @')) {
+        if (!ctx.remoteRegistry) {
+            return {
+                success: false,
+                exitCode: 1,
+                error: 'Remote registry not available',
+            };
+        }
+        // Extract remote name from command
+        const remoteName = cmd.replace('*list-modules @', '').trim();
+        if (!remoteName) {
+            return {
+                success: false,
+                exitCode: 1,
+                error: 'Remote name is required. Usage: *list-modules @<remote>',
+            };
+        }
+        // Get installed modules for comparison
+        const installedModules = new Set(discovery.locations
+            .filter((loc) => loc.status === 'valid')
+            .map((loc) => loc.moduleName)
+            .filter(Boolean));
+        // Discover modules from remote
+        const gitResolver = new GitSourceResolver();
+        const result = await discoverModules(remoteName, ctx.remoteRegistry, gitResolver, installedModules);
+        // Format and return
+        const content = formatModuleList(result);
+        return {
+            success: true,
+            type: 'list',
+            listType: 'remote-modules',
+            content,
+            exitCode: 0,
+            structuredData: {
+                items: result.modules || [],
+                summary: {
+                    total: result.modules?.length || 0,
+                    message: result.error || `Found ${result.modules?.length || 0} modules from @${result.remote}`,
+                },
+                metadata: {
+                    remote: result.remote,
+                    url: result.url,
+                    localPath: result.localPath,
+                    error: result.error,
+                },
+            },
+        };
     }
     return { success: false, exitCode: 1, error: 'Unknown list command' };
 }

@@ -6,6 +6,8 @@ import path from 'node:path';
 import { FileReader } from '../../utils/file-reader.js';
 import { convertAgents, convertWorkflows, } from '../../utils/master-manifest-adapter.js';
 import { loadAgent as loadAgentPayload } from './agent-loader.js';
+import { parseRemoteAgentRef, loadRemoteAgent, loadRemoteModule, } from '../../utils/dynamic-agent-loader.js';
+import { parseRemoteArgs } from '../../utils/remote-registry.js';
 import { executeWorkflow as executeWorkflowPayload } from './workflow-executor.js';
 import { doctor as doctorReport } from '../internal/doctor.js';
 import { handleInit as initHandler } from '../internal/init.js';
@@ -29,11 +31,13 @@ export class UnifiedBMADTool {
     userBmadPath;
     projectRoot;
     masterService;
+    remoteRegistry;
     constructor(options) {
-        const { bmadRoot, discovery, masterManifestService } = options;
+        const { bmadRoot, discovery, masterManifestService, remoteRegistry } = options;
         // Store core dependencies
         this.discovery = discovery;
         this.masterService = masterManifestService;
+        this.remoteRegistry = remoteRegistry;
         this.userBmadPath = discovery.userBmadPath;
         this.projectRoot = discovery.projectRoot;
         this.bmadRoot = path.resolve(bmadRoot);
@@ -54,11 +58,36 @@ export class UnifiedBMADTool {
         this.agents = convertAgents(masterData.agents);
         this.workflows = convertWorkflows(masterData.workflows);
     }
-    execute(command) {
+    async execute(command) {
         const normalized = command.trim();
         if (!normalized) {
             logger.info('Empty command, loading bmad-master (default)');
             return this.loadAgent('bmad-master');
+        }
+        // Check for remote agent or module loading (@remote:agents/name format)
+        const remoteAgentRef = parseRemoteAgentRef(normalized);
+        if (remoteAgentRef) {
+            // Parse remote registry from CLI args (or use built-ins)
+            const registry = parseRemoteArgs(process.argv);
+            if (remoteAgentRef.isModule) {
+                // Load entire module (agents/module-name)
+                logger.info(`Loading remote module: ${remoteAgentRef.agentPath} from ${remoteAgentRef.remote}`);
+                const { result, scanned } = await loadRemoteModule(remoteAgentRef, registry);
+                // Register scanned resources in master manifest
+                if (scanned) {
+                    const masterManifests = this.masterService.get();
+                    masterManifests.agents.push(...scanned.agents);
+                    masterManifests.workflows.push(...scanned.workflows);
+                    masterManifests.tasks.push(...scanned.tasks);
+                    logger.info(`Registered ${scanned.agents.length} agents, ${scanned.workflows.length} workflows, ${scanned.tasks.length} tasks`);
+                }
+                return result;
+            }
+            else {
+                // Load single agent file (agents/module-name/agents/agent.md)
+                logger.info(`Loading remote agent: ${remoteAgentRef.agentPath} from ${remoteAgentRef.remote}`);
+                return await loadRemoteAgent(remoteAgentRef, registry);
+            }
         }
         if (normalized === '*doctor' || normalized.startsWith('*doctor ')) {
             return doctorReport(normalized, {
@@ -76,8 +105,11 @@ export class UnifiedBMADTool {
         // Listing commands (handled before general parsing)
         if (normalized === '*list-agents' ||
             normalized === '*list-workflows' ||
+            normalized === '*list-remotes' ||
+            normalized.startsWith('*list-agents @') ||
+            normalized.startsWith('*list-modules @') ||
             normalized.startsWith('*export-master-manifest')) {
-            return this.handleListCommand(normalized);
+            return await this.handleListCommand(normalized);
         }
         const parsedCommand = parseCommand(normalized, this.workflows);
         if (parsedCommand.type === 'error') {
@@ -103,7 +135,7 @@ export class UnifiedBMADTool {
      * @param cmd - List command string
      * @returns Formatted list result
      */
-    handleListCommand(cmd) {
+    async handleListCommand(cmd) {
         console.error(`🔧 ORCHESTRATOR handleListCommand called with: "${cmd}"`);
         const master = this.masterService.get();
         // Use full resolved catalog that includes all discoverable agents (like diagnostic)
@@ -112,7 +144,12 @@ export class UnifiedBMADTool {
             scope: 'all', // Show all discoverable agents, not just active-only
         });
         console.error(`🔧 About to call handleList from internal/list.ts`);
-        return handleList(cmd, { resolved, master, discovery: this.discovery });
+        return await handleList(cmd, {
+            resolved,
+            master,
+            discovery: this.discovery,
+            remoteRegistry: this.remoteRegistry,
+        });
     }
     /**
      * Resolve agent name aliases (e.g., "master" → "bmad-master").

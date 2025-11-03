@@ -5,6 +5,7 @@
 import type { BMADToolResult } from '../../types/index.js';
 import type { BmadPathResolution } from '../../utils/bmad-path-resolver.js';
 import { MasterManifestService } from '../../services/master-manifest-service.js';
+import type { RemoteRegistry } from '../../utils/remote-registry.js';
 /**
  * Unified BMAD Tool - Main orchestrator for agent and workflow loading.
  *
@@ -20,12 +21,14 @@ export declare class UnifiedBMADTool {
     private userBmadPath;
     private projectRoot;
     private masterService;
+    private remoteRegistry?;
     constructor(options: {
         bmadRoot: string;
         discovery: BmadPathResolution;
         masterManifestService: MasterManifestService;
+        remoteRegistry?: RemoteRegistry;
     });
-    execute(command: string): BMADToolResult;
+    execute(command: string): Promise<BMADToolResult>;
     /**
      * Handle list commands (*list-agents, *list-workflows).
      *

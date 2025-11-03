@@ -30,6 +30,10 @@ import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
 import logger from './utils/logger.js';
+import {
+  parseRemoteArgs,
+  type RemoteRegistry,
+} from './utils/remote-registry.js';
 
 // Compute __dirname - use import.meta.url when available (production)
 // Fall back to build directory for test environments
@@ -109,14 +113,17 @@ export class BMADMCPServer {
   private server: Server;
   private discovery: BmadPathResolution;
   private version: string;
+  private remoteRegistry: RemoteRegistry;
 
   constructor(
     bmadRoot: string,
     discovery: BmadPathResolution,
+    remoteRegistry: RemoteRegistry,
     version: string = 'unknown',
   ) {
     this.version = version;
     this.discovery = discovery;
+    this.remoteRegistry = remoteRegistry;
     this.bmadRoot = path.resolve(bmadRoot);
     this.projectRoot = this.bmadRoot;
 
@@ -157,6 +164,7 @@ export class BMADMCPServer {
         bmadRoot: this.projectRoot,
         discovery,
         masterManifestService: this.masterService,
+        remoteRegistry: this.remoteRegistry,
       });
 
       // Show final summary
@@ -230,7 +238,7 @@ export class BMADMCPServer {
     });
 
     // Get a specific prompt (BMAD agent)
-    this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const name = request.params.name;
       logger.info(`get_prompt called for: ${name}`);
 
@@ -268,7 +276,7 @@ export class BMADMCPServer {
       }
 
       // Use unified tool to load agent
-      const result = this.unifiedTool.execute(agentName);
+      const result = await this.unifiedTool.execute(agentName);
 
       if (!result.success) {
         return {
@@ -343,7 +351,7 @@ export class BMADMCPServer {
     });
 
     // Call a tool
-    this.server.setRequestHandler(CallToolRequestSchema, (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       logger.info(
         `call_tool called: ${name} with args: ${JSON.stringify(args)}`,
@@ -365,7 +373,7 @@ export class BMADMCPServer {
       logger.info(`Executing bmad tool with command: '${command}'`);
 
       // Execute through unified tool
-      const result = this.unifiedTool.execute(command);
+      const result = await this.unifiedTool.execute(command);
 
       // Check if error occurred
       if (!result.success) {
@@ -530,6 +538,10 @@ export async function main(): Promise<void> {
   // Filter out commands (starting with * or --) to only keep paths
   const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
 
+  // Parse --remote arguments for dynamic agent loading
+  const remoteRegistry = parseRemoteArgs(allArgs);
+  console.error(`🌐 Registered ${remoteRegistry.remotes.size} remote(s)`);
+
   // Parse --mode flag
   const modeArg = allArgs.find((arg) => arg.startsWith('--mode='));
   const modeValue = modeArg?.split('=')[1];
@@ -688,7 +700,12 @@ export async function main(): Promise<void> {
   }
 
   try {
-    const server = new BMADMCPServer(activeRoot, discovery, version);
+    const server = new BMADMCPServer(
+      activeRoot,
+      discovery,
+      remoteRegistry,
+      version,
+    );
     await server.run();
   } catch (error) {
     console.error('\n❌ Server Initialization Failed');

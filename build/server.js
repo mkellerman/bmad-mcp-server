@@ -18,6 +18,7 @@ import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
 import logger from './utils/logger.js';
+import { parseRemoteArgs } from './utils/remote-registry.js';
 // Compute __dirname - use import.meta.url when available (production)
 // Fall back to build directory for test environments
 function getDirname() {
@@ -87,9 +88,11 @@ export class BMADMCPServer {
     server;
     discovery;
     version;
-    constructor(bmadRoot, discovery, version = 'unknown') {
+    remoteRegistry;
+    constructor(bmadRoot, discovery, remoteRegistry, version = 'unknown') {
         this.version = version;
         this.discovery = discovery;
+        this.remoteRegistry = remoteRegistry;
         this.bmadRoot = path.resolve(bmadRoot);
         this.projectRoot = this.bmadRoot;
         // Build master manifest at startup with error handling
@@ -121,6 +124,7 @@ export class BMADMCPServer {
                 bmadRoot: this.projectRoot,
                 discovery,
                 masterManifestService: this.masterService,
+                remoteRegistry: this.remoteRegistry,
             });
             // Show final summary
             const masterData = this.masterService.get();
@@ -173,7 +177,7 @@ export class BMADMCPServer {
             };
         });
         // Get a specific prompt (BMAD agent)
-        this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
+        this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
             const name = request.params.name;
             logger.info(`get_prompt called for: ${name}`);
             // Normalize agent name (handle both "analyst" and "bmad-analyst")
@@ -207,7 +211,7 @@ export class BMADMCPServer {
                 };
             }
             // Use unified tool to load agent
-            const result = this.unifiedTool.execute(agentName);
+            const result = await this.unifiedTool.execute(agentName);
             if (!result.success) {
                 return {
                     description: 'Error loading agent',
@@ -273,7 +277,7 @@ export class BMADMCPServer {
             return { tools };
         });
         // Call a tool
-        this.server.setRequestHandler(CallToolRequestSchema, (request) => {
+        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
             logger.info(`call_tool called: ${name} with args: ${JSON.stringify(args)}`);
             if (name !== 'bmad') {
@@ -290,7 +294,7 @@ export class BMADMCPServer {
             const command = args?.command ?? '';
             logger.info(`Executing bmad tool with command: '${command}'`);
             // Execute through unified tool
-            const result = this.unifiedTool.execute(command);
+            const result = await this.unifiedTool.execute(command);
             // Check if error occurred
             if (!result.success) {
                 const errorText = result.error ?? 'Unknown error occurred';
@@ -432,6 +436,9 @@ export async function main() {
     // Support multiple paths as CLI arguments (argv[2], argv[3], ...)
     // Filter out commands (starting with * or --) to only keep paths
     const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
+    // Parse --remote arguments for dynamic agent loading
+    const remoteRegistry = parseRemoteArgs(allArgs);
+    console.error(`🌐 Registered ${remoteRegistry.remotes.size} remote(s)`);
     // Parse --mode flag
     const modeArg = allArgs.find((arg) => arg.startsWith('--mode='));
     const modeValue = modeArg?.split('=')[1];
@@ -564,7 +571,7 @@ export async function main() {
         throw new Error('Unable to determine valid BMAD root');
     }
     try {
-        const server = new BMADMCPServer(activeRoot, discovery, version);
+        const server = new BMADMCPServer(activeRoot, discovery, remoteRegistry, version);
         await server.run();
     }
     catch (error) {
