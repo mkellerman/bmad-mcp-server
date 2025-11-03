@@ -52,16 +52,23 @@ function getDirname(): string {
 const __dirname = getDirname();
 
 /**
- * Format MCP response with explicit display instructions for LLMs.
+ * Format MCP tool response with XML-structured instructions and content.
  *
- * This ensures that:
- * 1. User-facing content (markdown/formatted text) is displayed EXACTLY as written
- * 2. Structured data (JSON) is available for queries but NOT shown to the user
- * 3. LLM understands the distinction between "display" and "use as context"
+ * Strategy:
+ * 1. Use XML tags to clearly separate instructions from user-facing content
+ * 2. LLMs are trained to respect XML tag boundaries (recommended by OpenAI & Anthropic)
+ * 3. Instructions in <instructions> tags guide LLM behavior
+ * 4. Content in <content> tags is displayed to user without modification
+ * 5. Optional structured data in <context> tags for LLM queries only
+ *
+ * Benefits:
+ * - Clear boundaries prevent instruction leakage into user output
+ * - Parseable structure for easy content extraction
+ * - Follows industry best practices for prompt engineering
  *
  * @param displayContent - Content to show the user (markdown, formatted text)
  * @param contextData - Optional structured data for LLM queries (not displayed)
- * @returns MCP TextContent array with proper instructions
+ * @returns MCP TextContent array with XML-structured response
  */
 function formatMCPResponse(
   displayContent: string,
@@ -69,24 +76,34 @@ function formatMCPResponse(
 ): TextContent[] {
   const response: TextContent[] = [];
 
-  // Primary content with display instruction
+  // Primary response with XML-structured instructions and content
   response.push({
     type: 'text',
-    text: `**INSTRUCTIONS: Display the content below to the user EXACTLY as written. Do not summarize or paraphrase.**
+    text: `<instructions>
+You are providing information from the BMAD system to the user. Your task is to present this information clearly and accurately.
 
----
+Display the content in the <content> tags below EXACTLY as written. Do not summarize, paraphrase, or modify it in any way. Present it to the user as-is.
+</instructions>
 
-${displayContent}`,
+<content>
+${displayContent}
+</content>`,
   } as TextContent);
 
   // Optional structured data for queries (marked as context-only)
   if (contextData) {
     response.push({
       type: 'text',
-      text:
-        '\n---\n\n**📦 Structured Data** *(for your use in answering questions - do NOT display this to the user)*\n\n```json\n' +
-        JSON.stringify(contextData, null, 2) +
-        '\n```',
+      text: `
+<context>
+<instructions>
+The following structured data is provided for your use in answering follow-up questions. Do NOT display this data to the user unless specifically asked about it.
+</instructions>
+
+<data format="json">
+${JSON.stringify(contextData, null, 2)}
+</data>
+</context>`,
     } as TextContent);
   }
 

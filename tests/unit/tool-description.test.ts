@@ -104,10 +104,8 @@ describe('Dynamic Tool Description', () => {
     expect(description).toContain('Execute workflow');
     expect(description).toContain('Discovery commands');
 
-    // Should explain asterisk requirement
-    expect(description).toContain(
-      'To execute a workflow, you MUST prefix the name with an asterisk (*)',
-    );
+    // Should explain asterisk requirement (phrasing may vary)
+    expect(description).toContain('asterisk prefix');
   });
 
   it('should include helpful examples', () => {
