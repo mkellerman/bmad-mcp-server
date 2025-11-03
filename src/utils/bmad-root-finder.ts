@@ -252,6 +252,14 @@ export function findBmadRootsRecursive(
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
 
+      // Check exclude list first (applies at all depths)
+      if (excludeDirs.includes(entry.name)) {
+        logger.debug(
+          `${indent}[bmad-finder] Skipping ${entry.name} (excluded)`,
+        );
+        continue;
+      }
+
       // At depth > 1, only search bmad-named, agents, workflows, tasks, or src directories
       if (currentDepth > 1 && !shouldSearchDirectory(entry.name, excludeDirs)) {
         logger.debug(

@@ -700,6 +700,33 @@ export async function main(): Promise<void> {
     }
   });
 
+  // Show discovered BMAD installations
+  const validLocations = discovery.locations.filter(
+    (l) => l.status === 'valid',
+  );
+  if (validLocations.length > 0) {
+    console.error(`\n📂 Found ${validLocations.length} BMAD installation(s):`);
+    validLocations.forEach((loc) => {
+      const isActive =
+        loc.resolvedRoot === discovery.activeLocation.resolvedRoot;
+      const marker = isActive ? '→' : ' ';
+      const versionStr = loc.version ? ` (${loc.version})` : '';
+      const sourceStr =
+        loc.source === 'cli'
+          ? 'CLI'
+          : loc.source === 'env'
+            ? 'ENV'
+            : loc.source === 'user'
+              ? 'User'
+              : loc.source === 'project'
+                ? 'Project'
+                : loc.source;
+      console.error(
+        `   ${marker} [${sourceStr}] ${loc.resolvedRoot}${versionStr}`,
+      );
+    });
+  }
+
   const activeRoot = discovery.activeLocation.resolvedRoot;
 
   if (!activeRoot || discovery.activeLocation.status !== 'valid') {

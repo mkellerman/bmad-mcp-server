@@ -48,10 +48,7 @@ export function masterRecordToAgent(record, parseMetadata = true) {
         !record.absolutePath.includes('/workflows/') &&
         !record.absolutePath.includes('/knowledge/') &&
         !record.absolutePath.includes('/tasks/');
-    const needsParsing = parseMetadata &&
-        record.exists &&
-        isLikelyAgentFile &&
-        !record.description; // If manifest has description, skip parsing
+    const needsParsing = parseMetadata && record.exists && isLikelyAgentFile && !record.description; // If manifest has description, skip parsing
     if (needsParsing) {
         parsedMetadata = parseAgentMetadata(record.absolutePath);
     }
