@@ -3,158 +3,189 @@ import { masterRecordToAgent } from '../../utils/master-manifest-adapter.js';
 import { listRemotes } from '../../utils/remote-registry.js';
 import { GitSourceResolver } from '../../utils/git-source-resolver.js';
 import { discoverAgents, discoverModules, formatAgentList, formatModuleList, } from '../../utils/remote-discovery.js';
+import { paginationState } from '../../utils/pagination-state.js';
 export async function handleListCommand(cmd, ctx) {
     const { resolved, master, discovery } = ctx;
     const lines = [];
+    // Handle *more command
+    if (cmd === '*more') {
+        // Try to get next page from any active pagination state
+        // Priority: local-agents, remote-agents-*, remote-modules-*
+        const keys = [
+            'local-agents',
+            'local-workflows',
+            'local-remotes',
+            // Will also check for remote keys dynamically
+        ];
+        let page = null;
+        let usedKey = '';
+        // Try local keys first
+        for (const key of keys) {
+            page = paginationState.getNextPage(key);
+            if (page) {
+                usedKey = key;
+                break;
+            }
+        }
+        // If no local pagination found, it might be a remote list
+        // We don't have a way to track which remote was last used,
+        // so we'll return an error suggesting to use the list command again
+        if (!page) {
+            return {
+                success: false,
+                exitCode: 1,
+                error: 'No active list to paginate. Please run a list command first (*list-agents, *list-workflows, *list-remotes, etc.)',
+            };
+        }
+        // Determine what type of list this is
+        const listType = usedKey.includes('agents')
+            ? 'agents'
+            : usedKey.includes('workflows')
+                ? 'workflows'
+                : usedKey.includes('remotes')
+                    ? 'remotes'
+                    : 'items';
+        // Format output based on type
+        const title = usedKey.includes('remote-agents')
+            ? '🌐 Remote Agents (continued)'
+            : usedKey.includes('remote-modules')
+                ? '🌐 Remote Modules (continued)'
+                : listType === 'agents'
+                    ? '🤖 BMAD Agents (continued)'
+                    : listType === 'workflows'
+                        ? '🔄 BMAD Workflows (continued)'
+                        : '📋 Items (continued)';
+        lines.push(`# ${title}\n`);
+        lines.push(`Showing ${page.start}-${page.end} of ${page.total}\n`);
+        for (const item of page.items) {
+            const num = item.number || 0;
+            const name = item.displayName || item.name || 'Unknown';
+            const moduleInfo = item.module ? ` (${item.module})` : '';
+            lines.push(`${num}. **${name}**${moduleInfo}`);
+            if (item.title) {
+                lines.push(`   ${item.title}`);
+            }
+            else if (item.description) {
+                lines.push(`   ${item.description}`);
+            }
+            if (item.loadCommand) {
+                lines.push(`   Load: \`bmad ${item.loadCommand}\``);
+            }
+            lines.push('');
+        }
+        if (page.hasMore) {
+            lines.push('---');
+            lines.push('📄 **More available**');
+            lines.push('Type `*more` to see the next page\n');
+        }
+        else {
+            lines.push('---');
+            lines.push('✅ End of list\n');
+        }
+        return {
+            success: true,
+            type: 'list',
+            listType,
+            count: page.total,
+            content: lines.join('\n'),
+            exitCode: 0,
+            structuredData: {
+                items: page.items,
+                summary: {
+                    total: page.total,
+                    message: `Page ${page.currentPage} of ${page.totalPages}`,
+                },
+                metadata: {
+                    currentPage: page.currentPage,
+                    totalPages: page.totalPages,
+                    hasMore: page.hasMore,
+                },
+            },
+        };
+    }
     if (cmd === '*list-agents') {
         // Build structured data
-        const agentsByModule = new Map();
-        const allAgents = [];
-        // Use ALL agents from master manifest for complete discoverability
-        // Group by name to handle duplicates with clear loading instructions
         const allAgentRecords = master.agents;
         // Parse metadata from agent files
         const parsedAgents = allAgentRecords.map((record) => masterRecordToAgent(record, true));
-        // Group agents by name to handle duplicates with clear UX
-        const agentsByName = new Map();
-        const uniqueAgents = [];
+        // Process agents and build simple list
+        const agents = [];
+        const seenNames = new Map();
         for (const agent of parsedAgents) {
             const name = (agent.name || '').toString().toLowerCase();
             const p = (agent.path || '').toString().toLowerCase();
             // Skip README files
             if (name === 'readme' || p.endsWith('/readme.md'))
                 continue;
-            const agentData = {
-                name: agent.name,
-                module: agent.module,
-                displayName: agent.displayName || agent.title || agent.name,
-                description: agent.title,
-                title: agent.title,
-                icon: agent.icon,
-                role: agent.role,
-                source: agent.sourceLocation?.includes('manifest')
-                    ? 'manifest'
-                    : 'filesystem',
-                path: agent.path,
-                commands: [], // Commands not available in Agent interface
-            };
-            // Group by name for duplicate detection
-            const nameGroup = agentsByName.get(name) || [];
-            nameGroup.push(agentData);
-            agentsByName.set(name, nameGroup);
-        }
-        // Process groups: show ALL agents for complete discoverability
-        for (const [name, group] of agentsByName) {
-            if (group.length === 1) {
-                // Single agent: show with simple name (user can load with just name)
-                const agent = group[0];
-                agent.loadCommand = name;
-                uniqueAgents.push(agent);
-                const moduleList = agentsByModule.get(agent.module) ?? [];
-                moduleList.push(agent);
-                agentsByModule.set(agent.module, moduleList);
+            const displayName = agent.displayName || agent.title || agent.name;
+            const title = agent.title || '';
+            const module = agent.module || '';
+            // Determine load command
+            let loadCommand = name;
+            const nameCount = seenNames.get(name) || 0;
+            seenNames.set(name, nameCount + 1);
+            // If duplicate name, use module-qualified form
+            if (nameCount > 0 ||
+                parsedAgents.filter((a) => a.name === agent.name).length > 1) {
+                loadCommand = module ? `${module}/${name}` : name;
             }
-            else {
-                // Multiple agents: show ALL variants with module qualification
-                // This ensures complete discoverability - users see every loadable option
-                for (const agent of group) {
-                    const agentTyped = agent;
-                    agentTyped.loadCommand = agentTyped.module
-                        ? `${agentTyped.module}/${name}`
-                        : name;
-                    agentTyped.isDuplicate = true;
-                    agentTyped.variantInfo = `(${agentTyped.module || 'core'})`;
-                    uniqueAgents.push(agentTyped);
-                    const moduleList = agentsByModule.get(agentTyped.module) ?? [];
-                    moduleList.push(agentTyped);
-                    agentsByModule.set(agentTyped.module, moduleList);
-                }
-            }
-        }
-        // Sort modules for metadata
-        const sortedModules = Array.from(agentsByModule.keys()).sort();
-        // Sort all agents alphabetically by load command for intuitive UX
-        const sortedAgents = uniqueAgents.sort((a, b) => {
-            const nameA = (a.loadCommand || a.name || '').toLowerCase();
-            const nameB = (b.loadCommand || b.name || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-        });
-        // Build markdown content with module-grouped UX design
-        const markdown = [];
-        markdown.push('# 🤖 BMAD Agents\n');
-        markdown.push(`**Found ${uniqueAgents.length} agents across ${sortedModules.length} modules**\n`);
-        markdown.push('---\n');
-        // Group agents by module for better discoverability
-        for (const moduleName of sortedModules) {
-            const moduleAgents = agentsByModule.get(moduleName) || [];
-            const displayModuleName = moduleName || 'Core/Standalone';
-            markdown.push(`## 📦 ${displayModuleName}\n`);
-            // Sort agents within each module
-            const sortedModuleAgents = moduleAgents.sort((a, b) => {
-                const nameA = (a.loadCommand || a.name || '').toLowerCase();
-                const nameB = (b.loadCommand || b.name || '').toLowerCase();
-                return nameA.localeCompare(nameB);
+            agents.push({
+                number: agents.length + 1,
+                name: agent.name || '',
+                module,
+                displayName,
+                title,
+                loadCommand,
             });
-            for (const agentData of sortedModuleAgents) {
-                const agent = agentData;
-                const icon = agent.icon || '🤖';
-                const displayName = agent.displayName || agent.name || 'Unknown';
-                const title = agent.title || '';
-                const role = agent.role || '';
-                const loadCmd = agent.loadCommand || agent.name;
-                // Build line segments safely with clear UX guidance
-                const segments = [];
-                // Format: "- icon `load-command`: Title (**DisplayName**) Role"
-                const prefix = `- ${icon} \`${loadCmd}\`:`;
-                if (title) {
-                    segments.push(title);
-                }
-                // Always show display name for clarity
-                segments.push(`(**${displayName}**)`);
-                if (role) {
-                    segments.push(role);
-                }
-                // Join segments and combine with prefix
-                const agentLine = segments.length > 0 ? `${prefix} ${segments.join(' - ')}` : prefix;
-                markdown.push(agentLine);
-            }
-            markdown.push(''); // Add spacing between modules
         }
-        markdown.push('');
-        markdown.push('---');
-        markdown.push('**Tip:** Load any agent using the command shown above');
-        markdown.push('- Simple names: `bmad analyst`');
-        markdown.push('- Module-qualified: `bmad bmad-core/ux-expert`');
-        markdown.push('---');
-        // Build summary for structured data
-        const byGroup = {};
-        for (const mod of sortedModules) {
-            byGroup[mod] = agentsByModule.get(mod).length;
+        // Sort alphabetically by load command
+        agents.sort((a, b) => a.loadCommand.localeCompare(b.loadCommand));
+        // Reassign numbers after sorting
+        agents.forEach((agent, idx) => {
+            agent.number = idx + 1;
+        });
+        // Get first page
+        const page = paginationState.getFirstPage('local-agents', agents, 'agents');
+        // Build simple numbered list
+        const lines = [];
+        lines.push('# 🤖 BMAD Agents\n');
+        lines.push(`Showing ${page.start}-${page.end} of ${page.total} agents\n`);
+        for (const agent of page.items) {
+            const moduleInfo = agent.module ? ` (${agent.module})` : '';
+            lines.push(`${agent.number}. **${agent.displayName}**${moduleInfo}`);
+            if (agent.title) {
+                lines.push(`   ${agent.title}`);
+            }
+            lines.push(`   Load: \`bmad ${agent.loadCommand}\``);
+            lines.push('');
+        }
+        if (page.hasMore) {
+            lines.push('---');
+            lines.push('📄 **More agents available**');
+            lines.push('Type `*more` to see the next page\n');
+        }
+        else {
+            lines.push('---');
+            lines.push('✅ End of list\n');
         }
         return {
             success: true,
             type: 'list',
             listType: 'agents',
-            count: uniqueAgents.length,
-            content: markdown.join('\n'),
+            count: page.total,
+            content: lines.join('\n'),
             exitCode: 0,
             structuredData: {
-                items: uniqueAgents,
+                items: page.items,
                 summary: {
-                    total: uniqueAgents.length,
-                    byGroup,
-                    message: `Found ${uniqueAgents.length} agents across ${sortedModules.length} modules`,
+                    total: page.total,
+                    message: `Found ${page.total} agents (page ${page.currentPage}/${page.totalPages})`,
                 },
                 metadata: {
-                    modules: sortedModules,
-                    timestamp: new Date().toISOString(),
+                    currentPage: page.currentPage,
+                    totalPages: page.totalPages,
+                    hasMore: page.hasMore,
                 },
-                followUpSuggestions: [
-                    'Tell me more about a specific agent',
-                    'Show me agents in a specific module',
-                    'What commands does an agent have?',
-                    'Load an agent to start working',
-                ],
             },
         };
     }

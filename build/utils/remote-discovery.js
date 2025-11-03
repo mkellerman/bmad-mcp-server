@@ -12,6 +12,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { buildMasterManifests } from './master-manifest.js';
 import { masterRecordToAgent } from './master-manifest-adapter.js';
+import { paginationState } from './pagination-state.js';
 /**
  * Clone or pull a remote repository to local cache
  *
@@ -84,8 +85,10 @@ export function scanAgents(repoPath, installedAgents = new Set()) {
         let isMarketplace = false;
         if (existsSync(agentsDir) && statSync(agentsDir).isDirectory()) {
             const agentEntries = readdirSync(agentsDir, { withFileTypes: true });
-            const hasSubdirs = agentEntries.some(e => e.isDirectory() && !e.name.startsWith('.'));
-            const hasAgentFiles = agentEntries.some(e => e.isFile() && e.name.endsWith('.md') && e.name.toLowerCase() !== 'readme.md');
+            const hasSubdirs = agentEntries.some((e) => e.isDirectory() && !e.name.startsWith('.'));
+            const hasAgentFiles = agentEntries.some((e) => e.isFile() &&
+                e.name.endsWith('.md') &&
+                e.name.toLowerCase() !== 'readme.md');
             // If it has subdirectories and no direct .md files, it's a marketplace structure
             isMarketplace = hasSubdirs && !hasAgentFiles;
         }
@@ -349,39 +352,46 @@ export async function discoverModules(remoteName, remoteRegistry, gitResolver, i
  */
 export function formatAgentList(result) {
     const lines = [];
-    lines.push(`# Remote Agents: @${result.remote}\n`);
+    lines.push(`# 🌐 Remote Agents: @${result.remote}\n`);
     if (result.error) {
         lines.push(`❌ **Error:** ${result.error}\n`);
         return lines.join('\n');
     }
-    lines.push(`**Repository:** ${result.url}`);
-    lines.push(`**Local Cache:** \`${result.localPath}\`\n`);
     const agents = result.agents || [];
     if (agents.length === 0) {
         lines.push('*No agents found in this repository.*\n');
         return lines.join('\n');
     }
-    lines.push(`**Found ${agents.length} agent(s):**\n`);
-    for (const agent of agents) {
+    // Sort agents alphabetically by name
+    const sortedAgents = [...agents].sort((a, b) => a.name.localeCompare(b.name));
+    // Add number to each agent
+    const numberedAgents = sortedAgents.map((agent, idx) => ({
+        ...agent,
+        number: idx + 1,
+    }));
+    // Get first page
+    const page = paginationState.getFirstPage(`remote-agents-${result.remote}`, numberedAgents, 'agents', result.remote);
+    lines.push(`Showing ${page.start}-${page.end} of ${page.total} agents\n`);
+    for (const agentData of page.items) {
+        const agent = agentData;
         const statusIcon = agent.installed ? '✅' : '📦';
-        const status = agent.installed ? 'Installed' : 'Available';
-        lines.push(`### ${statusIcon} ${agent.name}`);
-        if (agent.displayName) {
-            lines.push(`**Display Name:** ${agent.displayName}`);
-        }
+        const status = agent.installed ? 'installed' : 'available';
+        lines.push(`${agent.number}. **${agent.displayName || agent.name}** (${status} ${statusIcon})`);
         if (agent.title) {
-            lines.push(`**Title:** ${agent.title}`);
+            lines.push(`   ${agent.title}`);
         }
-        if (agent.description) {
-            lines.push(`**Description:** ${agent.description}`);
-        }
-        lines.push(`**Status:** ${status}`);
-        lines.push(`**Path:** \`${agent.path}\`\n`);
+        lines.push(`   Load: \`bmad @${result.remote}/${agent.name}\``);
+        lines.push('');
     }
-    lines.push('\n**Usage:**');
-    lines.push(`\`\`\`
-bmad @${result.remote}:agents/{agent-name}
-\`\`\`\n`);
+    if (page.hasMore) {
+        lines.push('---');
+        lines.push('📄 **More agents available**');
+        lines.push('Type `*more` to see the next page\n');
+    }
+    else {
+        lines.push('---');
+        lines.push('✅ End of list\n');
+    }
     return lines.join('\n');
 }
 /**
@@ -392,38 +402,46 @@ bmad @${result.remote}:agents/{agent-name}
  */
 export function formatModuleList(result) {
     const lines = [];
-    lines.push(`# Remote Modules: @${result.remote}\n`);
+    lines.push(`# 🌐 Remote Modules: @${result.remote}\n`);
     if (result.error) {
         lines.push(`❌ **Error:** ${result.error}\n`);
         return lines.join('\n');
     }
-    lines.push(`**Repository:** ${result.url}`);
-    lines.push(`**Local Cache:** \`${result.localPath}\`\n`);
     const modules = result.modules || [];
     if (modules.length === 0) {
         lines.push('*No modules found in this repository.*\n');
         return lines.join('\n');
     }
-    lines.push(`**Found ${modules.length} module(s):**\n`);
-    for (const mod of modules) {
+    // Sort modules alphabetically by name
+    const sortedModules = [...modules].sort((a, b) => a.name.localeCompare(b.name));
+    // Add number to each module
+    const numberedModules = sortedModules.map((mod, idx) => ({
+        ...mod,
+        number: idx + 1,
+    }));
+    // Get first page
+    const page = paginationState.getFirstPage(`remote-modules-${result.remote}`, numberedModules, 'modules', result.remote);
+    lines.push(`Showing ${page.start}-${page.end} of ${page.total} modules\n`);
+    for (const modData of page.items) {
+        const mod = modData;
         const statusIcon = mod.installed ? '✅' : '📦';
-        const status = mod.installed ? 'Installed' : 'Available';
-        lines.push(`### ${statusIcon} ${mod.name}`);
-        if (mod.version) {
-            lines.push(`**Version:** ${mod.version}`);
-        }
+        const status = mod.installed ? 'installed' : 'available';
+        lines.push(`${mod.number}. **${mod.name}** (${status} ${statusIcon})`);
         if (mod.description) {
-            lines.push(`**Description:** ${mod.description}`);
+            lines.push(`   ${mod.description}`);
         }
-        lines.push(`**Content:** ${mod.agentCount} agents, ${mod.workflowCount} workflows`);
-        lines.push(`**Status:** ${status}`);
-        lines.push(`**Path:** \`${mod.path}\`\n`);
+        lines.push(`   Content: ${mod.agentCount} agents, ${mod.workflowCount} workflows`);
+        lines.push('');
     }
-    lines.push('\n**Usage:**');
-    lines.push(`\`\`\`
-bmad @${result.remote}:agents/{agent-name}
-bmad @${result.remote}:*{workflow-name}
-\`\`\`\n`);
+    if (page.hasMore) {
+        lines.push('---');
+        lines.push('📄 **More modules available**');
+        lines.push('Type `*more` to see the next page\n');
+    }
+    else {
+        lines.push('---');
+        lines.push('✅ End of list\n');
+    }
     return lines.join('\n');
 }
 //# sourceMappingURL=remote-discovery.js.map

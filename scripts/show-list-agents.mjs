@@ -60,7 +60,7 @@ const resolved = {
   tasks: master.tasks,
 };
 
-const result = handleListCommand('*list-agents', {
+const result = await handleListCommand('*list-agents', {
   resolved,
   master,
   discovery,

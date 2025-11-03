@@ -157,6 +157,7 @@ export class UnifiedBMADTool {
       normalized === '*list-agents' ||
       normalized === '*list-workflows' ||
       normalized === '*list-remotes' ||
+      normalized === '*more' ||
       normalized.startsWith('*list-agents @') ||
       normalized.startsWith('*list-modules @') ||
       normalized.startsWith('*export-master-manifest')

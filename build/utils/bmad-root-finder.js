@@ -173,7 +173,9 @@ export function findBmadRootsRecursive(startPath, options = {}) {
             const agentsDir = path.join(resolvedPath, 'agents');
             const modulesDir = path.join(resolvedPath, 'modules');
             if (fs.existsSync(agentsDir) && fs.statSync(agentsDir).isDirectory()) {
-                const agentsEntries = fs.readdirSync(agentsDir, { withFileTypes: true });
+                const agentsEntries = fs.readdirSync(agentsDir, {
+                    withFileTypes: true,
+                });
                 for (const entry of agentsEntries) {
                     if (entry.isDirectory() && !entry.name.startsWith('.')) {
                         const subResults = findBmadRootsRecursive(path.join(agentsDir, entry.name), { ...options, currentDepth: currentDepth + 1 });
@@ -182,7 +184,9 @@ export function findBmadRootsRecursive(startPath, options = {}) {
                 }
             }
             if (fs.existsSync(modulesDir) && fs.statSync(modulesDir).isDirectory()) {
-                const modulesEntries = fs.readdirSync(modulesDir, { withFileTypes: true });
+                const modulesEntries = fs.readdirSync(modulesDir, {
+                    withFileTypes: true,
+                });
                 for (const entry of modulesEntries) {
                     if (entry.isDirectory() && !entry.name.startsWith('.')) {
                         const subResults = findBmadRootsRecursive(path.join(modulesDir, entry.name), { ...options, currentDepth: currentDepth + 1 });
