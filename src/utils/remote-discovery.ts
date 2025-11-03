@@ -13,7 +13,6 @@ import { RemoteRegistry } from './remote-registry.js';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { findBmadRootsRecursive } from './bmad-root-finder.js';
 import { buildMasterManifests } from './master-manifest.js';
 import { masterRecordToAgent } from './master-manifest-adapter.js';
 import type { BmadOrigin } from '../types/index.js';
@@ -120,12 +119,14 @@ export function parseAgentMetadata(filePath: string): {
 }
 
 /**
- * Scan a directory for BMAD agents using proper BMAD discovery
+ * Scan a remote repository for BMAD agents
  *
- * Discovers agents in the same way as when providing a BMAD root path:
- * - Searches for v6 BMAD installations (contains _cfg/manifest.yaml)
- * - Searches for v4 BMAD installations (contains install-manifest.yaml)
- * - Discovers agents in modules and agents directories
+ * Supports two structures:
+ * 1. Marketplace/gallery structure:
+ *    - modules/<module-name>/ - v4 style BMAD modules
+ *    - agents/<module-name>/ - v6 style agent modules
+ * 2. Flat structure:
+ *    - agents/*.md - Direct agent files
  *
  * @param repoPath - Path to local repository (cloned remote)
  * @param installedAgents - Set of installed agent names for comparison
@@ -136,27 +137,81 @@ export function scanAgents(
   installedAgents: Set<string> = new Set(),
 ): DiscoveredAgent[] {
   try {
-    // Use BMAD discovery to find all BMAD installations in the repository
-    const foundRoots = findBmadRootsRecursive(repoPath, {
-      maxDepth: 3,
-      excludeDirs: ['.git', 'node_modules', 'cache', 'build', 'dist'],
-    });
+    const origins: BmadOrigin[] = [];
+    let priority = 1;
 
-    if (foundRoots.length === 0) {
+    // Check if agents/ contains subdirectories (marketplace) or files (flat)
+    const agentsDir = path.join(repoPath, 'agents');
+    let isMarketplace = false;
+
+    if (existsSync(agentsDir) && statSync(agentsDir).isDirectory()) {
+      const agentEntries = readdirSync(agentsDir, { withFileTypes: true });
+      const hasSubdirs = agentEntries.some(
+        (e) => e.isDirectory() && !e.name.startsWith('.'),
+      );
+      const hasAgentFiles = agentEntries.some(
+        (e) =>
+          e.isFile() &&
+          e.name.endsWith('.md') &&
+          e.name.toLowerCase() !== 'readme.md',
+      );
+
+      // If it has subdirectories and no direct .md files, it's a marketplace structure
+      isMarketplace = hasSubdirs && !hasAgentFiles;
+    }
+
+    if (isMarketplace) {
+      // Marketplace structure: scan modules/* and agents/* subdirectories
+      const modulesDir = path.join(repoPath, 'modules');
+      if (existsSync(modulesDir) && statSync(modulesDir).isDirectory()) {
+        const moduleEntries = readdirSync(modulesDir, { withFileTypes: true });
+        for (const entry of moduleEntries) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            const modulePath = path.join(modulesDir, entry.name);
+            origins.push({
+              kind: 'cli' as const,
+              root: modulePath,
+              version: 'unknown', // Will be detected by inventory
+              displayName: `modules/${entry.name}`,
+              manifestDir: path.join(modulePath, '_cfg'),
+              priority: priority++,
+            });
+          }
+        }
+      }
+
+      // Scan agents/* subdirectories (v6 style agent modules)
+      const agentEntries = readdirSync(agentsDir, { withFileTypes: true });
+      for (const entry of agentEntries) {
+        if (entry.isDirectory() && !entry.name.startsWith('.')) {
+          const modulePath = path.join(agentsDir, entry.name);
+          origins.push({
+            kind: 'cli' as const,
+            root: modulePath,
+            version: 'unknown', // Will be detected by inventory
+            displayName: `agents/${entry.name}`,
+            manifestDir: path.join(modulePath, '_cfg'),
+            priority: priority++,
+          });
+        }
+      }
+    } else {
+      // Flat structure: treat the repo root as a single BMAD installation
+      origins.push({
+        kind: 'cli' as const,
+        root: repoPath,
+        version: 'unknown',
+        displayName: path.basename(repoPath),
+        manifestDir: path.join(repoPath, '_cfg'),
+        priority: 1,
+      });
+    }
+
+    if (origins.length === 0) {
       return [];
     }
 
-    // Convert found roots to BmadOrigin format
-    const origins: BmadOrigin[] = foundRoots.map((root, index) => ({
-      kind: 'cli' as const,
-      root: root.root,
-      version: root.version,
-      displayName: `Remote: ${path.basename(repoPath)}`,
-      manifestDir: root.manifestDir || path.join(root.root, '_cfg'),
-      priority: index + 1,
-    }));
-
-    // Build master manifests from discovered BMAD installations
+    // Build master manifests from all discovered module roots
     const masterData = buildMasterManifests(origins);
 
     // Convert master manifest agents to DiscoveredAgent format

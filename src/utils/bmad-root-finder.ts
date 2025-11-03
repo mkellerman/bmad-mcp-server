@@ -227,7 +227,42 @@ export function findBmadRootsRecursive(
       logger.debug(`${indent}[bmad-finder]   - No manifest (custom)`);
       customRoot.depth = currentDepth;
       results.push(customRoot);
-      // Don't recurse into custom installations either
+
+      // For custom roots, continue searching in agents/ and modules/ subdirectories
+      // to find nested BMAD modules (common in registry/catalog repositories)
+      const agentsDir = path.join(resolvedPath, 'agents');
+      const modulesDir = path.join(resolvedPath, 'modules');
+
+      if (fs.existsSync(agentsDir) && fs.statSync(agentsDir).isDirectory()) {
+        const agentsEntries = fs.readdirSync(agentsDir, {
+          withFileTypes: true,
+        });
+        for (const entry of agentsEntries) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            const subResults = findBmadRootsRecursive(
+              path.join(agentsDir, entry.name),
+              { ...options, currentDepth: currentDepth + 1 },
+            );
+            results.push(...subResults);
+          }
+        }
+      }
+
+      if (fs.existsSync(modulesDir) && fs.statSync(modulesDir).isDirectory()) {
+        const modulesEntries = fs.readdirSync(modulesDir, {
+          withFileTypes: true,
+        });
+        for (const entry of modulesEntries) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            const subResults = findBmadRootsRecursive(
+              path.join(modulesDir, entry.name),
+              { ...options, currentDepth: currentDepth + 1 },
+            );
+            results.push(...subResults);
+          }
+        }
+      }
+
       return results;
     }
 
