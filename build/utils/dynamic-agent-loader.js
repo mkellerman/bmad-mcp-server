@@ -10,7 +10,7 @@
 import { GitSourceResolver } from './git-source-resolver.js';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import yaml from 'js-yaml';
 import { getAgentInstructions } from '../tools/common/agent-instructions.js';
 /**
  * In-memory cache for loaded remote agents
@@ -120,8 +120,7 @@ export function parseAgentFrontmatter(content) {
     }
     const yamlContent = lines.slice(1, endIndex + 1).join('\n');
     try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const parsed = parseYaml(yamlContent);
+        const parsed = yaml.load(yamlContent);
         return typeof parsed === 'object' && parsed !== null
             ? parsed
             : {};

@@ -9,7 +9,7 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import yaml from 'js-yaml';
 /**
  * Clone or pull a remote repository to local cache
  *
@@ -42,8 +42,8 @@ export function parseAgentMetadata(filePath) {
         if (!frontmatterMatch) {
             return null;
         }
-        const yaml = frontmatterMatch[1];
-        const metadata = parseYaml(yaml);
+        const yamlContent = frontmatterMatch[1];
+        const metadata = yaml.load(yamlContent);
         return {
             name: typeof metadata.name === 'string' ? metadata.name : undefined,
             displayName: typeof metadata['display-name'] === 'string'
@@ -111,7 +111,7 @@ export function scanAgents(repoPath, installedAgents = new Set()) {
 function parseModuleManifest(manifestPath) {
     try {
         const content = readFileSync(manifestPath, 'utf-8');
-        const manifest = parseYaml(content);
+        const manifest = yaml.load(content);
         return {
             name: typeof manifest.name === 'string' ? manifest.name : undefined,
             description: typeof manifest.description === 'string'

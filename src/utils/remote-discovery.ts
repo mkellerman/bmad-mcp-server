@@ -12,7 +12,7 @@ import { GitSourceResolver } from './git-source-resolver.js';
 import { RemoteRegistry } from './remote-registry.js';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import yaml from 'js-yaml';
 
 /**
  * Metadata for a discovered agent
@@ -95,8 +95,8 @@ export function parseAgentMetadata(filePath: string): {
       return null;
     }
 
-    const yaml = frontmatterMatch[1];
-    const metadata = parseYaml(yaml) as Record<string, unknown>;
+    const yamlContent = frontmatterMatch[1];
+    const metadata = yaml.load(yamlContent) as Record<string, unknown>;
 
     return {
       name: typeof metadata.name === 'string' ? metadata.name : undefined,
@@ -182,7 +182,7 @@ function parseModuleManifest(manifestPath: string): {
 } | null {
   try {
     const content = readFileSync(manifestPath, 'utf-8');
-    const manifest = parseYaml(content) as Record<string, unknown>;
+    const manifest = yaml.load(content) as Record<string, unknown>;
 
     return {
       name: typeof manifest.name === 'string' ? manifest.name : undefined,
