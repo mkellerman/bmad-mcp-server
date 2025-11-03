@@ -314,7 +314,9 @@ describe('Agent Validation with LLM', () => {
   });
 
   afterAll(async () => {
-    await mcpClient.cleanup();
+    if (mcpClient) {
+      await mcpClient.cleanup();
+    }
 
     // Generate reports
     console.log('\n📝 Generating test reports...');

@@ -45,7 +45,9 @@ describe('Single Agent LLM Integration Test', () => {
   });
 
   afterAll(async () => {
-    await mcpClient.cleanup();
+    if (mcpClient) {
+      await mcpClient.cleanup();
+    }
   });
 
   it('should load analyst agent through LLM and log response', async () => {
