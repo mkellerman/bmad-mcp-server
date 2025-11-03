@@ -98,7 +98,9 @@ export async function handleListCommand(cmd, ctx) {
             if (nameCount > 0 ||
                 parsedAgents.filter((a) => {
                     const aRecord = allAgentRecords.find((r) => r.absolutePath === a.path);
-                    const aName = (aRecord?.name || a.name || '').toString().toLowerCase();
+                    const aName = (aRecord?.name || a.name || '')
+                        .toString()
+                        .toLowerCase();
                     return aName === name;
                 }).length > 1) {
                 loadCommand = module ? `${module}/${name}` : name;
