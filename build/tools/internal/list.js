@@ -79,7 +79,9 @@ export async function handleListCommand(cmd, ctx) {
         const agents = [];
         const seenNames = new Map();
         for (const agent of parsedAgents) {
-            const name = (agent.name || '').toString().toLowerCase();
+            // Use the original record name (from filename/manifest), not the parsed display name
+            const record = allAgentRecords.find((r) => r.absolutePath === agent.path);
+            const name = (record?.name || agent.name || '').toString().toLowerCase();
             const p = (agent.path || '').toString().toLowerCase();
             // Skip README files
             if (name === 'readme' || p.endsWith('/readme.md'))
@@ -94,11 +96,15 @@ export async function handleListCommand(cmd, ctx) {
             seenNames.set(name, nameCount + 1);
             // If duplicate name, use module-qualified form
             if (nameCount > 0 ||
-                parsedAgents.filter((a) => a.name === agent.name).length > 1) {
+                parsedAgents.filter((a) => {
+                    const aRecord = allAgentRecords.find((r) => r.absolutePath === a.path);
+                    const aName = (aRecord?.name || a.name || '').toString().toLowerCase();
+                    return aName === name;
+                }).length > 1) {
                 loadCommand = module ? `${module}/${name}` : name;
             }
             agents.push({
-                name: agent.name || '',
+                name: name, // Use the actual agent name (from record), not display name
                 module,
                 displayName,
                 title,
@@ -356,8 +362,7 @@ export async function handleListCommand(cmd, ctx) {
             // Extract module from path (e.g., "bmad-2d-phaser-v4" from path)
             const module = agent.path
                 .split('/')
-                .find((p) => p.startsWith('bmad-') || p.startsWith('debug-'))
-                || '';
+                .find((p) => p.startsWith('bmad-') || p.startsWith('debug-')) || '';
             const name = agent.name.toLowerCase().replace(/\s+/g, '-');
             const displayName = agent.displayName || agent.name;
             const title = agent.title || agent.description || '';

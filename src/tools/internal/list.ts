@@ -157,7 +157,11 @@ export async function handleListCommand(
     const seenNames = new Map<string, number>();
 
     for (const agent of parsedAgents) {
-      const name = (agent.name || '').toString().toLowerCase();
+      // Use the original record name (from filename/manifest), not the parsed display name
+      const record = allAgentRecords.find(
+        (r: MasterRecord) => r.absolutePath === agent.path,
+      );
+      const name = (record?.name || agent.name || '').toString().toLowerCase();
       const p = (agent.path || '').toString().toLowerCase();
 
       // Skip README files
@@ -176,13 +180,21 @@ export async function handleListCommand(
       // If duplicate name, use module-qualified form
       if (
         nameCount > 0 ||
-        parsedAgents.filter((a: any) => a.name === agent.name).length > 1
+        parsedAgents.filter((a: any) => {
+          const aRecord = allAgentRecords.find(
+            (r: MasterRecord) => r.absolutePath === a.path,
+          );
+          const aName = (aRecord?.name || a.name || '')
+            .toString()
+            .toLowerCase();
+          return aName === name;
+        }).length > 1
       ) {
         loadCommand = module ? `${module}/${name}` : name;
       }
 
       agents.push({
-        name: agent.name || '',
+        name: name, // Use the actual agent name (from record), not display name
         module,
         displayName,
         title,
