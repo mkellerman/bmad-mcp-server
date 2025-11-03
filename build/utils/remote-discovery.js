@@ -12,6 +12,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { findBmadRootsRecursive } from './bmad-root-finder.js';
 import { buildMasterManifests } from './master-manifest.js';
+import { masterRecordToAgent } from './master-manifest-adapter.js';
 /**
  * Clone or pull a remote repository to local cache
  *
@@ -95,16 +96,21 @@ export function scanAgents(repoPath, installedAgents = new Set()) {
         // Build master manifests from discovered BMAD installations
         const masterData = buildMasterManifests(origins);
         // Convert master manifest agents to DiscoveredAgent format
+        // Use masterRecordToAgent adapter to parse frontmatter metadata
         const agents = masterData.agents
             .filter((record) => record.exists) // Only include existing files
-            .map((record) => ({
-            name: record.name || '',
-            displayName: record.displayName,
-            title: record.description, // Use description as title
-            description: record.description,
-            path: record.absolutePath,
-            installed: installedAgents.has(record.name || ''),
-        }))
+            .map((record) => {
+            // Parse agent file to get real name and metadata
+            const agentData = masterRecordToAgent(record, true);
+            return {
+                name: agentData.name,
+                displayName: agentData.displayName,
+                title: agentData.title,
+                description: agentData.title, // title is the description in agent files
+                path: record.absolutePath,
+                installed: installedAgents.has(agentData.name),
+            };
+        })
             .filter((agent) => agent.name); // Remove any entries without names
         return agents.sort((a, b) => a.name.localeCompare(b.name));
     }

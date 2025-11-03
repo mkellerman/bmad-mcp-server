@@ -111,6 +111,25 @@ function listFilesRecursive(dir, predicate) {
     return results;
 }
 /**
+ * List agent files directly in the agents/ directory (non-recursive)
+ * Agents must be in the pattern: agents/<agent-name>.md
+ */
+function listAgentFiles(agentsDir) {
+    const results = [];
+    try {
+        const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isFile() && entry.name.endsWith('.md')) {
+                results.push(path.join(agentsDir, entry.name));
+            }
+        }
+    }
+    catch {
+        // Directory doesn't exist or not accessible
+    }
+    return results;
+}
+/**
  * Inventory a v4 BMAD installation by reading install-manifest.yaml
  * and scanning filesystem for orphaned files
  */
@@ -239,10 +258,10 @@ export function inventoryOriginV4(origin) {
                 : `.bmad-${moduleName}`);
         if (!fs.existsSync(moduleDir))
             continue;
-        // Scan agents
+        // Scan agents - only direct children of agents/ directory
         const agentsDir = path.join(moduleDir, 'agents');
         if (fs.existsSync(agentsDir)) {
-            const agentFiles = listFilesRecursive(agentsDir, (p) => p.endsWith('.md'));
+            const agentFiles = listAgentFiles(agentsDir);
             for (const absolutePath of agentFiles) {
                 // Compute path like: .bmad-core/agents/test.md or .bmad-infrastructure-devops/agents/test.md
                 const moduleDirName = moduleName === 'core'

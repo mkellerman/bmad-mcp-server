@@ -67,8 +67,8 @@ export function masterRecordToAgent(
   }
 
   return {
-    // Primary identification
-    name: record.name || '',
+    // Primary identification - prefer parsed name from file over filename
+    name: parsedMetadata.name || record.name || '',
     displayName: parsedMetadata.name || record.displayName || record.name || '',
     title: parsedMetadata.title || record.description || '',
 

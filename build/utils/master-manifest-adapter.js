@@ -53,8 +53,8 @@ export function masterRecordToAgent(record, parseMetadata = true) {
         parsedMetadata = parseAgentMetadata(record.absolutePath);
     }
     return {
-        // Primary identification
-        name: record.name || '',
+        // Primary identification - prefer parsed name from file over filename
+        name: parsedMetadata.name || record.name || '',
         displayName: parsedMetadata.name || record.displayName || record.name || '',
         title: parsedMetadata.title || record.description || '',
         // Module and location info

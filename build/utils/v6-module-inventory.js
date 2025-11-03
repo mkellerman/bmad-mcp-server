@@ -41,6 +41,28 @@ function listFilesRecursive(dir, predicate) {
     }
     return results;
 }
+/**
+ * List agent files directly in the agents/ directory (non-recursive)
+ * Agents must be in the pattern: agents/<agent-name>.md
+ */
+function listAgentFiles(agentsDir) {
+    const results = [];
+    try {
+        const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isFile() && entry.name.endsWith('.md')) {
+                const baseLower = entry.name.toLowerCase();
+                if (!EXCLUDED_AGENT_FILES.includes(baseLower)) {
+                    results.push(path.join(agentsDir, entry.name));
+                }
+            }
+        }
+    }
+    catch {
+        // Directory doesn't exist or not accessible
+    }
+    return results;
+}
 function listWorkflowFiles(workflowsDir) {
     const results = [];
     try {
@@ -194,8 +216,8 @@ export function inventoryOriginV6(origin) {
             };
             taskRecords.push(rec);
         }
-        // FS scan
-        const agentFiles = listFilesRecursive(path.join(modulePath, 'agents'), (p) => p.endsWith('.md'));
+        // FS scan - agents must be directly in agents/ directory (non-recursive)
+        const agentFiles = listAgentFiles(path.join(modulePath, 'agents'));
         const workflowFiles = listWorkflowFiles(path.join(modulePath, 'workflows'));
         const taskFiles = listFilesRecursive(path.join(modulePath, 'tasks'), (p) => p.endsWith('.md') || p.endsWith('.xml'));
         // Agents from manifest (priority source - always include)
