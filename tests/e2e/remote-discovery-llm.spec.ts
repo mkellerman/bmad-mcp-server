@@ -228,11 +228,16 @@ describe('Remote Discovery LLM Integration', () => {
 
     console.log('Command parameter description:', commandDescription);
 
-    // Check for key pass-through instructions
-    expect(commandDescription.toLowerCase()).toContain('complete');
-    expect(commandDescription.toLowerCase()).toContain('verbatim');
+    // Check for CRITICAL pass-through instructions
+    expect(commandDescription).toContain('CRITICAL');
+    expect(commandDescription).toContain('ZERO modifications');
+    expect(commandDescription).toContain('Do NOT remove @ symbols');
+    expect(commandDescription).toContain('do NOT strip remote references');
     expect(commandDescription).toContain('*list-agents @awesome');
+    expect(commandDescription).toContain('*list-modules @myorg');
 
-    console.log('✅ Tool description includes pass-through instructions');
+    console.log(
+      '✅ Tool description includes CRITICAL pass-through instructions',
+    );
   });
 });

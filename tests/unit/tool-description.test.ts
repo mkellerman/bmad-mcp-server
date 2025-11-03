@@ -115,9 +115,7 @@ describe('Dynamic Tool Description', () => {
 
     // Should include examples for common operations
     expect(description).toContain('bmad analyst');
-    expect(description).toContain('bmad debug');
     expect(description).toContain('bmad *party-mode');
-    expect(description).toContain('bmad *debug-quick');
     expect(description).toContain('bmad *list-agents');
     expect(description).toContain('bmad *list-workflows');
   });

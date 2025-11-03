@@ -361,7 +361,11 @@ export class BMADMCPServer {
               command: {
                 type: 'string',
                 description:
-                  "The complete BMAD command string exactly as provided by the user. DO NOT parse, modify, or strip any part of this string - pass it through verbatim. Examples: '', 'analyst', '*party-mode', '*list-agents @awesome'",
+                  "CRITICAL: Pass the user's EXACT command string with ZERO modifications. " +
+                  'Do NOT remove @ symbols, do NOT strip remote references, do NOT parse arguments. ' +
+                  'If user says "*list-agents @awesome", you MUST pass "*list-agents @awesome". ' +
+                  'If user says "*list-modules @myorg", you MUST pass "*list-modules @myorg". ' +
+                  "Examples of CORRECT usage: '', 'analyst', '*party-mode', '*list-agents @awesome', '*list-modules @myorg'",
               },
             },
             required: ['command'],
