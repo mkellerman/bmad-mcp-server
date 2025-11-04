@@ -27,11 +27,24 @@ export interface CLIConfig {
   rawArgs: string[];
 }
 
+/**
+ * Instructions injected when loading agents and workflows.
+ * These provide the LLM with guidance on how to process and adopt agent personas
+ * and execute workflows according to BMAD methodology.
+ */
+export interface InstructionsConfig {
+  /** Instructions appended to agent content when loading agents */
+  agent: string;
+  /** Instructions appended to workflow content when executing workflows */
+  workflow: string;
+}
+
 export interface BMADConfig {
   discovery: DiscoveryConfig;
   git: GitConfig;
   logging: LoggingConfig;
   cli: CLIConfig;
+  instructions: InstructionsConfig;
 }
 
 function toBool(value: string | undefined, defaultValue: boolean): boolean {
@@ -104,6 +117,48 @@ export function loadConfig(options?: {
 
   const remotes = argv.filter((a) => a.startsWith('--remote='));
 
+  // Agent instructions - appended to all loaded agents
+  // Modify these to change how the LLM processes agent personas
+  const agentInstructions = [
+    '## Agent Instructions',
+    '',
+    '1. Read the agent definition markdown to understand role, identity, and principles',
+    '2. Apply the communication style specified in the agent definition',
+    '3. Follow activation rules and command handling as defined in the agent XML/markdown',
+    '',
+    '## Default Configuration (config.yaml)',
+    '',
+    '- user_name: User',
+    '- communication_language: English',
+    '- output_folder: ./docs',
+    '',
+  ].join('\n');
+
+  // Workflow instructions - appended to all executed workflows
+  // Modify these to change how the LLM processes workflow definitions
+  const workflowInstructions = [
+    '## Execution Instructions',
+    '',
+    'Process this workflow according to BMAD workflow execution methodology:',
+    '',
+    '1. **Read the complete workflow.yaml configuration**',
+    '2. **IMPORTANT - MCP Resource Resolution:**',
+    '   - All `{mcp-resources}` placeholders refer to the MCP server installation',
+    "   - DO NOT search the user's workspace for manifest files or agent data",
+    '   - USE the Agent Roster JSON provided in the Workflow Context section above',
+    '   - The MCP server has already resolved all paths and loaded all necessary data',
+    '3. **Resolve variables:** Replace any `{{variables}}` with user input or defaults',
+    '4. **Follow instructions:** Execute steps in exact order as defined',
+    '5. **Generate content:** Process `<template-output>` sections as needed',
+    '6. **Request input:** Use `<elicit-required>` sections to gather additional user input',
+    '',
+    '**CRITICAL:** The Agent Roster JSON in the Workflow Context contains all agent metadata',
+    'from the MCP server. Use this data directly - do not attempt to read files from the',
+    "user's workspace.",
+    '',
+    'Begin workflow execution now.',
+  ].join('\n');
+
   return {
     discovery: {
       mode,
@@ -125,6 +180,10 @@ export function loadConfig(options?: {
       modeArg,
       remotes,
       rawArgs: argv,
+    },
+    instructions: {
+      agent: agentInstructions,
+      workflow: workflowInstructions,
     },
   };
 }

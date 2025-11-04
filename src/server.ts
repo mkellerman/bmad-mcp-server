@@ -25,6 +25,7 @@ import {
   type BmadPathResolution,
 } from './utils/bmad-path-resolver.js';
 import { UnifiedBMADTool, buildToolDescription } from './tools/index.js';
+import { getWorkflowInstructions } from './tools/common/workflow-instructions.js';
 import { MasterManifestService } from './services/master-manifest-service.js';
 import { convertAgents } from './utils/master-manifest-adapter.js';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
@@ -499,26 +500,7 @@ export class BMADMCPServer {
         }
 
         // Add execution guidance
-        responseParts.push(`## Execution Instructions
-
-Process this workflow according to BMAD workflow execution methodology:
-
-1. **Read the complete workflow.yaml configuration**
-2. **IMPORTANT - MCP Resource Resolution:**
-   - All \`{mcp-resources}\` placeholders refer to the MCP server installation
-   - DO NOT search the user's workspace for manifest files or agent data
-   - USE the Agent Roster JSON provided in the Workflow Context section above
-   - The MCP server has already resolved all paths and loaded all necessary data
-3. **Resolve variables:** Replace any \`{{variables}}\` with user input or defaults
-4. **Follow instructions:** Execute steps in exact order as defined
-5. **Generate content:** Process \`<template-output>\` sections as needed
-6. **Request input:** Use \`<elicit-required>\` sections to gather additional user input
-
-**CRITICAL:** The Agent Roster JSON in the Workflow Context contains all agent metadata 
-from the MCP server. Use this data directly - do not attempt to read files from the 
-user's workspace.
-
-Begin workflow execution now.`);
+        responseParts.push(getWorkflowInstructions());
 
         return {
           content: [
