@@ -5,7 +5,6 @@
       "args": [
         "${workspaceFolder}/build/index.js",
         "git+https://github.com/bmad-code-org/BMAD-METHOD#main:/bmad",
-        "git+https://github.com/mkellerman/awesome-bmad-agents#main:/modules/bmad-bmm-v6",
         "git+https://github.com/mkellerman/awesome-bmad-agents#main:/agents/debug-diana-v6",
         "--mode=strict"
       ]

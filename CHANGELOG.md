@@ -1,21 +1,54 @@
-# [2.0.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.2.0...v2.0.0) (2025-11-03)
-
-
-### Bug Fixes
-
-* **docs:** update config source paths in workflow instructions to use bmb directory [skip ci] ([d09917a](https://github.com/mkellerman/bmad-mcp-server/commit/d09917a5dab37637cac703c1bf6f6f48e357ffc5))
-* **tests:** add null safety to afterAll cleanup in LLM tests ([68a4654](https://github.com/mkellerman/bmad-mcp-server/commit/68a46540a7bd1ec8d99fc70346e36f499888f1fb))
-* **tests:** skip LLM tests in CI environment ([34b994c](https://github.com/mkellerman/bmad-mcp-server/commit/34b994cd35dc9e7305606805c189583286d17ee2))
-
+# [2.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v2.0.0...v2.1.0) (2025-11-03)
 
 ### Features
 
-* **testing:** add comprehensive E2E testing framework with LLM integration ([cb7c3e6](https://github.com/mkellerman/bmad-mcp-server/commit/cb7c3e62f9d855476aeef921501b04fffdd1c83a))
+- **config:** centralize instructions configuration for agents and workflows ([#17](https://github.com/mkellerman/bmad-mcp-server/pull/17))
+  - New `InstructionsConfig` interface in `src/config.ts`
+  - Agent instructions loaded from config instead of hardcoded
+  - Workflow instructions extracted to reusable helper function
+  - Enables customization of LLM processing instructions
 
+- **list:** always use module-qualified names in \*list-agents output ([#17](https://github.com/mkellerman/bmad-mcp-server/pull/17))
+  - Consistent display format: `module/agent-name`
+  - Prevents ambiguity when multiple modules have same agent names
+  - Improves discoverability and reduces confusion
+
+### Bug Fixes
+
+- **cache:** simplify git cache key to avoid stale cache issues ([#17](https://github.com/mkellerman/bmad-mcp-server/pull/17))
+  - Cache key now: `host-org-repo-ref` (removed URL hash)
+  - Subpath changes don't invalidate cache (full repo is cloned)
+  - More predictable cache behavior
+
+- **manifest:** deduplicate master manifest records by absolute path ([#17](https://github.com/mkellerman/bmad-mcp-server/pull/17))
+  - Prevents duplicate agents/workflows in master manifest
+  - Uses Map-based deduplication (like PowerShell hashtable)
+  - First occurrence by priority wins
+
+### Code Quality
+
+- **refactor:** extract workflow instructions to reusable utility ([#17](https://github.com/mkellerman/bmad-mcp-server/pull/17))
+  - New `getWorkflowInstructions()` helper
+  - Reduces code duplication
+  - Consistent with agent instructions pattern
+
+---
+
+# [2.0.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.2.0...v2.0.0) (2025-11-03)
+
+### Bug Fixes
+
+- **docs:** update config source paths in workflow instructions to use bmb directory [skip ci] ([d09917a](https://github.com/mkellerman/bmad-mcp-server/commit/d09917a5dab37637cac703c1bf6f6f48e357ffc5))
+- **tests:** add null safety to afterAll cleanup in LLM tests ([68a4654](https://github.com/mkellerman/bmad-mcp-server/commit/68a46540a7bd1ec8d99fc70346e36f499888f1fb))
+- **tests:** skip LLM tests in CI environment ([34b994c](https://github.com/mkellerman/bmad-mcp-server/commit/34b994cd35dc9e7305606805c189583286d17ee2))
+
+### Features
+
+- **testing:** add comprehensive E2E testing framework with LLM integration ([cb7c3e6](https://github.com/mkellerman/bmad-mcp-server/commit/cb7c3e62f9d855476aeef921501b04fffdd1c83a))
 
 ### BREAKING CHANGES
 
-* **testing:** None - backward compatible feature addition
+- **testing:** None - backward compatible feature addition
 
 # [1.3.0](https://github.com/mkellerman/bmad-mcp-server/compare/v1.2.0...v1.3.0) (2025-11-03)
 

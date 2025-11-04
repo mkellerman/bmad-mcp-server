@@ -97,12 +97,9 @@ export class GitSourceResolver {
    */
   async resolve(gitUrl: string): Promise<string> {
     const spec = this.parseGitUrl(gitUrl);
-    const urlHash = crypto
-      .createHash('sha256')
-      .update(gitUrl)
-      .digest('hex')
-      .substring(0, 16);
-    const cacheKey = `${spec.host}-${spec.org}-${spec.repo}-${spec.ref}-${urlHash}`;
+    // Simplified cache key without URL hash - just host-org-repo-ref
+    // This ensures consistent paths and avoids stale cache issues
+    const cacheKey = `${spec.host}-${spec.org}-${spec.repo}-${spec.ref}`;
     const cachePath = path.join(this.cacheDir, cacheKey);
 
     logger.info(`Resolving Git source: ${gitUrl}`);
@@ -194,6 +191,9 @@ export class GitSourceResolver {
 
   /**
    * Validate cache against current URL and spec
+   *
+   * Cache is valid if ref (branch/tag) matches.
+   * Subpath changes don't invalidate the cache since we clone the full repo.
    */
   private isValidCache(
     metadata: CacheMetadata | null,
@@ -202,12 +202,9 @@ export class GitSourceResolver {
   ): boolean {
     if (!metadata) return false;
 
-    // Validate: same URL hash, branch, and subpath
-    return (
-      metadata.sourceUrl === gitUrl &&
-      metadata.ref === spec.ref &&
-      metadata.subpath === (spec.subpath || '')
-    );
+    // Only validate ref (branch/tag) matches
+    // Subpath is applied after cache resolution, so changes don't invalidate cache
+    return metadata.ref === spec.ref;
   }
 
   /**

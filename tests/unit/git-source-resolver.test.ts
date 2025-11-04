@@ -171,11 +171,11 @@ describe('GitSourceResolver', () => {
       const spec1 = (resolver as any).parseGitUrl(url1);
       const spec2 = (resolver as any).parseGitUrl(url2);
 
-      // Cache keys should differ because of URL hash
+      // Cache keys differ because of branch ref
       expect(spec1.ref).not.toBe(spec2.ref);
     });
 
-    it('should generate different cache keys for different subpaths', () => {
+    it('should parse different subpaths correctly', () => {
       const resolver = new GitSourceResolver();
 
       const url1 = 'git+https://github.com/org/repo.git#main:/bmad';
@@ -184,6 +184,7 @@ describe('GitSourceResolver', () => {
       const spec1 = (resolver as any).parseGitUrl(url1);
       const spec2 = (resolver as any).parseGitUrl(url2);
 
+      // Subpaths are different but cache key is the same (full repo is cached)
       expect(spec1.subpath).not.toBe(spec2.subpath);
     });
   });
@@ -207,7 +208,7 @@ describe('GitSourceResolver', () => {
       expect(isValid).toBe(true);
     });
 
-    it('should invalidate cache with different URL', () => {
+    it('should invalidate cache with different branch', () => {
       const resolver = new GitSourceResolver();
       const gitUrl = 'git+https://github.com/org/repo.git#main:/bmad';
       const spec = (resolver as any).parseGitUrl(gitUrl);
@@ -215,35 +216,17 @@ describe('GitSourceResolver', () => {
       const metadata = {
         sourceUrl: 'git+https://github.com/org/repo.git#develop:/bmad',
         hash: 'abc123',
-        ref: 'develop',
+        ref: 'develop', // Different branch
         subpath: 'bmad',
         lastPull: new Date().toISOString(),
-        currentCommit: 'def456',
+        currentCommit: 'abc456',
       };
 
       const isValid = (resolver as any).isValidCache(metadata, gitUrl, spec);
       expect(isValid).toBe(false);
     });
 
-    it('should invalidate cache with different branch', () => {
-      const resolver = new GitSourceResolver();
-      const gitUrl = 'git+https://github.com/org/repo.git#main:/bmad';
-      const spec = (resolver as any).parseGitUrl(gitUrl);
-
-      const metadata = {
-        sourceUrl: gitUrl,
-        hash: 'abc123',
-        ref: 'develop',
-        subpath: 'bmad',
-        lastPull: new Date().toISOString(),
-        currentCommit: 'def456',
-      };
-
-      const isValid = (resolver as any).isValidCache(metadata, gitUrl, spec);
-      expect(isValid).toBe(false);
-    });
-
-    it('should invalidate cache with different subpath', () => {
+    it('should NOT invalidate cache with different subpath (subpath applied after cache)', () => {
       const resolver = new GitSourceResolver();
       const gitUrl = 'git+https://github.com/org/repo.git#main:/bmad';
       const spec = (resolver as any).parseGitUrl(gitUrl);
@@ -252,13 +235,14 @@ describe('GitSourceResolver', () => {
         sourceUrl: gitUrl,
         hash: 'abc123',
         ref: 'main',
-        subpath: 'packages/bmad',
+        subpath: 'packages/bmad', // Different subpath
         lastPull: new Date().toISOString(),
         currentCommit: 'def456',
       };
 
+      // Subpath changes don't invalidate cache since we clone the full repo
       const isValid = (resolver as any).isValidCache(metadata, gitUrl, spec);
-      expect(isValid).toBe(false);
+      expect(isValid).toBe(true); // Changed from false to true
     });
 
     it('should invalidate cache with null metadata', () => {

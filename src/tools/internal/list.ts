@@ -172,25 +172,14 @@ export async function handleListCommand(
       const role = agent.role || '';
       const module = agent.module || '';
 
-      // Determine load command - use module prefix for collisions
+      // Determine load command - always use module prefix when module exists for consistency
       let loadCommand = name;
       const nameCount = seenNames.get(name) || 0;
       seenNames.set(name, nameCount + 1);
 
-      // If duplicate name, use module-qualified form
-      if (
-        nameCount > 0 ||
-        parsedAgents.filter((a: any) => {
-          const aRecord = allAgentRecords.find(
-            (r: MasterRecord) => r.absolutePath === a.path,
-          );
-          const aName = (aRecord?.name || a.name || '')
-            .toString()
-            .toLowerCase();
-          return aName === name;
-        }).length > 1
-      ) {
-        loadCommand = module ? `${module}/${name}` : name;
+      // Always use module-qualified form when module exists
+      if (module) {
+        loadCommand = `${module}/${name}`;
       }
 
       agents.push({
