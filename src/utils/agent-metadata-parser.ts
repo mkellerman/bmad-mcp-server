@@ -132,6 +132,30 @@ function parseV4YamlFormat(content: string): AgentMetadata {
 }
 
 /**
+ * Parse YAML frontmatter format (--- ... ---)
+ * Used in simple agent files with frontmatter metadata
+ */
+function parseFrontmatter(content: string): AgentMetadata {
+  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!frontmatterMatch) return {};
+
+  const yaml = frontmatterMatch[1];
+
+  // Extract basic fields from frontmatter
+  const name = extractYamlField(yaml, 'name');
+  const title = extractYamlField(yaml, 'title');
+  const icon = extractYamlField(yaml, 'icon');
+  const role = extractYamlField(yaml, 'role');
+
+  return {
+    name,
+    title,
+    icon,
+    role,
+  };
+}
+
+/**
  * Parse agent metadata from an agent .md file.
  *
  * Supports both v6 (XML) and v4 (YAML) formats.
@@ -154,7 +178,15 @@ export function parseAgentMetadata(filePath: string): AgentMetadata {
 
     const content = fs.readFileSync(filePath, 'utf-8');
 
-    // Try v6 XML format first
+    // Try frontmatter format first (--- ... ---)
+    if (content.startsWith('---')) {
+      const metadata = parseFrontmatter(content);
+      if (metadata.name || metadata.title) {
+        return metadata;
+      }
+    }
+
+    // Try v6 XML format
     if (content.includes('```xml')) {
       return parseV6XmlFormat(content);
     }
@@ -164,7 +196,9 @@ export function parseAgentMetadata(filePath: string): AgentMetadata {
       return parseV4YamlFormat(content);
     }
 
-    logger.warn(`No recognized format (XML or YAML) found in: ${filePath}`);
+    logger.warn(
+      `No recognized format (XML, YAML, or frontmatter) found in: ${filePath}`,
+    );
     return {};
   } catch (error) {
     logger.warn(`Failed to parse agent metadata from ${filePath}:`, error);

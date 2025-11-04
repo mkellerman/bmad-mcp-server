@@ -7,7 +7,7 @@ lerna-debug.log*
 .pnpm-debug.log*
 
 # Build output
-# build/ - Commented out to allow git installations via npx
+build/
 dist/
 *.tsbuildinfo
 
@@ -89,3 +89,4 @@ pyproject.toml
 test-results/
 playwright-report/
 master-manifest.json
+bin/graph

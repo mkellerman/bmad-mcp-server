@@ -282,10 +282,12 @@ export class UnifiedBMADTool {
     // Handle disambiguation cases with numbered options
     if (validation.requiresDisambiguation && validation.disambiguationOptions) {
       const lines: string[] = [];
+      lines.push('<instructions>\n');
       lines.push(
-        '**INSTRUCTIONS: Display the content below to the user EXACTLY as written. Do not summarize or paraphrase.**\n',
+        'You are helping the user select from multiple matching agents in the BMAD system. Display the content in the <content> tags below EXACTLY as written to help them make their selection.\n',
       );
-      lines.push('---\n');
+      lines.push('</instructions>\n\n');
+      lines.push('<content>\n');
       lines.push(`# 🤔 Multiple Agents Found\n`);
       lines.push(
         `Multiple agents found with the same name. Please select which one you want to load:\n`,
@@ -308,7 +310,7 @@ export class UnifiedBMADTool {
       lines.push(
         `\n💡 **Tip:** You can avoid this prompt by using module-qualified names from the start!`,
       );
-      lines.push('\n---');
+      lines.push('</content>');
 
       return {
         success: false,

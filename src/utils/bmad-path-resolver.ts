@@ -33,6 +33,9 @@ export interface ResolveBmadPathsOptions {
   envVar?: string;
   userBmadPath?: string;
   mode?: DiscoveryMode;
+  rootSearchMaxDepth?: number;
+  includeUserBmad?: boolean;
+  excludeDirs?: string[];
 }
 
 const PRIORITY_ORDER: BmadLocationSource[] = ['project', 'cli', 'env', 'user'];
@@ -63,31 +66,17 @@ export function resolveBmadPaths(
 /**
  * Strict mode: Use exact paths only, no discovery
  * Only considers CLI arguments, fails if none provided or invalid
+ * Note: Empty cliArgs can occur when git sources fail to resolve - this is allowed
  */
 function resolveStrictPaths(
   options: ResolveBmadPathsOptions,
 ): BmadPathResolution {
   const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
 
-  if (!options.cliArgs || options.cliArgs.length === 0) {
-    const errorMessage = [
-      '╭─────────────────────────────────────────────────────────────╮',
-      '│ ⚠️  BMAD Strict Mode: No Paths Provided                    │',
-      '├─────────────────────────────────────────────────────────────┤',
-      '│                                                             │',
-      '│ Strict mode requires explicit CLI arguments.               │',
-      '│                                                             │',
-      '│ 🔧 Provide BMAD path(s):                                    │',
-      '│    node build/index.js /path/to/bmad                       │',
-      '│                                                             │',
-      '│ Or switch to auto mode:                                     │',
-      '│    node build/index.js --mode=auto                         │',
-      '│    export BMAD_DISCOVERY_MODE=auto                         │',
-      '│                                                             │',
-      '╰─────────────────────────────────────────────────────────────╯',
-    ].join('\n');
-
-    throw new Error(errorMessage);
+  // Allow empty cliArgs in strict mode (can happen when git sources fail)
+  // The server will still start, just with no BMAD installations loaded
+  if (!options.cliArgs) {
+    options.cliArgs = [];
   }
 
   // In strict mode, only check CLI arguments - no recursion, no fallbacks
@@ -165,34 +154,28 @@ function resolveStrictPaths(
       (loc.manifestDir || loc.manifestPath || loc.version === 'unknown'),
   );
 
+  // If no valid installation found, return a fallback configuration
+  // This allows the server to start even when all sources fail
   if (!activeLocation) {
-    const errorMessage = [
-      '╭─────────────────────────────────────────────────────────────╮',
-      '│ ⚠️  BMAD Strict Mode: No Valid Installation Found          │',
-      '├─────────────────────────────────────────────────────────────┤',
-      '│                                                             │',
-      '│ All provided paths are invalid.                            │',
-      '│                                                             │',
-      '│ Strict mode requirements:                                   │',
-      '│  • Path must exist and be a directory                      │',
-      '│  • Path must contain BMAD installation directly            │',
-      '│  • v6: Must have bmad/_cfg/manifest.yaml                   │',
-      '│  • v4: Must have install-manifest.yaml                     │',
-      '│                                                             │',
-      '│ Checked paths:                                              │',
-      ...candidates.map((location) => {
-        const pathStr = location.originalPath || '(not provided)';
-        const detailStr = location.details || location.status;
-        return [
-          `│   ✗ ${pathStr.padEnd(57)}│`,
-          `│     → ${detailStr.padEnd(55)}│`,
-        ].join('\n');
-      }),
-      '│                                                             │',
-      '╰─────────────────────────────────────────────────────────────╯',
-    ].join('\n');
+    // Create a fallback location
+    const fallbackLocation: BmadLocationInfo = {
+      source: 'user',
+      priority: 4,
+      displayName: 'No installation',
+      status: 'not-found',
+      details:
+        candidates.length > 0
+          ? 'All provided paths failed to load'
+          : 'No BMAD sources configured',
+    };
 
-    throw new Error(errorMessage);
+    return {
+      activeLocation: fallbackLocation,
+      activeLocations: [],
+      locations: candidates.length > 0 ? candidates : [fallbackLocation],
+      userBmadPath,
+      projectRoot: options.cwd,
+    };
   }
 
   // Collect all valid CLI locations for multi-root support
@@ -218,12 +201,39 @@ function resolveAutoPaths(
   options: ResolveBmadPathsOptions,
 ): BmadPathResolution {
   const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
+  const maxDepth = options.rootSearchMaxDepth ?? 3;
+  const includeUserBmad = options.includeUserBmad ?? true;
+  const excludeDirs = options.excludeDirs;
 
   const candidates: BmadLocationInfo[] = [
-    ...buildCandidate('project', 'Local project', options.cwd),
-    ...buildCandidate('env', 'BMAD_ROOT environment variable', options.envVar),
-    ...buildCandidate('user', 'User defaults (~/.bmad)', userBmadPath),
+    ...buildCandidate(
+      'project',
+      'Local project',
+      options.cwd,
+      maxDepth,
+      excludeDirs,
+    ),
+    ...buildCandidate(
+      'env',
+      'BMAD_ROOT environment variable',
+      options.envVar,
+      maxDepth,
+      excludeDirs,
+    ),
   ];
+
+  // Conditionally add user BMAD path
+  if (includeUserBmad) {
+    candidates.push(
+      ...buildCandidate(
+        'user',
+        'User defaults (~/.bmad)',
+        userBmadPath,
+        maxDepth,
+        excludeDirs,
+      ),
+    );
+  }
 
   // Add all CLI arguments as candidates with priority based on order
   if (options.cliArgs && options.cliArgs.length > 0) {
@@ -232,6 +242,8 @@ function resolveAutoPaths(
         'cli',
         `CLI argument #${index + 1}`,
         cliArg,
+        maxDepth,
+        excludeDirs,
       );
       // Insert CLI candidates at the beginning (highest priority)
       candidates.splice(index + 1, 0, ...cliCandidates);
@@ -316,7 +328,11 @@ function resolveAutoPaths(
  * Resolve manifests for an individual candidate path.
  * Returns an array since one path may contain multiple BMAD installations.
  */
-function resolveCandidate(candidate?: string): BmadLocationInfo[] {
+function resolveCandidate(
+  candidate?: string,
+  maxDepth?: number,
+  excludeDirs?: string[],
+): BmadLocationInfo[] {
   if (!candidate) {
     return [];
   }
@@ -343,7 +359,10 @@ function resolveCandidate(candidate?: string): BmadLocationInfo[] {
   }
 
   // Search for BMAD installations recursively
-  const foundRoots = findBmadRootsRecursive(resolvedPath);
+  const foundRoots = findBmadRootsRecursive(resolvedPath, {
+    maxDepth: maxDepth ?? 3,
+    excludeDirs,
+  });
 
   if (foundRoots.length === 0) {
     // No BMAD installations found - return as valid directory but no manifests
@@ -496,6 +515,8 @@ function buildCandidate(
   source: BmadLocationSource,
   displayName: string,
   candidatePath?: string,
+  maxDepth?: number,
+  excludeDirs?: string[],
 ): BmadLocationInfo[] {
   if (!candidatePath) {
     return [
@@ -509,7 +530,11 @@ function buildCandidate(
     ];
   }
 
-  const resolvedLocations = resolveCandidate(candidatePath);
+  const resolvedLocations = resolveCandidate(
+    candidatePath,
+    maxDepth,
+    excludeDirs,
+  );
 
   // Enrich each location with source metadata
   return resolvedLocations.map((location, index) => {

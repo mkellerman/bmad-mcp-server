@@ -55,10 +55,12 @@ export interface CacheMetadata {
  */
 export class GitSourceResolver {
   private cacheDir: string;
+  private autoUpdate: boolean;
 
-  constructor(cacheDir?: string) {
+  constructor(cacheDir?: string, autoUpdate: boolean = true) {
     this.cacheDir =
       cacheDir || path.join(os.homedir(), '.bmad', 'cache', 'git');
+    this.autoUpdate = autoUpdate;
   }
 
   /**
@@ -95,12 +97,9 @@ export class GitSourceResolver {
    */
   async resolve(gitUrl: string): Promise<string> {
     const spec = this.parseGitUrl(gitUrl);
-    const urlHash = crypto
-      .createHash('sha256')
-      .update(gitUrl)
-      .digest('hex')
-      .substring(0, 16);
-    const cacheKey = `${spec.host}-${spec.org}-${spec.repo}-${spec.ref}-${urlHash}`;
+    // Simplified cache key without URL hash - just host-org-repo-ref
+    // This ensures consistent paths and avoids stale cache issues
+    const cacheKey = `${spec.host}-${spec.org}-${spec.repo}-${spec.ref}`;
     const cachePath = path.join(this.cacheDir, cacheKey);
 
     logger.info(`Resolving Git source: ${gitUrl}`);
@@ -111,11 +110,19 @@ export class GitSourceResolver {
       const metadata = await this.loadMetadata(cachePath);
 
       if (this.isValidCache(metadata, gitUrl, spec)) {
-        // Cache exists and URL matches → PULL LATEST
-        logger.info(
-          `Updating cached repo: ${spec.org}/${spec.repo}#${spec.ref}`,
-        );
-        await this.updateRepository(spec, cachePath, gitUrl);
+        // Cache exists and URL matches
+        if (this.autoUpdate) {
+          // Auto-update enabled → PULL LATEST
+          logger.info(
+            `Updating cached repo: ${spec.org}/${spec.repo}#${spec.ref}`,
+          );
+          await this.updateRepository(spec, cachePath, gitUrl);
+        } else {
+          // Auto-update disabled → USE CACHED VERSION
+          logger.info(
+            `Using cached repo (auto-update disabled): ${spec.org}/${spec.repo}#${spec.ref}`,
+          );
+        }
       } else {
         // URL changed (different subpath/branch) → DELETE & RECLONE
         logger.warn(
@@ -184,6 +191,9 @@ export class GitSourceResolver {
 
   /**
    * Validate cache against current URL and spec
+   *
+   * Cache is valid if ref (branch/tag) matches.
+   * Subpath changes don't invalidate the cache since we clone the full repo.
    */
   private isValidCache(
     metadata: CacheMetadata | null,
@@ -192,12 +202,9 @@ export class GitSourceResolver {
   ): boolean {
     if (!metadata) return false;
 
-    // Validate: same URL hash, branch, and subpath
-    return (
-      metadata.sourceUrl === gitUrl &&
-      metadata.ref === spec.ref &&
-      metadata.subpath === (spec.subpath || '')
-    );
+    // Only validate ref (branch/tag) matches
+    // Subpath is applied after cache resolution, so changes don't invalidate cache
+    return metadata.ref === spec.ref;
   }
 
   /**

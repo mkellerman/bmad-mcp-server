@@ -12,7 +12,7 @@ import { GitSourceResolver } from './git-source-resolver.js';
 import type { RemoteRegistry } from './remote-registry.js';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import * as yaml from 'js-yaml';
 import type { BMADToolResult, MasterRecord } from '../types/index.js';
 import { getAgentInstructions } from '../tools/common/agent-instructions.js';
 
@@ -168,8 +168,7 @@ export function parseAgentFrontmatter(
   const yamlContent = lines.slice(1, endIndex + 1).join('\n');
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const parsed = parseYaml(yamlContent);
+    const parsed = yaml.load(yamlContent);
     return typeof parsed === 'object' && parsed !== null
       ? (parsed as Record<string, unknown>)
       : {};

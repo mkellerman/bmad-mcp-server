@@ -48,18 +48,26 @@ export function masterRecordToAgent(
   // Only parse agent file if we don't already have description/role from manifest
   // and the file exists
   let parsedMetadata: ReturnType<typeof parseAgentMetadata> = {};
-  const needsParsing =
-    parseMetadata &&
-    record.exists &&
+
+  // Skip parsing for files that are clearly not agent definitions:
+  // - workflow instructions (workflows/*/instructions.md)
+  // - knowledge base files (knowledge/*.md)
+  // - tasks (tasks/*.md)
+  const isLikelyAgentFile =
     record.absolutePath &&
-    !record.description; // If manifest has description, skip parsing
+    !record.absolutePath.includes('/workflows/') &&
+    !record.absolutePath.includes('/knowledge/') &&
+    !record.absolutePath.includes('/tasks/');
+
+  const needsParsing =
+    parseMetadata && record.exists && isLikelyAgentFile && !record.description; // If manifest has description, skip parsing
 
   if (needsParsing) {
     parsedMetadata = parseAgentMetadata(record.absolutePath);
   }
 
   return {
-    // Primary identification
+    // Primary identification - filename is authoritative source for agent name
     name: record.name || '',
     displayName: parsedMetadata.name || record.displayName || record.name || '',
     title: parsedMetadata.title || record.description || '',

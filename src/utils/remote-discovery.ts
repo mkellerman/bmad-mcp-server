@@ -12,7 +12,11 @@ import { GitSourceResolver } from './git-source-resolver.js';
 import { RemoteRegistry } from './remote-registry.js';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import yaml from 'js-yaml';
+import { buildMasterManifests } from './master-manifest.js';
+import { masterRecordToAgent } from './master-manifest-adapter.js';
+import type { BmadOrigin } from '../types/index.js';
+import { paginationState } from './pagination-state.js';
 
 /**
  * Metadata for a discovered agent
@@ -95,8 +99,8 @@ export function parseAgentMetadata(filePath: string): {
       return null;
     }
 
-    const yaml = frontmatterMatch[1];
-    const metadata = parseYaml(yaml) as Record<string, unknown>;
+    const yamlContent = frontmatterMatch[1];
+    const metadata = yaml.load(yamlContent) as Record<string, unknown>;
 
     return {
       name: typeof metadata.name === 'string' ? metadata.name : undefined,
@@ -116,11 +120,16 @@ export function parseAgentMetadata(filePath: string): {
 }
 
 /**
- * Scan a directory for BMAD agents
+ * Scan a remote repository for BMAD agents
  *
- * Looks for .md files in agents/ directory and parses their metadata.
+ * Supports two structures:
+ * 1. Marketplace/gallery structure:
+ *    - modules/<module-name>/ - v4 style BMAD modules
+ *    - agents/<module-name>/ - v6 style agent modules
+ * 2. Flat structure:
+ *    - agents/*.md - Direct agent files
  *
- * @param repoPath - Path to local repository
+ * @param repoPath - Path to local repository (cloned remote)
  * @param installedAgents - Set of installed agent names for comparison
  * @returns Array of discovered agents
  */
@@ -128,45 +137,111 @@ export function scanAgents(
   repoPath: string,
   installedAgents: Set<string> = new Set(),
 ): DiscoveredAgent[] {
-  const agentsPath = path.join(repoPath, 'agents');
-
-  if (!existsSync(agentsPath)) {
-    return [];
-  }
-
-  const agents: DiscoveredAgent[] = [];
-
   try {
-    const entries = readdirSync(agentsPath);
+    const origins: BmadOrigin[] = [];
+    let priority = 1;
 
-    for (const entry of entries) {
-      const fullPath = path.join(agentsPath, entry);
-      const stat = statSync(fullPath);
+    // Check if agents/ contains subdirectories (marketplace) or files (flat)
+    const agentsDir = path.join(repoPath, 'agents');
+    let isMarketplace = false;
 
-      // Only process .md files
-      if (stat.isFile() && entry.endsWith('.md')) {
-        const metadata = parseAgentMetadata(fullPath);
+    if (existsSync(agentsDir) && statSync(agentsDir).isDirectory()) {
+      const agentEntries = readdirSync(agentsDir, { withFileTypes: true });
+      const hasSubdirs = agentEntries.some(
+        (e) => e.isDirectory() && !e.name.startsWith('.'),
+      );
+      const hasAgentFiles = agentEntries.some(
+        (e) =>
+          e.isFile() &&
+          e.name.endsWith('.md') &&
+          e.name.toLowerCase() !== 'readme.md',
+      );
 
-        // Use filename (without .md) as fallback name
-        const fileName = entry.replace(/\.md$/, '');
-        const agentName = metadata?.name || fileName;
-
-        agents.push({
-          name: agentName,
-          displayName: metadata?.displayName,
-          title: metadata?.title,
-          description: metadata?.description,
-          path: fullPath,
-          installed: installedAgents.has(agentName),
-        });
-      }
+      // If it has subdirectories and no direct .md files, it's a marketplace structure
+      isMarketplace = hasSubdirs && !hasAgentFiles;
     }
-  } catch {
-    // Return empty array if scan fails
+
+    if (isMarketplace) {
+      // Marketplace structure: scan modules/* and agents/* subdirectories
+      const modulesDir = path.join(repoPath, 'modules');
+      if (existsSync(modulesDir) && statSync(modulesDir).isDirectory()) {
+        const moduleEntries = readdirSync(modulesDir, { withFileTypes: true });
+        for (const entry of moduleEntries) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            const modulePath = path.join(modulesDir, entry.name);
+            origins.push({
+              kind: 'cli' as const,
+              root: modulePath,
+              version: 'unknown', // Will be detected by inventory
+              displayName: `modules/${entry.name}`,
+              manifestDir: path.join(modulePath, '_cfg'),
+              priority: priority++,
+            });
+          }
+        }
+      }
+
+      // Scan agents/* subdirectories (v6 style agent modules)
+      const agentEntries = readdirSync(agentsDir, { withFileTypes: true });
+      for (const entry of agentEntries) {
+        if (entry.isDirectory() && !entry.name.startsWith('.')) {
+          const modulePath = path.join(agentsDir, entry.name);
+          origins.push({
+            kind: 'cli' as const,
+            root: modulePath,
+            version: 'unknown', // Will be detected by inventory
+            displayName: `agents/${entry.name}`,
+            manifestDir: path.join(modulePath, '_cfg'),
+            priority: priority++,
+          });
+        }
+      }
+    } else {
+      // Flat structure: treat the repo root as a single BMAD installation
+      origins.push({
+        kind: 'cli' as const,
+        root: repoPath,
+        version: 'unknown',
+        displayName: path.basename(repoPath),
+        manifestDir: path.join(repoPath, '_cfg'),
+        priority: 1,
+      });
+    }
+
+    if (origins.length === 0) {
+      return [];
+    }
+
+    // Build master manifests from all discovered module roots
+    const masterData = buildMasterManifests(origins);
+
+    // Convert master manifest agents to DiscoveredAgent format
+    // Use masterRecordToAgent adapter to parse frontmatter metadata
+    const agents: DiscoveredAgent[] = masterData.agents
+      .filter((record) => record.exists) // Only include existing files
+      .map((record) => {
+        // Parse agent file to get real name and metadata
+        const agentData = masterRecordToAgent(record, true);
+        return {
+          name: agentData.name,
+          displayName: agentData.displayName,
+          title: agentData.title,
+          description: agentData.title, // title is the description in agent files
+          path: record.absolutePath,
+          installed: installedAgents.has(agentData.name),
+        };
+      })
+      .filter((agent) => agent.name); // Remove any entries without names
+
+    return agents.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    // Return empty array if discovery fails
+    console.error(
+      `[remote-discovery] Failed to scan agents in ${repoPath}:`,
+      error,
+    );
     return [];
   }
-
-  return agents.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -182,7 +257,7 @@ function parseModuleManifest(manifestPath: string): {
 } | null {
   try {
     const content = readFileSync(manifestPath, 'utf-8');
-    const manifest = parseYaml(content) as Record<string, unknown>;
+    const manifest = yaml.load(content) as Record<string, unknown>;
 
     return {
       name: typeof manifest.name === 'string' ? manifest.name : undefined,
@@ -394,15 +469,12 @@ export async function discoverModules(
 export function formatAgentList(result: DiscoveryResult): string {
   const lines: string[] = [];
 
-  lines.push(`# Remote Agents: @${result.remote}\n`);
+  lines.push(`# 🌐 Remote Agents: @${result.remote}\n`);
 
   if (result.error) {
     lines.push(`❌ **Error:** ${result.error}\n`);
     return lines.join('\n');
   }
-
-  lines.push(`**Repository:** ${result.url}`);
-  lines.push(`**Local Cache:** \`${result.localPath}\`\n`);
 
   const agents = result.agents || [];
 
@@ -411,34 +483,48 @@ export function formatAgentList(result: DiscoveryResult): string {
     return lines.join('\n');
   }
 
-  lines.push(`**Found ${agents.length} agent(s):**\n`);
+  // Sort agents alphabetically by name
+  const sortedAgents = [...agents].sort((a, b) => a.name.localeCompare(b.name));
 
-  for (const agent of agents) {
+  // Add number to each agent
+  const numberedAgents = sortedAgents.map((agent, idx) => ({
+    ...agent,
+    number: idx + 1,
+  }));
+
+  // Get first page
+  const page = paginationState.getFirstPage(
+    `remote-agents-${result.remote}`,
+    numberedAgents,
+    'agents',
+    result.remote,
+  );
+
+  lines.push(`Showing ${page.start}-${page.end} of ${page.total} agents\n`);
+
+  for (const agentData of page.items) {
+    const agent = agentData as DiscoveredAgent & { number: number };
     const statusIcon = agent.installed ? '✅' : '📦';
-    const status = agent.installed ? 'Installed' : 'Available';
+    const status = agent.installed ? 'installed' : 'available';
 
-    lines.push(`### ${statusIcon} ${agent.name}`);
-
-    if (agent.displayName) {
-      lines.push(`**Display Name:** ${agent.displayName}`);
-    }
-
+    lines.push(
+      `${agent.number}. **${agent.displayName || agent.name}** (${status} ${statusIcon})`,
+    );
     if (agent.title) {
-      lines.push(`**Title:** ${agent.title}`);
+      lines.push(`   ${agent.title}`);
     }
-
-    if (agent.description) {
-      lines.push(`**Description:** ${agent.description}`);
-    }
-
-    lines.push(`**Status:** ${status}`);
-    lines.push(`**Path:** \`${agent.path}\`\n`);
+    lines.push(`   Load: \`bmad @${result.remote}/${agent.name}\``);
+    lines.push('');
   }
 
-  lines.push('\n**Usage:**');
-  lines.push(`\`\`\`
-bmad @${result.remote}:agents/{agent-name}
-\`\`\`\n`);
+  if (page.hasMore) {
+    lines.push('---');
+    lines.push('📄 **More agents available**');
+    lines.push('Type `*more` to see the next page\n');
+  } else {
+    lines.push('---');
+    lines.push('✅ End of list\n');
+  }
 
   return lines.join('\n');
 }
@@ -452,15 +538,12 @@ bmad @${result.remote}:agents/{agent-name}
 export function formatModuleList(result: DiscoveryResult): string {
   const lines: string[] = [];
 
-  lines.push(`# Remote Modules: @${result.remote}\n`);
+  lines.push(`# 🌐 Remote Modules: @${result.remote}\n`);
 
   if (result.error) {
     lines.push(`❌ **Error:** ${result.error}\n`);
     return lines.join('\n');
   }
-
-  lines.push(`**Repository:** ${result.url}`);
-  lines.push(`**Local Cache:** \`${result.localPath}\`\n`);
 
   const modules = result.modules || [];
 
@@ -469,34 +552,50 @@ export function formatModuleList(result: DiscoveryResult): string {
     return lines.join('\n');
   }
 
-  lines.push(`**Found ${modules.length} module(s):**\n`);
+  // Sort modules alphabetically by name
+  const sortedModules = [...modules].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 
-  for (const mod of modules) {
+  // Add number to each module
+  const numberedModules = sortedModules.map((mod, idx) => ({
+    ...mod,
+    number: idx + 1,
+  }));
+
+  // Get first page
+  const page = paginationState.getFirstPage(
+    `remote-modules-${result.remote}`,
+    numberedModules,
+    'modules',
+    result.remote,
+  );
+
+  lines.push(`Showing ${page.start}-${page.end} of ${page.total} modules\n`);
+
+  for (const modData of page.items) {
+    const mod = modData as DiscoveredModule & { number: number };
     const statusIcon = mod.installed ? '✅' : '📦';
-    const status = mod.installed ? 'Installed' : 'Available';
+    const status = mod.installed ? 'installed' : 'available';
 
-    lines.push(`### ${statusIcon} ${mod.name}`);
-
-    if (mod.version) {
-      lines.push(`**Version:** ${mod.version}`);
-    }
-
+    lines.push(`${mod.number}. **${mod.name}** (${status} ${statusIcon})`);
     if (mod.description) {
-      lines.push(`**Description:** ${mod.description}`);
+      lines.push(`   ${mod.description}`);
     }
-
     lines.push(
-      `**Content:** ${mod.agentCount} agents, ${mod.workflowCount} workflows`,
+      `   Content: ${mod.agentCount} agents, ${mod.workflowCount} workflows`,
     );
-    lines.push(`**Status:** ${status}`);
-    lines.push(`**Path:** \`${mod.path}\`\n`);
+    lines.push('');
   }
 
-  lines.push('\n**Usage:**');
-  lines.push(`\`\`\`
-bmad @${result.remote}:agents/{agent-name}
-bmad @${result.remote}:*{workflow-name}
-\`\`\`\n`);
+  if (page.hasMore) {
+    lines.push('---');
+    lines.push('📄 **More modules available**');
+    lines.push('Type `*more` to see the next page\n');
+  } else {
+    lines.push('---');
+    lines.push('✅ End of list\n');
+  }
 
   return lines.join('\n');
 }

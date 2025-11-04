@@ -17,7 +17,15 @@ export class MasterManifestService {
     const origins = originsFromResolution(this.discovery);
 
     if (origins.length === 0) {
-      throw new Error('No valid BMAD origins available');
+      // Return empty manifests when no BMAD installations are available
+      // This allows the server to run in remote-only mode
+      this.cache = {
+        agents: [],
+        workflows: [],
+        tasks: [],
+        modules: [],
+      };
+      return this.cache;
     }
 
     this.cache = buildMasterManifests(origins);

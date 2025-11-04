@@ -17,6 +17,7 @@ export interface FoundBmadRoot {
 interface SearchOptions {
   maxDepth?: number; // Maximum depth to search (default: 3)
   currentDepth?: number; // Internal: current recursion depth
+  excludeDirs?: string[]; // Directories to exclude from search
 }
 
 /**
@@ -24,9 +25,18 @@ interface SearchOptions {
  * Returns true if the directory name:
  * - Contains 'bmad' (case-insensitive), OR
  * - Exactly matches 'agents', 'workflows', 'tasks', or '_cfg'
+ * - Is NOT in the exclude list
  */
-function shouldSearchDirectory(dirName: string): boolean {
+function shouldSearchDirectory(
+  dirName: string,
+  excludeDirs?: string[],
+): boolean {
   const lowerName = dirName.toLowerCase();
+
+  // Check exclude list first
+  if (excludeDirs && excludeDirs.includes(dirName)) {
+    return false;
+  }
 
   // Check if contains 'bmad'
   if (lowerName.includes('bmad')) return true;
@@ -142,6 +152,15 @@ export function findBmadRootsRecursive(
 ): FoundBmadRoot[] {
   const maxDepth = options.maxDepth ?? 3;
   const currentDepth = options.currentDepth ?? 0;
+  const excludeDirs = options.excludeDirs ?? [
+    '.git',
+    'git',
+    'node_modules',
+    'cache',
+    'build',
+    'dist',
+    'bin',
+  ];
   const results: FoundBmadRoot[] = [];
 
   try {
@@ -208,7 +227,42 @@ export function findBmadRootsRecursive(
       logger.debug(`${indent}[bmad-finder]   - No manifest (custom)`);
       customRoot.depth = currentDepth;
       results.push(customRoot);
-      // Don't recurse into custom installations either
+
+      // For custom roots, continue searching in agents/ and modules/ subdirectories
+      // to find nested BMAD modules (common in registry/catalog repositories)
+      const agentsDir = path.join(resolvedPath, 'agents');
+      const modulesDir = path.join(resolvedPath, 'modules');
+
+      if (fs.existsSync(agentsDir) && fs.statSync(agentsDir).isDirectory()) {
+        const agentsEntries = fs.readdirSync(agentsDir, {
+          withFileTypes: true,
+        });
+        for (const entry of agentsEntries) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            const subResults = findBmadRootsRecursive(
+              path.join(agentsDir, entry.name),
+              { ...options, currentDepth: currentDepth + 1 },
+            );
+            results.push(...subResults);
+          }
+        }
+      }
+
+      if (fs.existsSync(modulesDir) && fs.statSync(modulesDir).isDirectory()) {
+        const modulesEntries = fs.readdirSync(modulesDir, {
+          withFileTypes: true,
+        });
+        for (const entry of modulesEntries) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            const subResults = findBmadRootsRecursive(
+              path.join(modulesDir, entry.name),
+              { ...options, currentDepth: currentDepth + 1 },
+            );
+            results.push(...subResults);
+          }
+        }
+      }
+
       return results;
     }
 
@@ -233,8 +287,16 @@ export function findBmadRootsRecursive(
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
 
+      // Check exclude list first (applies at all depths)
+      if (excludeDirs.includes(entry.name)) {
+        logger.debug(
+          `${indent}[bmad-finder] Skipping ${entry.name} (excluded)`,
+        );
+        continue;
+      }
+
       // At depth > 1, only search bmad-named, agents, workflows, tasks, or src directories
-      if (currentDepth > 1 && !shouldSearchDirectory(entry.name)) {
+      if (currentDepth > 1 && !shouldSearchDirectory(entry.name, excludeDirs)) {
         logger.debug(
           `${indent}[bmad-finder] Skipping ${entry.name} (filtered by name)`,
         );
@@ -242,7 +304,10 @@ export function findBmadRootsRecursive(
       }
 
       // Skip hidden directories unless they match our search criteria
-      if (entry.name.startsWith('.') && !shouldSearchDirectory(entry.name)) {
+      if (
+        entry.name.startsWith('.') &&
+        !shouldSearchDirectory(entry.name, excludeDirs)
+      ) {
         logger.debug(`${indent}[bmad-finder] Skipping ${entry.name} (hidden)`);
         continue;
       }
@@ -253,6 +318,7 @@ export function findBmadRootsRecursive(
       const childResults = findBmadRootsRecursive(childPath, {
         maxDepth,
         currentDepth: currentDepth + 1,
+        excludeDirs,
       });
 
       results.push(...childResults);

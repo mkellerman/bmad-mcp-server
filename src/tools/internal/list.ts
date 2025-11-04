@@ -7,8 +7,6 @@ import { GitSourceResolver } from '../../utils/git-source-resolver.js';
 import {
   discoverAgents,
   discoverModules,
-  formatAgentList,
-  formatModuleList,
 } from '../../utils/remote-discovery.js';
 
 interface ListContext {
@@ -16,6 +14,117 @@ interface ListContext {
   master: any;
   discovery: any;
   remoteRegistry?: RemoteRegistry;
+}
+
+/**
+ * Format a list of agents grouped by module
+ */
+function formatAgentsByModule(
+  agents: Array<{
+    name: string;
+    module: string;
+    displayName: string;
+    title: string;
+    role?: string;
+    loadCommand: string;
+    isDuplicate?: boolean;
+  }>,
+  title: string,
+  totalCount: number,
+  moduleCount: number,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${title}\n`);
+  lines.push(`**Found ${totalCount} agents across ${moduleCount} modules**\n`);
+  lines.push('---\n');
+
+  // Group agents by module
+  const agentsByModule = new Map<string, typeof agents>();
+  for (const agent of agents) {
+    const moduleList = agentsByModule.get(agent.module) || [];
+    moduleList.push(agent);
+    agentsByModule.set(agent.module, moduleList);
+  }
+
+  // Sort modules
+  const sortedModules = Array.from(agentsByModule.keys()).sort();
+
+  // Display each module group
+  for (const moduleName of sortedModules) {
+    const moduleAgents = agentsByModule.get(moduleName) || [];
+    const displayModuleName = moduleName || 'Core/Standalone';
+
+    lines.push(`## 📦 ${displayModuleName}\n`);
+
+    // Sort agents within module by load command
+    const sortedAgents = moduleAgents.sort((a, b) =>
+      a.loadCommand.localeCompare(b.loadCommand),
+    );
+
+    for (const agent of sortedAgents) {
+      // Build line segments
+      const segments: string[] = [];
+
+      // Format: "- `load-command`: Title (**DisplayName**) Role"
+      const prefix = `- \`${agent.loadCommand}\`:`;
+
+      if (agent.title) {
+        segments.push(agent.title);
+      }
+
+      // Always show display name for clarity
+      segments.push(`(**${agent.displayName}**)`);
+
+      if (agent.role) {
+        segments.push(agent.role);
+      }
+
+      // Join segments and combine with prefix
+      const agentLine =
+        segments.length > 0 ? `${prefix} ${segments.join(' - ')}` : prefix;
+      lines.push(agentLine);
+    }
+
+    lines.push(''); // Add spacing between modules
+  }
+
+  lines.push('---');
+
+  return lines.join('\n');
+}
+
+/**
+ * Simple formatter for module lists
+ */
+function formatModulesList(
+  modules: Array<{
+    name: string;
+    description?: string;
+    agentCount: number;
+    workflowCount: number;
+  }>,
+  remoteName: string,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`# 🌐 Remote Modules: @${remoteName}\n`);
+  lines.push(`**Found ${modules.length} modules**\n`);
+  lines.push('---\n');
+
+  for (const mod of modules) {
+    lines.push(`## 📦 ${mod.name}\n`);
+    if (mod.description) {
+      lines.push(`${mod.description}\n`);
+    }
+    lines.push(
+      `**Content:** ${mod.agentCount} agents, ${mod.workflowCount} workflows\n`,
+    );
+  }
+
+  lines.push('---');
+
+  return lines.join('\n');
 }
 
 export async function handleListCommand(
@@ -27,11 +136,6 @@ export async function handleListCommand(
 
   if (cmd === '*list-agents') {
     // Build structured data
-    const agentsByModule = new Map<string, unknown[]>();
-    const allAgents: unknown[] = [];
-
-    // Use ALL agents from master manifest for complete discoverability
-    // Group by name to handle duplicates with clear loading instructions
     const allAgentRecords = master.agents;
 
     // Parse metadata from agent files
@@ -39,185 +143,101 @@ export async function handleListCommand(
       masterRecordToAgent(record, true),
     );
 
-    // Group agents by name to handle duplicates with clear UX
-    const agentsByName = new Map<string, unknown[]>();
-    const uniqueAgents: unknown[] = [];
+    // Process agents and build list
+    const agents: Array<{
+      name: string;
+      module: string;
+      displayName: string;
+      title: string;
+      role?: string;
+      loadCommand: string;
+      isDuplicate?: boolean;
+    }> = [];
+
+    const seenNames = new Map<string, number>();
 
     for (const agent of parsedAgents) {
-      const name = (agent.name || '').toString().toLowerCase();
+      // Use the original record name (from filename/manifest), not the parsed display name
+      const record = allAgentRecords.find(
+        (r: MasterRecord) => r.absolutePath === agent.path,
+      );
+      const name = (record?.name || agent.name || '').toString().toLowerCase();
       const p = (agent.path || '').toString().toLowerCase();
 
       // Skip README files
       if (name === 'readme' || p.endsWith('/readme.md')) continue;
 
-      const agentData = {
-        name: agent.name,
-        module: agent.module,
-        displayName: agent.displayName || agent.title || agent.name,
-        description: agent.title,
-        title: agent.title,
-        icon: agent.icon,
-        role: agent.role,
-        source: agent.sourceLocation?.includes('manifest')
-          ? 'manifest'
-          : 'filesystem',
-        path: agent.path,
-        commands: [], // Commands not available in Agent interface
-      };
+      const displayName = agent.displayName || agent.title || agent.name;
+      const title = agent.title || '';
+      const role = agent.role || '';
+      const module = agent.module || '';
 
-      // Group by name for duplicate detection
-      const nameGroup = agentsByName.get(name) || [];
-      nameGroup.push(agentData);
-      agentsByName.set(name, nameGroup);
-    }
+      // Determine load command - always use module prefix when module exists for consistency
+      let loadCommand = name;
+      const nameCount = seenNames.get(name) || 0;
+      seenNames.set(name, nameCount + 1);
 
-    // Process groups: show ALL agents for complete discoverability
-    for (const [name, group] of agentsByName) {
-      if (group.length === 1) {
-        // Single agent: show with simple name (user can load with just name)
-        const agent = group[0] as any;
-        agent.loadCommand = name;
-        uniqueAgents.push(agent);
-
-        const moduleList = agentsByModule.get(agent.module) ?? [];
-        moduleList.push(agent);
-        agentsByModule.set(agent.module, moduleList);
-      } else {
-        // Multiple agents: show ALL variants with module qualification
-        // This ensures complete discoverability - users see every loadable option
-        for (const agent of group) {
-          const agentTyped = agent as any;
-          agentTyped.loadCommand = agentTyped.module
-            ? `${agentTyped.module}/${name}`
-            : name;
-          agentTyped.isDuplicate = true;
-          agentTyped.variantInfo = `(${agentTyped.module || 'core'})`;
-          uniqueAgents.push(agentTyped);
-
-          const moduleList = agentsByModule.get(agentTyped.module) ?? [];
-          moduleList.push(agentTyped);
-          agentsByModule.set(agentTyped.module, moduleList);
-        }
+      // Always use module-qualified form when module exists
+      if (module) {
+        loadCommand = `${module}/${name}`;
       }
-    }
 
-    // Sort modules for metadata
-    const sortedModules = Array.from(agentsByModule.keys()).sort();
-
-    // Sort all agents alphabetically by load command for intuitive UX
-    const sortedAgents = uniqueAgents.sort((a: any, b: any) => {
-      const nameA = (a.loadCommand || a.name || '').toLowerCase();
-      const nameB = (b.loadCommand || b.name || '').toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-
-    // Build markdown content with module-grouped UX design
-    const markdown: string[] = [];
-    markdown.push('# 🤖 BMAD Agents\n');
-    markdown.push(
-      `**Found ${uniqueAgents.length} agents across ${sortedModules.length} modules**\n`,
-    );
-    markdown.push('---\n');
-
-    // Group agents by module for better discoverability
-    for (const moduleName of sortedModules) {
-      const moduleAgents = agentsByModule.get(moduleName) || [];
-      const displayModuleName = moduleName || 'Core/Standalone';
-
-      markdown.push(`## 📦 ${displayModuleName}\n`);
-
-      // Sort agents within each module
-      const sortedModuleAgents = moduleAgents.sort((a: any, b: any) => {
-        const nameA = (a.loadCommand || a.name || '').toLowerCase();
-        const nameB = (b.loadCommand || b.name || '').toLowerCase();
-        return nameA.localeCompare(nameB);
+      agents.push({
+        name: name, // Use the actual agent name (from record), not display name
+        module,
+        displayName,
+        title,
+        role,
+        loadCommand,
+        isDuplicate: nameCount > 0,
       });
-
-      for (const agentData of sortedModuleAgents) {
-        const agent = agentData as {
-          name: string;
-          module: string;
-          displayName?: string;
-          description?: string;
-          icon?: string;
-          role?: string;
-          title?: string;
-          source: string;
-          commands?: string[];
-          loadCommand?: string;
-          isDuplicate?: boolean;
-          variantInfo?: string;
-        };
-
-        const icon = agent.icon || '🤖';
-        const displayName = agent.displayName || agent.name || 'Unknown';
-        const title = agent.title || '';
-        const role = agent.role || '';
-        const loadCmd = agent.loadCommand || agent.name;
-
-        // Build line segments safely with clear UX guidance
-        const segments: string[] = [];
-
-        // Format: "- icon `load-command`: Title (**DisplayName**) Role"
-        const prefix = `- ${icon} \`${loadCmd}\`:`;
-
-        if (title) {
-          segments.push(title);
-        }
-
-        // Always show display name for clarity
-        segments.push(`(**${displayName}**)`);
-
-        if (role) {
-          segments.push(role);
-        }
-
-        // Join segments and combine with prefix
-        const agentLine =
-          segments.length > 0 ? `${prefix} ${segments.join(' - ')}` : prefix;
-        markdown.push(agentLine);
-      }
-
-      markdown.push(''); // Add spacing between modules
     }
 
-    markdown.push('');
-    markdown.push('---');
-    markdown.push('**Tip:** Load any agent using the command shown above');
-    markdown.push('- Simple names: `bmad analyst`');
-    markdown.push('- Module-qualified: `bmad bmad-core/ux-expert`');
-    markdown.push('---');
+    // Sort alphabetically by load command
+    agents.sort((a, b) => a.loadCommand.localeCompare(b.loadCommand));
+
+    // Count unique modules
+    const moduleCount = new Set(agents.map((a) => a.module)).size;
+
+    // Format using shared function
+    const content = formatAgentsByModule(
+      agents,
+      '🤖 BMAD Agents',
+      agents.length,
+      moduleCount,
+    );
 
     // Build summary for structured data
+    const agentsByModule = new Map<string, typeof agents>();
+    for (const agent of agents) {
+      const moduleList = agentsByModule.get(agent.module) || [];
+      moduleList.push(agent);
+      agentsByModule.set(agent.module, moduleList);
+    }
+
     const byGroup: Record<string, number> = {};
-    for (const mod of sortedModules) {
-      byGroup[mod] = agentsByModule.get(mod)!.length;
+    for (const [mod, list] of agentsByModule) {
+      byGroup[mod] = list.length;
     }
 
     return {
       success: true,
       type: 'list',
       listType: 'agents',
-      count: uniqueAgents.length,
-      content: markdown.join('\n'),
+      count: agents.length,
+      content,
       exitCode: 0,
       structuredData: {
-        items: uniqueAgents,
+        items: agents,
         summary: {
-          total: uniqueAgents.length,
+          total: agents.length,
           byGroup,
-          message: `Found ${uniqueAgents.length} agents across ${sortedModules.length} modules`,
+          message: `Found ${agents.length} agents across ${moduleCount} modules`,
         },
         metadata: {
-          modules: sortedModules,
+          modules: Array.from(agentsByModule.keys()).sort(),
           timestamp: new Date().toISOString(),
         },
-        followUpSuggestions: [
-          'Tell me more about a specific agent',
-          'Show me agents in a specific module',
-          'What commands does an agent have?',
-          'Load an agent to start working',
-        ],
       },
     };
   }
@@ -474,8 +494,83 @@ export async function handleListCommand(
       installedAgents,
     );
 
-    // Format and return
-    const content = formatAgentList(result);
+    if (result.error) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: result.error,
+      };
+    }
+
+    const discoveredAgents = result.agents || [];
+
+    // Transform discovered agents to the same format as local agents
+    const agents: Array<{
+      name: string;
+      module: string;
+      displayName: string;
+      title: string;
+      role?: string;
+      loadCommand: string;
+      isDuplicate?: boolean;
+    }> = [];
+
+    // Track seen names for collision detection
+    const seenNames = new Map<string, number>();
+
+    for (const agent of discoveredAgents) {
+      // Extract module from path (e.g., "bmad-2d-phaser-v4" from path)
+      const module =
+        agent.path
+          .split('/')
+          .find((p) => p.startsWith('bmad-') || p.startsWith('debug-')) || '';
+
+      const name = agent.name.toLowerCase().replace(/\s+/g, '-');
+      const displayName = agent.displayName || agent.name;
+      const title = agent.title || agent.description || '';
+
+      // Determine load command - always use module prefix for remote
+      const loadCommand = module ? `${module}/${name}` : name;
+
+      const nameCount = seenNames.get(name) || 0;
+      seenNames.set(name, nameCount + 1);
+
+      agents.push({
+        name: agent.name,
+        module,
+        displayName,
+        title,
+        loadCommand,
+        isDuplicate: nameCount > 0,
+      });
+    }
+
+    // Sort alphabetically by load command
+    agents.sort((a, b) => a.loadCommand.localeCompare(b.loadCommand));
+
+    // Count unique modules
+    const moduleCount = new Set(agents.map((a) => a.module)).size;
+
+    // Format using shared function
+    const content = formatAgentsByModule(
+      agents,
+      `🌐 Remote Agents: @${remoteName}`,
+      agents.length,
+      moduleCount,
+    );
+
+    // Build summary for structured data
+    const agentsByModule = new Map<string, typeof agents>();
+    for (const agent of agents) {
+      const moduleList = agentsByModule.get(agent.module) || [];
+      moduleList.push(agent);
+      agentsByModule.set(agent.module, moduleList);
+    }
+
+    const byGroup: Record<string, number> = {};
+    for (const [mod, list] of agentsByModule) {
+      byGroup[mod] = list.length;
+    }
 
     return {
       success: true,
@@ -484,18 +579,17 @@ export async function handleListCommand(
       content,
       exitCode: 0,
       structuredData: {
-        items: result.agents || [],
+        items: agents,
         summary: {
-          total: result.agents?.length || 0,
-          message:
-            result.error ||
-            `Found ${result.agents?.length || 0} agents from @${result.remote}`,
+          total: agents.length,
+          byGroup,
+          message: `Found ${agents.length} agents from @${remoteName}`,
         },
         metadata: {
           remote: result.remote,
           url: result.url,
           localPath: result.localPath,
-          error: result.error,
+          modules: Array.from(agentsByModule.keys()).sort(),
         },
       },
     };
@@ -539,8 +633,16 @@ export async function handleListCommand(
       installedModules,
     );
 
+    if (result.error) {
+      return {
+        success: false,
+        exitCode: 1,
+        error: result.error,
+      };
+    }
+
     // Format and return
-    const content = formatModuleList(result);
+    const content = formatModulesList(result.modules || [], remoteName);
 
     return {
       success: true,

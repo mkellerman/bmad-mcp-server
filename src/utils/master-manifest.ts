@@ -1,4 +1,9 @@
-import type { BmadOrigin, MasterManifests } from '../types/index.js';
+import type {
+  BmadOrigin,
+  MasterManifests,
+  MasterRecord,
+  V6ModuleInfo,
+} from '../types/index.js';
 import type { BmadPathResolution } from './bmad-path-resolver.js';
 import { inventoryOriginV6 } from './v6-module-inventory.js';
 import { inventoryOriginV4 } from './v4-module-inventory.js';
@@ -21,12 +26,11 @@ export function originsFromResolution(
 }
 
 export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
-  const master: MasterManifests = {
-    agents: [],
-    workflows: [],
-    tasks: [],
-    modules: [],
-  };
+  // Use Maps for deduplication by absolute path (like PowerShell hashtable: $master[$path] = $item)
+  const agentsMap = new Map<string, MasterRecord>();
+  const workflowsMap = new Map<string, MasterRecord>();
+  const tasksMap = new Map<string, MasterRecord>();
+  const modules: V6ModuleInfo[] = [];
 
   for (const origin of origins) {
     try {
@@ -35,19 +39,61 @@ export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
 
       if (version === 'v6') {
         const inv = inventoryOriginV6(origin);
-        master.modules.push(...inv.modules);
-        master.agents.push(...inv.agents);
-        master.workflows.push(...inv.workflows);
-        master.tasks.push(...inv.tasks);
+        modules.push(...inv.modules);
+
+        // Deduplicate agents by absolutePath
+        for (const agent of inv.agents) {
+          const key = agent.absolutePath || '';
+          if (key && !agentsMap.has(key)) {
+            agentsMap.set(key, agent);
+          }
+        }
+
+        // Deduplicate workflows by absolutePath
+        for (const workflow of inv.workflows) {
+          const key = workflow.absolutePath || '';
+          if (key && !workflowsMap.has(key)) {
+            workflowsMap.set(key, workflow);
+          }
+        }
+
+        // Deduplicate tasks by absolutePath
+        for (const task of inv.tasks) {
+          const key = task.absolutePath || '';
+          if (key && !tasksMap.has(key)) {
+            tasksMap.set(key, task);
+          }
+        }
         continue;
       }
 
       if (version === 'v4') {
         const inv = inventoryOriginV4(origin);
-        master.modules.push(...inv.modules);
-        master.agents.push(...inv.agents);
-        master.workflows.push(...inv.workflows);
-        master.tasks.push(...inv.tasks);
+        modules.push(...inv.modules);
+
+        // Deduplicate agents by absolutePath
+        for (const agent of inv.agents) {
+          const key = agent.absolutePath || '';
+          if (key && !agentsMap.has(key)) {
+            agentsMap.set(key, agent);
+          }
+        }
+
+        // Deduplicate workflows by absolutePath
+        for (const workflow of inv.workflows) {
+          const key = workflow.absolutePath || '';
+          if (key && !workflowsMap.has(key)) {
+            workflowsMap.set(key, workflow);
+          }
+        }
+
+        // Deduplicate tasks by absolutePath
+        for (const task of inv.tasks) {
+          const key = task.absolutePath || '';
+          if (key && !tasksMap.has(key)) {
+            tasksMap.set(key, task);
+          }
+        }
         continue;
       }
 
@@ -61,10 +107,27 @@ export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
             inv.workflows.length > 0 ||
             inv.tasks.length > 0
           ) {
-            master.modules.push(...inv.modules);
-            master.agents.push(...inv.agents);
-            master.workflows.push(...inv.workflows);
-            master.tasks.push(...inv.tasks);
+            modules.push(...inv.modules);
+
+            // Deduplicate by absolutePath
+            for (const agent of inv.agents) {
+              const key = agent.absolutePath || '';
+              if (key && !agentsMap.has(key)) {
+                agentsMap.set(key, agent);
+              }
+            }
+            for (const workflow of inv.workflows) {
+              const key = workflow.absolutePath || '';
+              if (key && !workflowsMap.has(key)) {
+                workflowsMap.set(key, workflow);
+              }
+            }
+            for (const task of inv.tasks) {
+              const key = task.absolutePath || '';
+              if (key && !tasksMap.has(key)) {
+                tasksMap.set(key, task);
+              }
+            }
             continue;
           }
         } catch {
@@ -74,10 +137,27 @@ export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
         // Try v4 pattern
         try {
           const inv = inventoryOriginV4(origin);
-          master.modules.push(...inv.modules);
-          master.agents.push(...inv.agents);
-          master.workflows.push(...inv.workflows);
-          master.tasks.push(...inv.tasks);
+          modules.push(...inv.modules);
+
+          // Deduplicate by absolutePath
+          for (const agent of inv.agents) {
+            const key = agent.absolutePath || '';
+            if (key && !agentsMap.has(key)) {
+              agentsMap.set(key, agent);
+            }
+          }
+          for (const workflow of inv.workflows) {
+            const key = workflow.absolutePath || '';
+            if (key && !workflowsMap.has(key)) {
+              workflowsMap.set(key, workflow);
+            }
+          }
+          for (const task of inv.tasks) {
+            const key = task.absolutePath || '';
+            if (key && !tasksMap.has(key)) {
+              tasksMap.set(key, task);
+            }
+          }
         } catch {
           // Both failed - skip this origin silently
         }
@@ -87,7 +167,13 @@ export function buildMasterManifests(origins: BmadOrigin[]): MasterManifests {
     }
   }
 
-  return master;
+  // Convert Maps back to arrays
+  return {
+    agents: Array.from(agentsMap.values()),
+    workflows: Array.from(workflowsMap.values()),
+    tasks: Array.from(tasksMap.values()),
+    modules,
+  };
 }
 
 /**

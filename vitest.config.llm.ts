@@ -14,6 +14,10 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 30000,
     hookTimeout: 30000,
-    reporters: ['verbose'],
+    reporters: ['verbose', 'json', 'html'],
+    outputFile: {
+      json: './test-results/reports/e2e-results.json',
+      html: './test-results/reports/e2e-results.html',
+    },
   },
 });
