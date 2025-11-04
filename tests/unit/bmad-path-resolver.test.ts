@@ -226,49 +226,64 @@ describe('bmad-path-resolver', () => {
   });
 
   describe('strict mode', () => {
-    it('should throw error when strict mode has no CLI args', () => {
-      expect(() => {
-        resolveBmadPaths({
-          cwd: fixture.tmpDir,
-          mode: 'strict',
-        });
-      }).toThrow(/Strict mode requires explicit CLI arguments/);
+    it('should return fallback when strict mode has no CLI args', () => {
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('not-found');
+      expect(result.activeLocations).toHaveLength(0);
+      expect(result.activeLocation.details).toContain(
+        'No BMAD sources configured',
+      );
     });
 
-    it('should throw error when strict mode path does not exist', () => {
-      expect(() => {
-        resolveBmadPaths({
-          cwd: fixture.tmpDir,
-          cliArgs: ['/nonexistent/path'],
-          mode: 'strict',
-        });
-      }).toThrow(/No Valid Installation Found/);
+    it('should return fallback when strict mode path does not exist', () => {
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+        cliArgs: ['/nonexistent/path'],
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('not-found');
+      expect(result.activeLocations).toHaveLength(0);
+      expect(result.locations[0].status).toBe('missing');
+      expect(result.locations[0].details).toBe('Path does not exist');
     });
 
-    it('should throw error when strict mode path is not a directory', () => {
+    it('should return fallback when strict mode path is not a directory', () => {
       const filePath = path.join(fixture.tmpDir, 'file.txt');
       fs.writeFileSync(filePath, 'content');
 
-      expect(() => {
-        resolveBmadPaths({
-          cwd: fixture.tmpDir,
-          cliArgs: [filePath],
-          mode: 'strict',
-        });
-      }).toThrow(/No Valid Installation Found/);
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+        cliArgs: [filePath],
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('not-found');
+      expect(result.activeLocations).toHaveLength(0);
+      expect(result.locations[0].status).toBe('invalid');
+      expect(result.locations[0].details).toBe('Path is not a directory');
     });
 
-    it('should throw error when strict mode path has no BMAD installation', () => {
+    it('should return fallback when strict mode path has no BMAD installation', () => {
       const emptyDir = path.join(fixture.tmpDir, 'empty');
       fs.mkdirSync(emptyDir, { recursive: true });
 
-      expect(() => {
-        resolveBmadPaths({
-          cwd: fixture.tmpDir,
-          cliArgs: [emptyDir],
-          mode: 'strict',
-        });
-      }).toThrow(/No Valid Installation Found/);
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+        cliArgs: [emptyDir],
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('not-found');
+      expect(result.activeLocations).toHaveLength(0);
+      expect(result.locations[0].status).toBe('invalid');
+      expect(result.locations[0].details).toContain(
+        'No BMAD installation found',
+      );
     });
 
     it('should succeed when strict mode has valid v6 installation', () => {
@@ -336,13 +351,14 @@ describe('bmad-path-resolver', () => {
       const projectBmad = path.join(fixture.tmpDir, 'bmad', '_cfg');
       fs.mkdirSync(projectBmad, { recursive: true });
 
-      // In strict mode, should fail even though project has valid bmad
-      expect(() => {
-        resolveBmadPaths({
-          cwd: fixture.tmpDir,
-          mode: 'strict',
-        });
-      }).toThrow(/Strict mode requires explicit CLI arguments/);
+      // In strict mode, should return fallback even though project has valid bmad
+      const result = resolveBmadPaths({
+        cwd: fixture.tmpDir,
+        mode: 'strict',
+      });
+
+      expect(result.activeLocation.status).toBe('not-found');
+      expect(result.activeLocations).toHaveLength(0);
     });
 
     it('should accept custom installations in strict mode', () => {
