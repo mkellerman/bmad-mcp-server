@@ -120,25 +120,30 @@ export function loadConfig(options?: {
   // Agent instructions - appended to all loaded agents
   // Modify these to change how the LLM processes agent personas
   const agentInstructions = [
-    '## Agent Instructions',
+    '<!-- Powered by BMAD-CORE™ -->',
+    '',
+    '## INSTRUCTIONS FOR AGENT OVERRIDES',
     '',
     '1. Read the agent definition markdown to understand role, identity, and principles',
     '2. Apply the communication style specified in the agent definition',
     '3. Follow activation rules and command handling as defined in the agent XML/markdown',
     '',
-    '## Default Configuration (config.yaml)',
+    '## DEFAULT CONFIGURATION (config.yaml)',
     '',
     '- user_name: User',
     '- communication_language: English',
     '- output_folder: ./docs',
+    '',
+    '---',
     '',
   ].join('\n');
 
   // Workflow instructions - appended to all executed workflows
   // Modify these to change how the LLM processes workflow definitions
   const workflowInstructions = [
-    '## Execution Instructions',
+    '<!-- Powered by BMAD-CORE™ -->',
     '',
+    '## WORKFLOW EXECUTION INSTRUCTIONS',
     'Process this workflow according to BMAD workflow execution methodology:',
     '',
     '1. **Read the complete workflow.yaml configuration**',
