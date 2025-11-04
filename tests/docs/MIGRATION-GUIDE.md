@@ -251,7 +251,7 @@ reporter.addSuite({
 
 ### Generate Reports
 
-The reporter automatically saves to `test-results/reports/test-results.json` when tests complete.
+The reporter automatically saves to `test-results/test-results.json` when tests complete.
 
 To generate HTML:
 
@@ -259,7 +259,7 @@ To generate HTML:
 npm run generate-html
 ```
 
-This creates `test-results/reports/test-results.html` with:
+This creates `test-results/test-results.html` with:
 
 - Test results summary
 - Clickable tests that expand to show details
@@ -363,7 +363,7 @@ describe('Complete Integration Test', () => {
 - [ ] Replace old client creation with helpers
 - [ ] Build test result with TestBuilder
 - [ ] Add result to reporter with suite name
-- [ ] Verify JSON output in test-results/reports/
+- [ ] Verify JSON output in test-results/
 - [ ] Generate and review HTML report
 
 ## Next Steps

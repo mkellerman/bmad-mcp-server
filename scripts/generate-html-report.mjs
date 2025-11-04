@@ -7,7 +7,7 @@
  *   node scripts/generate-html-report.mjs <input.json> [output.html]
  *
  * Examples:
- *   node scripts/generate-html-report.mjs test-results/reports/test-results.json
+ *   node scripts/generate-html-report.mjs test-results/test-results.json
  *   node scripts/generate-html-report.mjs test-results.json test-report.html
  */
 
@@ -1181,7 +1181,7 @@ Arguments:
                  Default: same directory as input with .html extension
 
 Examples:
-  npm run generate-html test-results/reports/test-results.json
+  npm run generate-html test-results/test-results.json
   npm run generate-html test-results.json custom-report.html
 
 Options:

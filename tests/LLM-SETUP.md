@@ -25,11 +25,12 @@ Follow the device code authentication prompt. This saves your credentials to `~/
 ### 2. Start LiteLLM Proxy
 
 ```bash
-npm run litellm:docker:start
+npm run test:litellm-start
 ```
 
-This starts a background container that:
+This command:
 
+- Starts LiteLLM proxy via Docker Compose
 - Mounts your `~/.config/litellm` credentials
 - Mounts the test config at `tests/support/litellm-config.yaml`
 - Exposes the API on `http://localhost:4000`
@@ -37,7 +38,7 @@ This starts a background container that:
 ### 3. Verify Health
 
 ```bash
-npm run litellm:docker:health
+npm run litellm:health
 ```
 
 Expected output: `{"status":"healthy"}`
@@ -53,9 +54,16 @@ npm run test:llm
 After initial setup, you only need:
 
 ```bash
-npm run litellm:docker:start   # Start proxy
-npm run test:llm               # Run tests
-npm run litellm:docker:stop    # Stop proxy when done
+npm run test:litellm-start   # Start proxy
+npm run test:e2e             # Run E2E tests
+npm run test:litellm-stop    # Stop proxy when done
+```
+
+### Troubleshooting
+
+```bash
+npm run test:litellm-logs    # Check logs
+npm run test:litellm-health  # Verify proxy is healthy
 ```
 
 ## Troubleshooting

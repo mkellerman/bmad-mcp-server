@@ -25,11 +25,10 @@ export type TestStatus = 'passed' | 'failed' | 'skipped' | 'pending' | 'todo';
  * Test type categorization
  */
 export type TestType =
-  | 'unit' // Fast, isolated unit tests
+  | 'unit' // Fast, isolated unit tests (mocked dependencies)
   | 'integration' // Multi-component integration tests
-  | 'e2e' // End-to-end system tests
-  | 'llm' // LLM interaction tests
-  | 'agent'; // Agent validation tests
+  | 'e2e' // End-to-end system tests (require external services, no LLM)
+  | 'llm'; // LLM integration tests (require LiteLLM proxy)
 
 /**
  * Log severity levels
@@ -124,6 +123,51 @@ export interface LLMInteraction {
   rawRequest?: unknown;
   /** Raw response payload (for debugging) */
   rawResponse?: unknown;
+}
+
+/**
+ * Chat message role
+ */
+export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
+
+/**
+ * Single message in a chat conversation
+ */
+export interface ChatMessage {
+  /** Message role */
+  role: ChatRole;
+  /** Message content */
+  content: string | null;
+  /** Tool calls if assistant made them */
+  toolCalls?: ToolCall[];
+  /** Tool call ID if this is a tool response */
+  toolCallId?: string;
+  /** Timestamp when message was created */
+  timestamp: string;
+}
+
+/**
+ * Full chat conversation transcript
+ */
+export interface ChatConversation {
+  /** Unique conversation ID */
+  id: string;
+  /** All messages in chronological order */
+  messages: ChatMessage[];
+  /** LLM provider and model used */
+  provider: LLMProvider;
+  /** Total token usage across all interactions */
+  totalTokens?: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
+  /** Conversation start time */
+  startTime: string;
+  /** Conversation end time */
+  endTime: string;
+  /** Total duration in milliseconds */
+  duration: number;
 }
 
 /**
@@ -258,6 +302,26 @@ export interface BaseTestResult {
   tags: string[];
   /** Custom metadata */
   metadata: Record<string, unknown>;
+  /** LLM interactions (can appear in any test type) */
+  llmInteractions?: LLMInteraction[];
+  /** Chat conversation transcript (for LLM tests) */
+  chatConversation?: ChatConversation;
+  /** XML validation results (can appear in any test type) */
+  xmlValidation?: XMLValidation;
+  /** Agent logs (can appear in any test type) */
+  agentLogs?: AgentLog[];
+  /** Agent metadata (can appear in any test type) */
+  agent?: AgentMetadata;
+  /** Validation checks (can appear in any test type) */
+  validations?: Array<{
+    check: string;
+    passed: boolean;
+    message?: string;
+  }>;
+  /** Expected behavior description */
+  expectedBehavior?: string;
+  /** Actual behavior observed */
+  actualBehavior?: string;
 }
 
 /**
@@ -308,48 +372,9 @@ export interface E2ETestResult extends BaseTestResult {
 }
 
 /**
- * LLM test result - enriched with LLM interactions
- */
-export interface LLMTestResult extends BaseTestResult {
-  type: 'llm';
-  /** LLM interactions during test */
-  llmInteractions: LLMInteraction[];
-  /** XML validation results */
-  xmlValidation?: XMLValidation;
-  /** Agent logs if agent was involved */
-  agentLogs?: AgentLog[];
-  /** Expected behavior description */
-  expectedBehavior?: string;
-  /** Actual behavior observed */
-  actualBehavior?: string;
-}
-
-/**
- * Agent validation test result
- */
-export interface AgentTestResult extends BaseTestResult {
-  type: 'agent';
-  /** Agent being validated */
-  agent: AgentMetadata;
-  /** Validation checks performed */
-  validations: Array<{
-    check: string;
-    passed: boolean;
-    message?: string;
-  }>;
-  /** Agent execution logs */
-  agentLogs?: AgentLog[];
-}
-
-/**
  * Union type for all test results
  */
-export type TestResult =
-  | UnitTestResult
-  | IntegrationTestResult
-  | E2ETestResult
-  | LLMTestResult
-  | AgentTestResult;
+export type TestResult = UnitTestResult | IntegrationTestResult | E2ETestResult;
 
 // ============================================================================
 // Test Suite & Report Types
@@ -517,17 +542,12 @@ export interface ReporterConfig {
 // ============================================================================
 
 /**
- * Type guard to check if test result is LLM test
+ * Type guard to check if test has LLM interactions
  */
-export function isLLMTest(test: TestResult): test is LLMTestResult {
-  return test.type === 'llm';
-}
-
-/**
- * Type guard to check if test result is Agent test
- */
-export function isAgentTest(test: TestResult): test is AgentTestResult {
-  return test.type === 'agent';
+export function hasLLMInteractions(test: TestResult): boolean {
+  return (
+    !!(test as any).llmInteractions && (test as any).llmInteractions.length > 0
+  );
 }
 
 /**

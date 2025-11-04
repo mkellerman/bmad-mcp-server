@@ -24,6 +24,7 @@ import {
   type TestEnvironment,
   type TestType,
 } from './types.js';
+import { generateHTMLReport } from './html-generator.js';
 
 /**
  * BMADUnifiedReporter - Collects test results and generates JSON report
@@ -52,12 +53,11 @@ export class BMADUnifiedReporter {
   private startTime: Date | null = null;
   private environment: TestEnvironment | null = null;
 
-  constructor(
-    outputDir = 'test-results/reports',
-    jsonFilename = 'test-results.json',
-  ) {
+  constructor(outputDir = 'test-results', jsonFilename = 'test-results.json') {
     this.outputDir = outputDir;
-    this.testResultsDir = path.join(outputDir, 'test-fragments');
+    // Use TEST_TYPE subdirectory if available (unit, integration, e2e)
+    const testType = process.env.TEST_TYPE || 'default';
+    this.testResultsDir = path.join(outputDir, '.results', testType);
     this.jsonFilename = jsonFilename;
     this.initialize();
   }
@@ -77,10 +77,18 @@ export class BMADUnifiedReporter {
     // Ensure output directories exist
     await fs.mkdir(this.testResultsDir, { recursive: true });
 
-    // Create a unique filename for this test result
-    const safeTestId = test.id.replace(/[^a-z0-9-]/gi, '_');
-    const safeSuiteName = suiteName.replace(/[^a-z0-9-]/gi, '_');
-    const filename = `${safeSuiteName}__${safeTestId}.json`;
+    // Create a unique filename for this test result (lowercase-kebab)
+    const safeTestId = test.id
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    const safeSuiteName = suiteName
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    const filename = `${safeSuiteName}--${safeTestId}.json`;
     const filePath = path.join(this.testResultsDir, filename);
 
     // Write test result with suite info
@@ -164,6 +172,9 @@ export class BMADUnifiedReporter {
     // Write JSON report
     await this.writeJSONReport(report);
 
+    // Write HTML report
+    await this.writeHTMLReport(report);
+
     // Print summary
     const duration = endTime.getTime() - this.startTime.getTime();
     this.printSummary(report.summary, duration);
@@ -176,32 +187,59 @@ export class BMADUnifiedReporter {
   // =========================================================================
 
   /**
-   * Load all test fragment files
+   * Load all test fragment files from all test types (unit, integration, e2e)
    */
   private async loadAllFragments(): Promise<
     Array<{ suiteName: string; test: TestResult; timestamp: string }>
   > {
     try {
-      // Check if fragments directory exists
+      const resultsBaseDir = path.join(this.outputDir, '.results');
+      const allFragments: Array<{
+        suiteName: string;
+        test: TestResult;
+        timestamp: string;
+      }> = [];
+
+      // Check if base results directory exists
       try {
-        await fs.access(this.testResultsDir);
+        await fs.access(resultsBaseDir);
       } catch {
         // Directory doesn't exist yet
         return [];
       }
 
-      const files = await fs.readdir(this.testResultsDir);
-      const jsonFiles = files.filter((f) => f.endsWith('.json'));
+      // Read all subdirectories (unit, integration, e2e, etc.)
+      const testTypes = await fs.readdir(resultsBaseDir);
 
-      const fragments = await Promise.all(
-        jsonFiles.map(async (file) => {
-          const filePath = path.join(this.testResultsDir, file);
-          const content = await fs.readFile(filePath, 'utf-8');
-          return JSON.parse(content);
-        }),
-      );
+      for (const testType of testTypes) {
+        const testTypeDir = path.join(resultsBaseDir, testType);
 
-      return fragments;
+        // Check if it's a directory
+        const stat = await fs.stat(testTypeDir);
+        if (!stat.isDirectory()) continue;
+
+        // Read all JSON files in this test type directory
+        const files = await fs.readdir(testTypeDir);
+        // Filter out timestamped aggregate files and archived files
+        const jsonFiles = files.filter((f) => {
+          if (!f.endsWith('.json')) return false;
+          // Skip files matching pattern: <type>-results.json or <type>-<timestamp>-results.json
+          if (/-results\.json$/.test(f)) return false;
+          return true;
+        });
+
+        const fragments = await Promise.all(
+          jsonFiles.map(async (file) => {
+            const filePath = path.join(testTypeDir, file);
+            const content = await fs.readFile(filePath, 'utf-8');
+            return JSON.parse(content);
+          }),
+        );
+
+        allFragments.push(...fragments);
+      }
+
+      return allFragments;
     } catch {
       return [];
     }
@@ -285,7 +323,7 @@ export class BMADUnifiedReporter {
 
     // Calculate by type
     const byType: Record<TestType, any> = {} as any;
-    const types: TestType[] = ['unit', 'integration', 'e2e', 'llm', 'agent'];
+    const types: TestType[] = ['unit', 'integration', 'e2e', 'llm'];
 
     for (const type of types) {
       const typeTests = tests.filter((t) => t.type === type);
@@ -325,12 +363,54 @@ export class BMADUnifiedReporter {
 
   /**
    * Write JSON report to disk
+   * - Writes {type}-results.json to .results/ directory (current)
+   * - Writes {type}-{timestamp}-results.json to .results/archive/ (history)
+   * - Writes aggregated test-results.json to root test-results/
+   * - Individual fragment files are kept in .results/{type}/ for debugging
    */
   private async writeJSONReport(report: TestReport): Promise<void> {
-    const jsonPath = path.join(this.outputDir, this.jsonFilename);
     const json = JSON.stringify(report, null, 2);
+    const testType = process.env.TEST_TYPE || 'default';
+
+    // 1. Write current results to .results/{type}-results.json
+    const resultsDir = path.join(this.outputDir, '.results');
+    await fs.mkdir(resultsDir, { recursive: true });
+    const currentResultsPath = path.join(
+      resultsDir,
+      `${testType}-results.json`,
+    );
+    await fs.writeFile(currentResultsPath, json, 'utf-8');
+    console.log(`   ✅ Current results: ${currentResultsPath}`);
+
+    // 2. Archive to .results/archive/{type}-{timestamp}-results.json
+    const archiveDir = path.join(resultsDir, 'archive');
+    await fs.mkdir(archiveDir, { recursive: true });
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .slice(0, 19); // YYYY-MM-DDTHH-MM-SS
+    const archivePath = path.join(
+      archiveDir,
+      `${testType}-${timestamp}-results.json`,
+    );
+    await fs.writeFile(archivePath, json, 'utf-8');
+    console.log(`   ✅ Archived: ${archivePath}`);
+
+    // 3. Write to root test-results/ directory (for aggregation)
+    const jsonPath = path.join(this.outputDir, this.jsonFilename);
     await fs.writeFile(jsonPath, json, 'utf-8');
-    console.log(`   ✅ JSON report: ${jsonPath}`);
+    console.log(`   ✅ Root report: ${jsonPath}`);
+  }
+
+  /**
+   * Write HTML report to disk
+   */
+  private async writeHTMLReport(report: TestReport): Promise<void> {
+    const htmlFilename = this.jsonFilename.replace('.json', '.html');
+    const htmlPath = path.join(this.outputDir, htmlFilename);
+    const html = generateHTMLReport(report);
+    await fs.writeFile(htmlPath, html, 'utf-8');
+    console.log(`   ✅ HTML report: ${htmlPath}`);
   }
 
   /**

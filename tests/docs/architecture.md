@@ -388,10 +388,10 @@ scripts/
 └── test-prompt.mjs               # Interactive CLI tool
 
 test-results/
-├── reports/
-│   ├── test-report.html          # Unified HTML report
-│   └── test-results.json         # Machine-readable results
-├── agent-logs/                    # Agent interaction logs
+├── test-results.html             # Unified HTML report
+├── test-results.json             # Machine-readable results
+├── .fragments/                   # Test fragments (hidden)
+├── agent-logs/                   # Agent interaction logs
 └── prompts/                      # Saved prompt interactions
 ```
 

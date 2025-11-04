@@ -20,8 +20,8 @@
 - `npm run dev` — Run the server via tsx (respects `BMAD_ROOT`). Example: `BMAD_ROOT=/path/to/project npm run dev`.
 - `npm run build` — Compile TypeScript to `build/` and prepare CLI.
 - `npm start` — Run compiled server (`node build/index.js`).
-- `npm test` — Jest unit tests. `npm test -- --coverage` for report.
-- E2E: `npm run e2e:start` (LiteLLM docker), `npm run test:e2e`, `npm run test:report`, `npm run e2e:stop`.
+- `npm test` — Run all tests and generate JSON/HTML reports in `test-results/`.
+- E2E: `npm run test:litellm-start` (LiteLLM docker), `npm run test:e2e`, `npm run test:litellm-stop`.
 
 ## Coding Style & Naming Conventions
 
@@ -34,7 +34,7 @@
 
 - Unit tests live in `tests/unit/*.test.ts`; E2E specs in `tests/e2e/framework/*.spec.ts` with YAML cases under `tests/e2e/test-cases/`.
 - Keep or increase coverage; add tests for new utils, path resolution, and tool routing. Example: `npm test -- tests/unit/manifest-loader.test.ts`.
-- E2E requires LiteLLM (Docker). Verify with `npm run litellm:docker:health` if using the proxy scripts.
+- E2E requires LiteLLM (Docker). Verify with `npm run test:litellm-health` if using the proxy scripts.
 
 ## Commit & Pull Request Guidelines
 

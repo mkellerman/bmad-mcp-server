@@ -45,7 +45,7 @@ npm run test:prompt -- --help
 # Open HTML report in browser
 npm run test:report
 
-# Report is also at: test-results/reports/test-report.html
+# Report is also at: test-results/test-results.html
 ```
 
 ---
@@ -283,11 +283,13 @@ TEST_TIMEOUT=30000
 
 ```
 test-results/
-├── reports/
-│   ├── test-report.html          # 🌟 Main HTML report
-│   └── test-results.json         # Machine-readable results
+├── test-results.html             # 🌟 Unified HTML report (all test types)
+├── test-results.json             # Machine-readable unified results
+├── .fragments/                   # Individual test fragments (hidden)
+│   ├── Suite_A__test-1.json
+│   └── Suite_B__test-2.json
 │
-├── agent-logs/                    # Agent interaction logs
+├── agent-logs/                   # Agent interaction logs
 │   ├── analyst_2025-11-03_16-00-00.log
 │   ├── architect_2025-11-03_16-01-30.log
 │   └── ...

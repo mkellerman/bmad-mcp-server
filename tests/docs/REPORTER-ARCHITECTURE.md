@@ -25,7 +25,7 @@ await reporter.addTest('My Suite', testResult);
 The reporter immediately writes a JSON fragment file:
 
 ```
-test-results/reports/test-fragments/
+test-results/.fragments/
   ├── My_Suite__test-1.json
   ├── My_Suite__test-2.json
   ├── Other_Suite__test-3.json
@@ -52,7 +52,7 @@ Each fragment contains:
 
 After all tests complete, Vitest calls the global teardown which:
 
-1. Reads all `.json` files from `test-fragments/`
+1. Reads all `.json` files from `.fragments/`
 2. Groups tests by suite name
 3. Calculates summary statistics
 4. Writes final `test-results.json`
@@ -88,13 +88,14 @@ After all tests complete, Vitest calls the global teardown which:
 
 ```
 test-results/
-└── reports/
-    ├── test-fragments/          # Individual test result files
-    │   ├── Suite_A__test-1.json
-    │   ├── Suite_A__test-2.json
-    │   └── Suite_B__test-3.json
-    ├── test-results.json        # Merged final report
-    └── test-results.html        # Interactive HTML report
+├── .fragments/                  # Individual test result files (hidden)
+│   ├── Suite_A__test-1.json
+│   ├── Suite_A__test-2.json
+│   └── Suite_B__test-3.json
+├── test-results.json            # Merged final report
+├── test-results.html            # Interactive HTML report
+├── e2e-results.json             # E2E test results
+└── e2e-results.html             # E2E HTML report
 ```
 
 ## Configuration
@@ -115,13 +116,13 @@ export default defineConfig({
 ```typescript
 // Clean old fragments before tests
 export async function setup() {
-  await fs.rm('test-results/reports/test-fragments', {
+  await fs.rm('test-results/.fragments', {
     recursive: true,
     force: true,
   });
 }
 
-// Merge fragments after tests
+// Generate report after tests
 export async function teardown() {
   await reporter.generateReport();
 }
@@ -235,7 +236,7 @@ await reporter.addTest('Authorization', test2);
 2. Test threw error before reporting
 3. Fragment write failed (disk space, permissions)
 
-**Solution**: Check `test-results/reports/test-fragments/` for fragment files
+**Solution**: Check `test-results/.fragments/` for fragment files
 
 ### Duplicate Tests
 
@@ -252,7 +253,7 @@ await reporter.addTest('Authorization', test2);
 **Solution**: Global setup automatically cleans fragments. Manual cleanup:
 
 ```bash
-rm -rf test-results/reports/test-fragments
+rm -rf test-results/.fragments
 ```
 
 ## Future Enhancements
