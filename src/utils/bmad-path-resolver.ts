@@ -66,31 +66,17 @@ export function resolveBmadPaths(
 /**
  * Strict mode: Use exact paths only, no discovery
  * Only considers CLI arguments, fails if none provided or invalid
+ * Note: Empty cliArgs can occur when git sources fail to resolve - this is allowed
  */
 function resolveStrictPaths(
   options: ResolveBmadPathsOptions,
 ): BmadPathResolution {
   const userBmadPath = options.userBmadPath ?? path.join(os.homedir(), '.bmad');
 
-  if (!options.cliArgs || options.cliArgs.length === 0) {
-    const errorMessage = [
-      '╭─────────────────────────────────────────────────────────────╮',
-      '│ ⚠️  BMAD Strict Mode: No Paths Provided                    │',
-      '├─────────────────────────────────────────────────────────────┤',
-      '│                                                             │',
-      '│ Strict mode requires explicit CLI arguments.               │',
-      '│                                                             │',
-      '│ 🔧 Provide BMAD path(s):                                    │',
-      '│    node build/index.js /path/to/bmad                       │',
-      '│                                                             │',
-      '│ Or switch to auto mode:                                     │',
-      '│    node build/index.js --mode=auto                         │',
-      '│    export BMAD_DISCOVERY_MODE=auto                         │',
-      '│                                                             │',
-      '╰─────────────────────────────────────────────────────────────╯',
-    ].join('\n');
-
-    throw new Error(errorMessage);
+  // Allow empty cliArgs in strict mode (can happen when git sources fail)
+  // The server will still start, just with no BMAD installations loaded
+  if (!options.cliArgs) {
+    options.cliArgs = [];
   }
 
   // In strict mode, only check CLI arguments - no recursion, no fallbacks
@@ -168,34 +154,28 @@ function resolveStrictPaths(
       (loc.manifestDir || loc.manifestPath || loc.version === 'unknown'),
   );
 
+  // If no valid installation found, return a fallback configuration
+  // This allows the server to start even when all sources fail
   if (!activeLocation) {
-    const errorMessage = [
-      '╭─────────────────────────────────────────────────────────────╮',
-      '│ ⚠️  BMAD Strict Mode: No Valid Installation Found          │',
-      '├─────────────────────────────────────────────────────────────┤',
-      '│                                                             │',
-      '│ All provided paths are invalid.                            │',
-      '│                                                             │',
-      '│ Strict mode requirements:                                   │',
-      '│  • Path must exist and be a directory                      │',
-      '│  • Path must contain BMAD installation directly            │',
-      '│  • v6: Must have bmad/_cfg/manifest.yaml                   │',
-      '│  • v4: Must have install-manifest.yaml                     │',
-      '│                                                             │',
-      '│ Checked paths:                                              │',
-      ...candidates.map((location) => {
-        const pathStr = location.originalPath || '(not provided)';
-        const detailStr = location.details || location.status;
-        return [
-          `│   ✗ ${pathStr.padEnd(57)}│`,
-          `│     → ${detailStr.padEnd(55)}│`,
-        ].join('\n');
-      }),
-      '│                                                             │',
-      '╰─────────────────────────────────────────────────────────────╯',
-    ].join('\n');
+    // Create a fallback location
+    const fallbackLocation: BmadLocationInfo = {
+      source: 'user',
+      priority: 4,
+      displayName: 'No installation',
+      status: 'not-found',
+      details:
+        candidates.length > 0
+          ? 'All provided paths failed to load'
+          : 'No BMAD sources configured',
+    };
 
-    throw new Error(errorMessage);
+    return {
+      activeLocation: fallbackLocation,
+      activeLocations: [],
+      locations: candidates.length > 0 ? candidates : [fallbackLocation],
+      userBmadPath,
+      projectRoot: options.cwd,
+    };
   }
 
   // Collect all valid CLI locations for multi-root support

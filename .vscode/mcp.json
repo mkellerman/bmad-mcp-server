@@ -1,9 +1,8 @@
 {
   "servers": {
     "bmad": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
         "${workspaceFolder}/build/index.js",
         "git+https://github.com/bmad-code-org/BMAD-METHOD#main:/bmad",
         "git+https://github.com/mkellerman/awesome-bmad-agents#main:/modules/bmad-bmm-v6",
