@@ -168,12 +168,44 @@ export interface BMADToolResult {
  * Workflow execution context with resolved paths and manifest data
  */
 export interface WorkflowContext {
+  // Legacy fields (kept for backward compatibility)
   bmadServerRoot: string;
   projectRoot: string;
   mcpResources: string;
   agentManifestPath: string;
   agentManifestData: Agent[];
   agentCount: number;
+
+  // Enhanced context for placeholder resolution
+  placeholders: {
+    project_root: string; // User's project directory (cwd)
+    bmad_root: string; // BMAD installation root (e.g., git cache or local install)
+    module_root: string; // Current workflow's module directory
+    config_source: string; // Path to module's config.yaml
+    installed_path: string; // Path to workflow directory
+    output_folder: string; // Default output directory for generated files
+  };
+
+  // Module and origin information
+  moduleInfo?: {
+    name: string; // Module name (e.g., "bmm")
+    version?: string; // Module version
+    bmadVersion?: string; // BMAD version
+  };
+
+  originInfo?: {
+    kind: BmadOriginSource; // Where this workflow came from
+    displayName: string; // Human-readable source name
+    priority: number; // Priority for resolution
+  };
+
+  // Workflow-specific information (added by workflow executor)
+  workflowInfo?: {
+    name: string; // Workflow name
+    module: string; // Module name
+    path: string; // Absolute path to workflow.yaml
+    directory: string; // Directory containing workflow files
+  };
 }
 
 /**

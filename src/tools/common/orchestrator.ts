@@ -339,13 +339,59 @@ export class UnifiedBMADTool {
       this.discovery.activeLocation.manifestDir ||
       path.join(this.bmadRoot, '_cfg');
 
+    // Get the active origin (highest priority BMAD installation)
+    const activeOrigin = this.discovery.activeLocation;
+
+    // Determine paths for placeholder resolution
+    const projectRoot = this.discovery.projectRoot; // User's current working directory
+    const bmadRoot = activeOrigin.resolvedRoot || this.bmadRoot; // BMAD installation root
+
+    // For module-specific context, we'll use the first module from master manifest
+    // This is a reasonable default - specific workflows can override if needed
+    const masterData = this.masterService.get();
+    const firstModule = masterData.modules[0];
+
+    const moduleRoot = firstModule?.path || path.join(bmadRoot, 'core');
+    const configSource =
+      firstModule?.configPath || path.join(moduleRoot, 'config.yaml');
+
+    // Default output folder - prefer project's docs folder, fallback to current directory
+    const outputFolder = path.join(projectRoot, 'docs');
+
     return {
+      // Legacy fields
       bmadServerRoot: this.bmadRoot,
       projectRoot: this.bmadRoot,
       mcpResources: this.bmadRoot,
       agentManifestPath: path.join(manifestDir, 'agent-manifest.csv'),
       agentManifestData: this.agents,
       agentCount: this.agents.length,
+
+      // Enhanced placeholder resolution
+      placeholders: {
+        project_root: projectRoot,
+        bmad_root: bmadRoot,
+        module_root: moduleRoot,
+        config_source: configSource,
+        installed_path: bmadRoot, // Will be overridden by specific workflow
+        output_folder: outputFolder,
+      },
+
+      // Module information
+      moduleInfo: firstModule
+        ? {
+            name: firstModule.name,
+            version: firstModule.moduleVersion,
+            bmadVersion: firstModule.bmadVersion,
+          }
+        : undefined,
+
+      // Origin information
+      originInfo: {
+        kind: activeOrigin.source,
+        displayName: activeOrigin.displayName,
+        priority: activeOrigin.priority || 0,
+      },
     };
   }
 }

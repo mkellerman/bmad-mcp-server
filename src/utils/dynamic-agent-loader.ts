@@ -15,6 +15,13 @@ import path from 'node:path';
 import * as yaml from 'js-yaml';
 import type { BMADToolResult, MasterRecord } from '../types/index.js';
 import { getAgentInstructions } from '../tools/common/agent-instructions.js';
+import {
+  getOrBuildManifest,
+  type RemoteManifest,
+} from './remote-manifest-cache.js';
+import { fuzzyMatchAgents } from './remote-fuzzy-matcher.js';
+import { execSync } from 'node:child_process';
+import logger from './logger.js';
 
 /**
  * Parsed remote agent reference
@@ -24,6 +31,24 @@ export interface RemoteAgentRef {
   agentPath: string;
   fullRef: string; // e.g., "@awesome:agents/analyst"
   isModule: boolean; // true if path points to a module directory (not a single agent file)
+}
+
+/**
+ * Fuzzy resolution result for remote agents
+ */
+export interface FuzzyResolutionResult {
+  success: boolean;
+  matched?: {
+    name: string;
+    moduleName: string;
+    path: string; // Absolute path to agent file
+    repoPath: string; // Absolute path to repository root
+    displayName?: string;
+  };
+  suggestions?: string[];
+  corrected?: boolean; // True if auto-corrected a typo
+  errorMessage?: string;
+  exitCode?: number;
 }
 
 /**
@@ -89,6 +114,49 @@ class AgentCache {
 const agentCache = new AgentCache();
 
 /**
+ * Cache for remote manifests
+ * Prevents rebuilding manifests on every fuzzy search
+ */
+interface ManifestCacheEntry {
+  manifest: RemoteManifest;
+  timestamp: number;
+}
+
+class ManifestCache {
+  private cache = new Map<string, ManifestCacheEntry>();
+  private maxAge = 60 * 60 * 1000; // 1 hour TTL
+
+  set(remote: string, manifest: RemoteManifest): void {
+    this.cache.set(remote, {
+      manifest,
+      timestamp: Date.now(),
+    });
+  }
+
+  get(remote: string): RemoteManifest | undefined {
+    const entry = this.cache.get(remote);
+    if (!entry) {
+      return undefined;
+    }
+
+    // Check if expired
+    if (Date.now() - entry.timestamp > this.maxAge) {
+      this.cache.delete(remote);
+      return undefined;
+    }
+
+    return entry.manifest;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+// Singleton manifest cache instance
+const manifestCache = new ManifestCache();
+
+/**
  * Parse remote agent reference from @remote:path format
  *
  * Examples:
@@ -98,6 +166,7 @@ const agentCache = new AgentCache();
  *
  * Detection logic for modules:
  * - Path like "agents/module-name" (2 segments) → module directory
+```
  * - Path like "agents/module-name/agents/agent-name" (4+ segments) → specific agent file
  *
  * @param input - Remote agent reference string
@@ -600,4 +669,209 @@ export function getCacheStats(): { size: number; maxSize: number } {
  */
 export function clearCache(): void {
   agentCache.clear();
+  manifestCache.clear();
+}
+
+/**
+ * Get current git commit SHA for a repository
+ */
+function getGitCommit(repoPath: string): string {
+  try {
+    const result = execSync('git rev-parse HEAD', {
+      cwd: repoPath,
+      encoding: 'utf-8',
+    });
+    return String(result).trim();
+  } catch (error) {
+    logger.warn(`Failed to get git commit for ${repoPath}:`, error);
+    return 'unknown';
+  }
+}
+
+/**
+ * Resolve remote agent with fuzzy matching using manifest cache
+ *
+ * This function provides flexible agent resolution that supports:
+ * - Exact paths: @awesome:agents/debug-diana-v6/agents/debug
+ * - Module-qualified: @awesome:debug-diana-v6/debug
+ * - Partial module names: @awesome:debug-diana
+ * - Just agent names: @awesome:debug
+ * - Typo correction with suggestions
+ *
+ * @param command - Remote agent command (@remote:query)
+ * @param registry - Remote registry
+ * @param gitResolver - Git source resolver
+ * @returns Fuzzy resolution result
+ */
+export async function resolveRemoteAgentWithFuzzy(
+  command: string,
+  registry: RemoteRegistry,
+  gitResolver: GitSourceResolver,
+): Promise<FuzzyResolutionResult> {
+  // Parse the command
+  if (!command.startsWith('@')) {
+    return {
+      success: false,
+      errorMessage: 'Remote command must start with @ (e.g., @awesome:debug)',
+      exitCode: 1,
+    };
+  }
+
+  const colonIndex = command.indexOf(':');
+  if (colonIndex === -1) {
+    return {
+      success: false,
+      errorMessage:
+        'Remote command must include : separator (e.g., @awesome:debug)',
+      exitCode: 1,
+    };
+  }
+
+  const remoteName = command.slice(1, colonIndex);
+  const query = command.slice(colonIndex + 1).trim();
+
+  if (!remoteName) {
+    return {
+      success: false,
+      errorMessage: 'Remote name is required (e.g., @awesome:debug)',
+      exitCode: 1,
+    };
+  }
+
+  if (!query) {
+    return {
+      success: false,
+      errorMessage: 'Agent name is required (e.g., @awesome:debug)',
+      exitCode: 1,
+    };
+  }
+
+  // Check if remote exists
+  if (!registry.remotes.has(remoteName)) {
+    return {
+      success: false,
+      errorMessage: [
+        `❌ Unknown Remote: '${remoteName}'`,
+        ``,
+        `The remote '${remoteName}' is not registered.`,
+        ``,
+        `💡 Try: *list-remotes to see available remotes`,
+      ].join('\n'),
+      exitCode: 1,
+    };
+  }
+
+  // Get or build manifest for this remote
+  let manifest = manifestCache.get(remoteName);
+
+  if (!manifest) {
+    try {
+      // Clone/pull the remote repository
+      const remoteUrl = registry.remotes.get(remoteName)!;
+      const repoPath = await gitResolver.resolve(remoteUrl);
+
+      // Get current git commit
+      const gitCommit = getGitCommit(repoPath);
+
+      // Build or load cached manifest
+      manifest = getOrBuildManifest(repoPath, gitCommit);
+
+      // Cache the manifest
+      manifestCache.set(remoteName, manifest);
+    } catch (error) {
+      return {
+        success: false,
+        errorMessage: `Failed to access remote: ${error instanceof Error ? error.message : String(error)}`,
+        exitCode: 2,
+      };
+    }
+  }
+
+  if (manifest.agents.length === 0) {
+    return {
+      success: false,
+      errorMessage: `No agents found in remote '@${remoteName}'`,
+      exitCode: 3,
+    };
+  }
+
+  // Perform fuzzy matching against the manifest
+  const matches = fuzzyMatchAgents(query, manifest.agents);
+
+  if (matches.length === 0) {
+    return {
+      success: false,
+      errorMessage: [
+        `Agent '${query}' not found in remote '@${remoteName}'.`,
+        ``,
+        `💡 Try: *list-agents @${remoteName} to see available agents`,
+      ].join('\n'),
+      exitCode: 3,
+    };
+  }
+
+  // Get the best match
+  const bestMatch = matches[0];
+
+  // If we have a perfect exact match, return it
+  if (bestMatch.matchType === 'exact' && bestMatch.confidence === 1.0) {
+    return {
+      success: true,
+      matched: {
+        name: bestMatch.agent.name,
+        moduleName: bestMatch.agent.moduleName,
+        path: bestMatch.agent.path,
+        repoPath: manifest.repoPath,
+        displayName: bestMatch.agent.displayName,
+      },
+      exitCode: 0,
+    };
+  }
+
+  // If we have multiple high-confidence matches, return suggestions
+  const highConfidenceMatches = matches.filter((m) => m.confidence >= 0.9);
+  if (highConfidenceMatches.length > 1) {
+    return {
+      success: false,
+      suggestions: highConfidenceMatches.map((m) => m.agent.name),
+      errorMessage: [
+        `Multiple agents match '${query}':`,
+        ``,
+        ...highConfidenceMatches.map(
+          (m) => `  - ${m.agent.name} (${m.agent.moduleName})`,
+        ),
+        ``,
+        `Please be more specific.`,
+      ].join('\n'),
+      exitCode: 1,
+    };
+  }
+
+  // Single match or clear best match - return it
+  if (bestMatch.confidence >= 0.7) {
+    return {
+      success: true,
+      matched: {
+        name: bestMatch.agent.name,
+        moduleName: bestMatch.agent.moduleName,
+        path: bestMatch.agent.path,
+        repoPath: manifest.repoPath,
+        displayName: bestMatch.agent.displayName,
+      },
+      corrected: bestMatch.matchType === 'typo',
+      exitCode: 0,
+    };
+  }
+
+  // Low confidence - provide as suggestion
+  return {
+    success: false,
+    suggestions: [bestMatch.agent.name],
+    errorMessage: [
+      `Agent '${query}' not found.`,
+      ``,
+      `Did you mean: ${bestMatch.agent.name}?`,
+    ].join('\n'),
+    exitCode: 3,
+  };
 }

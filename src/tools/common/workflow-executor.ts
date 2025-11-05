@@ -46,13 +46,33 @@ export function executeWorkflow({
 
   // Load workflow.yaml and optional instructions.md alongside it
   const yamlContent = fileReader.readFile(wf.path);
-  const instructionsPath = path.join(path.dirname(wf.path), 'instructions.md');
+  const workflowDir = path.dirname(wf.path);
+  const instructionsPath = path.join(workflowDir, 'instructions.md');
   let instructions: string | undefined;
   try {
     instructions = fileReader.readFile(instructionsPath);
   } catch {
     // optional, ignore
   }
+
+  // Build context with workflow-specific overrides
+  const baseContext = buildWorkflowContext();
+
+  // Override installed_path to point to this workflow's directory
+  const workflowContext = {
+    ...baseContext,
+    placeholders: {
+      ...baseContext.placeholders,
+      installed_path: workflowDir,
+    },
+    // Add workflow-specific information
+    workflowInfo: {
+      name: wf.name,
+      module: wf.module,
+      path: wf.path,
+      directory: workflowDir,
+    },
+  };
 
   return {
     success: true,
@@ -63,7 +83,7 @@ export function executeWorkflow({
     path: wf.path,
     workflowYaml: yamlContent,
     instructions,
-    context: buildWorkflowContext(),
+    context: workflowContext,
     exitCode: 0,
   };
 }
