@@ -1,23 +1,39 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
+import { BMADReporter } from './tests/framework/reporters/bmad-vitest-reporter.js';
 
 /**
- * Vitest configuration for E2E/LLM-based tests that require external LiteLLM proxy.
- * These tests are excluded from CI and are for manual developer testing only.
+ * Vitest configuration for LLM-based E2E tests.
+ * Alias for test:e2e - LLM tests are now properly categorized as E2E tests.
+ * These tests validate complete workflows with LLM + MCP + tool calling.
  *
- * Run with: npm run test:e2e
- * Prerequisites: npm run litellm:docker:start
+ * Run with: npm run test:llm (or npm run test:e2e)
+ * Prerequisites: npm run test:litellm-start
  */
 export default defineConfig({
   test: {
-    include: ['tests/e2e/**/*.spec.ts'],
+    include: ['tests/e2e/**/*.spec.ts', 'tests/e2e/**/*.test.ts'],
+    exclude: [
+      '**/node_modules/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/tests/examples/**',
+    ],
     globals: true,
     environment: 'node',
-    testTimeout: 30000,
+    testTimeout: 300000, // 5 minutes for LLM tests
     hookTimeout: 30000,
-    reporters: ['verbose', 'json', 'html'],
+    fileParallelism: true,
+    globalSetup: ['./tests/framework/setup/global-setup.ts'],
+    setupFiles: ['./tests/framework/setup/test-setup.ts'],
+    reporters: ['default', new BMADReporter() as any],
     outputFile: {
-      json: './test-results/reports/e2e-results.json',
-      html: './test-results/reports/e2e-results.html',
+      json: './test-results/llm-results.json',
+    },
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
     },
   },
 });

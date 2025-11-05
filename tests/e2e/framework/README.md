@@ -11,7 +11,7 @@ This directory contains the infrastructure for end-to-end testing of the BMAD MC
 ### Start the test environment
 
 ```bash
-npm run e2e:start
+npm run test:litellm-start
 ```
 
 This will start a LiteLLM proxy on port 4000 that can route requests to various AI providers.
@@ -19,13 +19,13 @@ This will start a LiteLLM proxy on port 4000 that can route requests to various 
 ### Stop the test environment
 
 ```bash
-npm run e2e:stop
+npm run test:litellm-stop
 ```
 
 ### View logs
 
 ```bash
-npm run e2e:logs
+npm run test:litellm-logs
 ```
 
 ## Configuration

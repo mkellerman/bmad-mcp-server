@@ -38,7 +38,7 @@ interface SuiteResult {
  * Generates JSON and HTML reports from test results
  */
 export class BMADTestReporter {
-  private outputDir = path.join(process.cwd(), 'test-results', 'reports');
+  private outputDir = path.join(process.cwd(), 'test-results');
   private results: SuiteResult[] = [];
 
   constructor() {
@@ -73,7 +73,7 @@ export class BMADTestReporter {
       summary: this.generateSummary(),
     };
 
-    const jsonPath = path.join(this.outputDir, 'test-results.json');
+    const jsonPath = path.join(this.outputDir, 'e2e-results.json');
     fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
     console.log(`\n📄 JSON Report: ${jsonPath}`);
   }
@@ -302,7 +302,7 @@ export class BMADTestReporter {
 </body>
 </html>`;
 
-    const htmlPath = path.join(this.outputDir, 'test-report.html');
+    const htmlPath = path.join(this.outputDir, 'e2e-results.html');
     fs.writeFileSync(htmlPath, html);
     console.log(`📊 HTML Report: ${htmlPath}`);
   }

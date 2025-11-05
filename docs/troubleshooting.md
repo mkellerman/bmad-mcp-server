@@ -370,7 +370,7 @@ npm test -- --verbose
 npm run e2e:start
 
 # Check health
-npm run litellm:docker:health
+npm run test:litellm-health
 
 # Run E2E tests
 npm run test:e2e

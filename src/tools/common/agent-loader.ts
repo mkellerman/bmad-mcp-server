@@ -57,6 +57,9 @@ export function loadAgent({
   contentParts.push(`# BMAD Agent: ${displayName}`);
   contentParts.push(`**Title:** ${title}\n`);
 
+  // Include instructions section at the top (before agent content)
+  contentParts.push(getAgentInstructions());
+
   // Load agent markdown
   try {
     const agentContent = fileReader.readFile(agent.path);
@@ -78,10 +81,6 @@ export function loadAgent({
       exitCode: 3,
     };
   }
-
-  // Include instructions section
-  contentParts.push('');
-  contentParts.push(getAgentInstructions());
 
   return {
     success: true,

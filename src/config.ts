@@ -14,6 +14,7 @@ export interface DiscoveryConfig {
 export interface GitConfig {
   cacheDir: string;
   autoUpdate: boolean;
+  cacheTTL: number; // Time-to-live in seconds
 }
 
 export interface LoggingConfig {
@@ -101,9 +102,17 @@ export function loadConfig(options?: {
 
   const gitCacheDir =
     env.BMAD_GIT_CACHE_DIR || path.join(userBmadPath, 'cache', 'git');
-  const gitAutoUpdate = toBool(env.BMAD_AUTO_UPDATE_GIT, true);
+  const gitAutoUpdate = toBool(env.BMAD_GIT_AUTO_UPDATE, true); // Default true, tests override to false
+  const gitCacheTTL = parseInt(env.BMAD_GIT_CACHE_TTL || '86400', 10); // 24 hours default
 
   const debug = toBool(env.BMAD_DEBUG, false);
+
+  if (debug) {
+    console.error(
+      `🔧 Git config: cacheDir=${gitCacheDir}, autoUpdate=${gitAutoUpdate}, cacheTTL=${gitCacheTTL}s, env.BMAD_GIT_CACHE_DIR=${env.BMAD_GIT_CACHE_DIR}`,
+    );
+  }
+
   const levelEnv = (env.BMAD_LOG_LEVEL || '').toLowerCase();
   const level: LoggingConfig['level'] =
     levelEnv === 'debug' ||
@@ -120,25 +129,30 @@ export function loadConfig(options?: {
   // Agent instructions - appended to all loaded agents
   // Modify these to change how the LLM processes agent personas
   const agentInstructions = [
-    '## Agent Instructions',
+    '<!-- Powered by BMAD-CORE™ -->',
+    '',
+    '## INSTRUCTIONS FOR AGENT OVERRIDES',
     '',
     '1. Read the agent definition markdown to understand role, identity, and principles',
     '2. Apply the communication style specified in the agent definition',
     '3. Follow activation rules and command handling as defined in the agent XML/markdown',
     '',
-    '## Default Configuration (config.yaml)',
+    '## DEFAULT CONFIGURATION (config.yaml)',
     '',
     '- user_name: User',
     '- communication_language: English',
     '- output_folder: ./docs',
+    '',
+    '---',
     '',
   ].join('\n');
 
   // Workflow instructions - appended to all executed workflows
   // Modify these to change how the LLM processes workflow definitions
   const workflowInstructions = [
-    '## Execution Instructions',
+    '<!-- Powered by BMAD-CORE™ -->',
     '',
+    '## WORKFLOW EXECUTION INSTRUCTIONS',
     'Process this workflow according to BMAD workflow execution methodology:',
     '',
     '1. **Read the complete workflow.yaml configuration**',
@@ -171,6 +185,7 @@ export function loadConfig(options?: {
     git: {
       cacheDir: gitCacheDir,
       autoUpdate: gitAutoUpdate,
+      cacheTTL: gitCacheTTL,
     },
     logging: {
       debug,

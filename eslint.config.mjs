@@ -51,7 +51,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['tests/**/*.ts', 'playwright.config.ts'],
+    files: [
+      'tests/**/*.ts',
+      'playwright.config.ts',
+      'vitest.config.ts',
+      'vitest.config.llm.ts',
+    ],
     extends: [js.configs.recommended],
     languageOptions: {
       parser: tseslint.parser,

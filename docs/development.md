@@ -39,14 +39,14 @@ The project has comprehensive test coverage across multiple levels. See `tests/R
 Fast, focused tests for individual modules:
 
 ```bash
-# Run all unit tests
+# Run all unit tests (generates JSON + HTML reports)
 npm test
 
 # Run specific test file
 npm test -- tests/unit/manifest-loader.test.ts
 
 # Watch mode during development
-npm test -- --watch
+npm run test:watch
 
 # With coverage report
 npm run test:coverage
@@ -73,19 +73,16 @@ End-to-end tests using Playwright and LiteLLM to simulate real AI interactions:
 
 ```bash
 # Start LiteLLM Docker container
-npm run e2e:start
+npm run test:litellm-start
 
-# Run E2E tests
+# Run E2E tests (automatically generates JSON + HTML reports)
 npm run test:e2e
 
-# View test report
-npm run test:report
-
 # Stop LiteLLM
-npm run e2e:stop
+npm run test:litellm-stop
 
 # Health check
-npm run litellm:docker:health
+npm run test:litellm-health
 ```
 
 **E2E test structure:**

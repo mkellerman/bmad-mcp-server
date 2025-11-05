@@ -453,6 +453,9 @@ export class BMADMCPServer {
         responseParts.push(`# Workflow: ${result.name}`);
         responseParts.push(`\n**Description:** ${result.description ?? ''}\n`);
 
+        // Add execution guidance at the top (before workflow content)
+        responseParts.push(getWorkflowInstructions());
+
         // Add workflow context (server paths and agent manifest)
         if (result.context) {
           const context = result.context;
@@ -498,9 +501,6 @@ export class BMADMCPServer {
           responseParts.push(result.instructions);
           responseParts.push('```\n');
         }
-
-        // Add execution guidance
-        responseParts.push(getWorkflowInstructions());
 
         return {
           content: [
@@ -611,6 +611,7 @@ export async function main(): Promise<void> {
   const gitResolver = new GitSourceResolver(
     config.git.cacheDir,
     config.git.autoUpdate,
+    config.git.cacheTTL,
   );
   const processedCliArgs: string[] = [];
   const sourceResults: Array<{
