@@ -89,8 +89,7 @@ jobs:
       - name: Run unit tests with coverage
         env:
           CI: true
-          TEST_TYPE: unit
-        run: npm run test:coverage
+        run: TEST_TYPE=unit npm run test:coverage
 
       - name: Upload coverage artifact
         if: always()
