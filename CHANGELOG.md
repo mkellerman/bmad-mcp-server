@@ -1,3 +1,11 @@
+## [2.0.1](https://github.com/mkellerman/bmad-mcp-server/compare/v2.0.0...v2.0.1) (2025-11-05)
+
+
+### Bug Fixes
+
+* Update Node.js version in release workflow ([#24](https://github.com/mkellerman/bmad-mcp-server/issues/24)) ([d5661b6](https://github.com/mkellerman/bmad-mcp-server/commit/d5661b65a78e61898f30a7813318ec0463f41ccd))
+* Update Node.js version in release workflow ([#24](https://github.com/mkellerman/bmad-mcp-server/issues/24)) ([f3ce0ca](https://github.com/mkellerman/bmad-mcp-server/commit/f3ce0ca6cdbcc097aa4b530eddc4af70cd20141b))
+
 # [2.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v2.0.0...v2.1.0) (2025-11-03)
 
 ### Features
