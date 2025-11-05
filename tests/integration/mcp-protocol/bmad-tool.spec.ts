@@ -1,47 +1,41 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import {
-  MCPClientFixture,
-  createMCPClient,
-} from '../../support/mcp-client-fixture';
+import { MCPClientFixture } from '../../support/mcp-client-fixture';
+import path from 'node:path';
 
 /**
- * E2E Tests for BMAD MCP Tool
- * Tests the unified BMAD tool functionality
- *
- * SKIP REASON: This test suite loads BMAD from multiple sources (local .bmad,
- * git caches, etc.), resulting in duplicate agent names across modules. The
- * test expects single agents but gets disambiguation prompts, which is correct
- * behavior for production but makes tests environment-dependent.
- *
- * TODO: Create isolated E2E environment with single BMAD source, or update
- * tests to use qualified agent names (e.g., "bmm/analyst").
+ * Integration Tests for BMAD MCP Tool
+ * Tests the unified BMAD tool functionality using test fixtures
  */
-describe.skip('BMAD MCP Tool', () => {
+describe('BMAD MCP Tool', () => {
   let mcpClient: MCPClientFixture;
 
   beforeAll(async () => {
-    mcpClient = await createMCPClient();
+    // Create MCP client pointing to test fixtures
+    const fixtureRoot = path.resolve(
+      process.cwd(),
+      'tests/fixtures/bmad-core-v6',
+    );
+    mcpClient = new MCPClientFixture({ BMAD_ROOT: fixtureRoot });
+    await mcpClient.setup();
   });
 
   afterAll(async () => {
     await mcpClient.cleanup();
   });
 
-  // Discovery commands removed; skip listing tests
-
-  it('should load an agent by name', async () => {
+  it('should load an agent by qualified name', async () => {
     const result = await mcpClient.callTool('bmad', {
-      command: 'analyst',
+      command: 'core/bmad-master',
     });
 
     expect(result).toBeDefined();
-    expect(result.content).toContain('Mary');
-    expect(result.content).toContain('Business Analyst');
+    expect(result.content).toContain('BMad Master');
+    expect(result.content).toContain('Orchestrator');
   });
 
   it('should return actionable agent content (not display-only wrapper)', async () => {
     const result = await mcpClient.callTool('bmad', {
-      command: 'analyst',
+      command: 'bmb/bmad-builder',
     });
 
     expect(result).toBeDefined();

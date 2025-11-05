@@ -52,6 +52,13 @@ export default defineConfig({
     ...timeouts,
     // Tests can now run in parallel since each writes its own fragment file
     fileParallelism: true,
+    // Pool options: Run git-dependent tests sequentially to avoid lock conflicts
+    poolOptions: {
+      threads: {
+        // Use single thread for git tests to prevent cache lock conflicts
+        singleThread: testType === 'integration',
+      },
+    },
     // Global setup runs before runner initialization
     globalSetup: ['./tests/framework/setup/global-setup.ts'],
     // Setup files run in test context for each test file

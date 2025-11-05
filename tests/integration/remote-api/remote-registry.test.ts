@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   parseRemoteArgs,
   resolveRemotePath,
-} from '../../src/utils/remote-registry.js';
-import type { RemoteRegistry } from '../../src/utils/remote-registry.js';
+} from '../../../src/utils/remote-registry.js';
+import type { RemoteRegistry } from '../../../src/utils/remote-registry.js';
 
 describe('Remote Registry Integration', () => {
   describe('End-to-End Remote Resolution', () => {

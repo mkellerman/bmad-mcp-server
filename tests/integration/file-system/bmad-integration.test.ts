@@ -20,7 +20,7 @@ import {
   SAMPLE_AGENT,
   SAMPLE_WORKFLOW,
   type TestFixture,
-} from '../helpers/test-fixtures.js';
+} from '../../helpers/test-fixtures.js';
 
 describe('BMAD MCP Server Integration', () => {
   let fixture: TestFixture;

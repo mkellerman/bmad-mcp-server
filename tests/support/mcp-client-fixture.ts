@@ -19,6 +19,15 @@ export interface MCPToolResult {
 export class MCPClientFixture {
   private client!: Client;
   private transport!: StdioClientTransport;
+  private customEnv?: Record<string, string>;
+
+  /**
+   * Create an MCP client fixture
+   * @param customEnv - Optional custom environment variables to pass to the server
+   */
+  constructor(customEnv?: Record<string, string>) {
+    this.customEnv = customEnv;
+  }
 
   async setup() {
     // Path to the built server
@@ -37,6 +46,7 @@ export class MCPClientFixture {
       env: {
         ...process.env,
         BMAD_ROOT: bmadSamplePath,
+        ...this.customEnv, // Apply custom env vars
       },
     });
 

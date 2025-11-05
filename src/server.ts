@@ -611,6 +611,7 @@ export async function main(): Promise<void> {
   const gitResolver = new GitSourceResolver(
     config.git.cacheDir,
     config.git.autoUpdate,
+    config.git.cacheTTL,
   );
   const processedCliArgs: string[] = [];
   const sourceResults: Array<{

@@ -16,6 +16,9 @@ import path from 'node:path';
  * so they can run independently without interfering with each other.
  */
 export async function setup() {
+  // Set git auto-update to false for all tests to prevent git lock conflicts
+  process.env.BMAD_GIT_AUTO_UPDATE = 'false';
+
   const testType = process.env.TEST_TYPE || 'unknown';
   const resultsDir = path.join(
     process.cwd(),

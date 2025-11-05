@@ -1,158 +1,168 @@
 # BMAD MCP Server - Test Suite# BMAD MCP Server - Test Suite
 
-Comprehensive testing framework for the BMAD MCP Server with proper test categorization.Comprehensive test suite with unit, integration, E2E, and LLM tests.
+Comprehensive testing framework for the BMAD MCP Server with proper test categorization.
 
-## 📁 Test Structure## Quick Start
-
-```````bash
-
-tests/npm test                # Run unit + integration tests (483 tests)
-
-├── unit/                           # Pure unit tests (isolated, fast, no I/O)npm run test:e2e        # Run E2E tests (21 tests, no LLM)
-
-│   ├── utils/                      # Utility function testsnpm run test:llm        # Run LLM integration tests (66 tests, requires LiteLLM)
-
-│   │   ├── path-resolution/        # Path finding & resolutionnpm run test:all        # Run all tests
-
-│   │   ├── file-operations/        # File reading & YAML parsing```
-
-│   │   ├── validation/             # Validators & XML validation
-
-│   │   └── git/                    # Git source resolution## Test Structure
-
-│   ├── services/                   # Service layer tests
-
-│   ├── tools/                      # MCP tool tests```
-
-│   └── helpers/                    # Test helper functionstests/
-
-│├── unit/                    # Fast, isolated tests (433 tests)
-
-├── integration/                    # Component integration (with I/O, external deps)│   └── *.test.ts
-
-│   ├── mcp-protocol/               # MCP client ↔ server tests├── integration/             # Multi-component tests (50 tests)
-
-│   ├── remote-api/                 # External API integration (GitHub, etc.)│   └── *.test.ts
-
-│   └── file-system/                # File system integration tests├── e2e/                     # End-to-end tests WITHOUT LLM (21 tests)
-
-││   ├── bmad-tool.spec.ts
-
-├── e2e/                            # End-to-end (LLM + MCP + real workflows)│   ├── dynamic-agent-loading.spec.ts
-
-│   ├── workflows/                  # Complete workflow validation│   ├── remote-discovery.spec.ts
-
-│   ├── conversations/              # Multi-turn LLM conversations│   └── server-health.spec.ts
-
-│   └── remote-integration/         # LLM + remote discovery├── llm/                     # LLM integration tests (66 tests, requires LiteLLM)
-
-││   ├── framework/           # YAML test execution engine
-
-├── framework/                      # Test framework itself│   │   ├── llm-client.ts    # LiteLLM proxy client
-
-│   ├── core/                       # Core testing utilities│   │   ├── yaml-loader.ts   # YAML test parser
-
-│   ├── reporters/                  # Custom test reporters│   │   ├── validators.ts    # Validation strategies
-
-│   └── setup/                      # Global test setup│   │   └── runner.spec.ts   # YAML test runner (43 tests)
-
-││   ├── test-cases/          # YAML test definitions
-
-├── examples/                       # Usage examples (not run in CI)│   │   ├── agent-loading.yaml
-
-├── support/                        # Shared test utilities│   │   ├── discovery-commands.yaml
-
-└── helpers/                        # Test helper functions│   │   ├── error-handling.yaml
-
-```│   │   └── workflow-execution.yaml
-
-│   └── *.spec.ts            # Direct TypeScript LLM tests (23 tests)
-
-## 🧪 Test Categories Explained├── framework/               # Test utilities
-
-│   ├── core/                # Reporters, types, test context
-
-### Unit Tests (`tests/unit/`)│   └── helpers/             # MCP client, file helpers
-
-└── support/
-
-**What:** Pure unit tests that validate individual functions/modules in isolation.    ├── litellm-config.yaml  # LiteLLM proxy config
-
-    └── test-setup.ts        # Automatic test context tracking
-
-**Characteristics:**```
-
-- ⚡ Fast (< 5s total)
-
-- 🔒 Isolated (no I/O, no network, no file system)## Test Categories
-
-- 🎯 Focused (one function/module per test)
-
-- ✅ Always passing in CI| Category | Count | Description | Speed | Requirements |
-
-|----------|-------|-------------|-------|--------------|
-
-**Run with:**| **Unit** | 433 | Fast, isolated, mocked | ~5s | None |
-
-```bash| **Integration** | 50 | Multi-component | ~10s | None |
-
-npm run test:unit| **E2E** | 21 | Full system, no LLM | ~30s | External services |
-
-```| **LLM** | 66 | LLM behavior validation | ~2min | LiteLLM proxy |
-
-
-
-**Examples:**## Running Tests
-
-- Path resolution logic
-
-- YAML parsing### Unit + Integration (Default)
-
-- Validation functions
-
-- String utilities```bash
-
-npm test                     # Run all unit/integration tests
-
----npm run test:watch           # Watch mode
-
-npm run test:ui              # Interactive UI
-
-### Integration Tests (`tests/integration/`)npm run test:coverage        # Coverage report
+## 📁 Test Structure
 
 ```
+tests/
+├── unit/                           # Pure unit tests (isolated, fast, no I/O)
+│   ├── utils/                      # Utility function tests
+│   │   ├── path-resolution/        # Path finding & resolution
+│   │   ├── file-operations/        # File reading & YAML parsing
+│   │   ├── validation/             # Validators & XML validation
+│   │   └── git/                    # Git source resolution
+│   ├── services/                   # Service layer tests
+│   ├── tools/                      # MCP tool tests
+│   └── helpers/                    # Test helper functions
+│
+├── integration/                    # Component integration (with I/O, external deps)
+│   ├── mcp-protocol/               # MCP client ↔ server tests
+│   ├── remote-api/                 # External API integration (GitHub, etc.)
+│   └── file-system/                # File system integration tests
+│
+├── e2e/                            # End-to-end (LLM + MCP + real workflows)
+│   ├── workflows/                  # Complete workflow validation with LLM
+│   ├── conversations/              # Multi-turn LLM conversations
+│   └── remote-integration/         # LLM + remote discovery
+│
+├── framework/                      # Test framework itself
+│   ├── core/                       # Core testing utilities
+│   ├── reporters/                  # Custom test reporters
+│   └── setup/                      # Global test setup
+│
+├── examples/                       # Usage examples (not run in CI)
+├── support/                        # Shared test utilities
+└── helpers/                        # Test helper functions
+```
 
-**What:** Tests that validate how components work together, including real I/O.
+## 🧪 Test Categories Explained
 
-### End-to-End Tests
+### Unit Tests (`tests/unit/`)
+
+**What:** Pure unit tests that validate individual functions/modules in isolation.
 
 **Characteristics:**
 
-- 🐢 Moderate speed (5-30s)```bash
+- ⚡ Fast (< 5s total)
+- 🔒 Isolated (no I/O, no network, no file system)
+- 🎯 Focused (one function/module per test)
+- ✅ Always passing in CI
 
-- 🌐 Real dependencies (file system, APIs, MCP protocol)npm run test:e2e             # MCP server tests (no LLM)
+**Run with:**
 
-- 📦 Multi-component (2+ modules interacting)npm run test:e2e -- tests/e2e/bmad-tool.spec.ts  # Specific file
+```bash
+npm run test:unit
+```
 
-- ⚠️ May fail due to external factors```
+**Examples:**
 
+- Path resolution logic
+- YAML parsing
+- Validation functions
+- String utilities
 
+---
 
-**Subdirectories:**### LLM Integration Tests
+### Integration Tests (`tests/integration/`)
 
+**What:** Tests that validate how components work together, including real I/O and MCP protocol.
 
+**Characteristics:**
 
-#### `mcp-protocol/` - MCP Client ↔ ServerRequires LiteLLM proxy. See [`tests/llm/README.md`](./llm/README.md) for setup.
+- 🐢 Moderate speed (5-30s)
+- 🌐 Real dependencies (file system, MCP protocol, git operations)
+- 📦 Multi-component (2+ modules interacting)
+- 🚫 NO external LLM required
+
+**Subdirectories:**
+
+#### `mcp-protocol/` - MCP Client ↔ Server
 
 Tests MCP server functionality via stdio protocol:
 
-- Server health checks```bash
+- Server health checks
+- Agent/workflow discovery
+- Dynamic agent loading
+- Tool routing and command parsing
+- Fixture-based comprehensive testing
 
-- Tool registrationnpm run test:litellm-start   # Start LiteLLM proxy
+#### `remote-api/` - External API Integration
 
-- Dynamic agent loading via MCPnpm run test:llm             # Run LLM tests
+Tests integration with external services:
 
-npm run test:litellm-stop    # Stop proxy when done
+- Git repository cloning
+- Remote agent/workflow discovery
+- Cache management
+
+#### `file-system/` - File System Integration
+
+Tests BMAD path discovery and file operations:
+
+- BMAD installation detection
+- Manifest loading and parsing
+- v6 format validation
+
+**Run with:**
+
+```bash
+npm run test:integration
+```
+
+---
+
+### E2E Tests (`tests/e2e/`)
+
+**What:** End-to-end tests that validate complete user workflows WITH LLM integration.
+
+**Characteristics:**
+
+- 🐌 Slow (30s - 2min)
+- 🤖 Requires LiteLLM proxy running
+- 🌍 Full system integration (MCP + LLM + workflows)
+- ⚠️ Conditional execution (skipped if LiteLLM unavailable)
+
+**Subdirectories:**
+
+#### `workflows/` - Workflow Validation with LLM
+
+- Agent persona adoption validation
+- Workflow execution through LLM
+- Multi-step workflow orchestration
+
+#### `conversations/` - Multi-turn LLM Conversations
+
+- Persona adoption testing
+- Conversation context maintenance
+- Tool calling through LLM
+
+#### `remote-integration/` - Remote Discovery with LLM
+
+- LLM passing @remote syntax correctly
+- Remote agent loading through LLM
+
+**Run with:**
+
+```bash
+# Start LiteLLM proxy first
+npm run test:litellm-start
+
+# Run E2E tests
+npm run test:e2e
+
+# Stop LiteLLM proxy
+npm run test:litellm-stop
+```
+
+**Note:** All E2E tests use `describe.skipIf()` to gracefully skip when LiteLLM is unavailable.
+
+---
+
+- Tool registrationnpm run test:litellm-start # Start LiteLLM proxy
+
+- Dynamic agent loading via MCPnpm run test:llm # Run LLM tests
+
+npm run test:litellm-stop # Stop proxy when done
 
 **Run with:**```
 
@@ -162,7 +172,7 @@ npm run test:integration -- tests/integration/mcp-protocol/### All Tests
 
 ```
 
-```bash
+````bash
 
 #### `remote-api/` - External API Integrationnpm run test:all             # Run everything (unit + int + e2e + llm)
 
@@ -182,15 +192,15 @@ Tests integration with external services:```
 
 npm run test:integration -- tests/integration/remote-api/import { describe, it, expect } from 'vitest';
 
-```
+````
 
 describe('MyModule', () => {
 
-#### `file-system/` - File System Integration  it('should do something', () => {
+#### `file-system/` - File System Integration it('should do something', () => {
 
-Tests real file system operations:    expect(true).toBe(true);
+Tests real file system operations: expect(true).toBe(true);
 
-- BMAD installation detection  });
+- BMAD installation detection });
 
 - Manifest loading from disk});
 
@@ -202,11 +212,11 @@ Tests real file system operations:    expect(true).toBe(true);
 
 **Run with:**
 
-```bash```typescript
+`bash`typescript
 
 npm run test:integration -- tests/integration/file-system/import { describe, it, expect } from 'vitest';
 
-```import { MCPTestClient } from '../framework/helpers/mcp-client';
+````import { MCPTestClient } from '../framework/helpers/mcp-client';
 
 
 
@@ -282,25 +292,25 @@ Tests full agent/workflow execution:    llmClient = new LLMClient();
 
 npm run test:e2e -- tests/e2e/workflows/  });
 
-```
+````
 
-  afterAll(async () => {
+afterAll(async () => {
 
-#### `conversations/` - Multi-Turn LLM Conversations    await mcpClient.cleanup();
+#### `conversations/` - Multi-Turn LLM Conversations await mcpClient.cleanup();
 
-Tests LLM conversation flows:  });
+Tests LLM conversation flows: });
 
 - Single agent interactions
 
-- Persona adoption  it('should understand bmad tool', async () => {
+- Persona adoption it('should understand bmad tool', async () => {
 
-- Context preservation across turns    const completion = await llmClient.chat(
+- Context preservation across turns const completion = await llmClient.chat(
 
       'gpt-4.1',
 
-**Run with:**      [{ role: 'user', content: 'Load the analyst agent using bmad' }],
+**Run with:** [{ role: 'user', content: 'Load the analyst agent using bmad' }],
 
-```bash      { temperature: 0.1 }
+```bash { temperature: 0.1 }
 
 npm run test:e2e -- tests/e2e/conversations/    );
 
@@ -308,7 +318,7 @@ npm run test:e2e -- tests/e2e/conversations/    );
 
     expect(completion.choices[0].message.content).toContain('analyst');
 
-#### `remote-integration/` - LLM + Remote Discovery  });
+#### `remote-integration/` - LLM + Remote Discovery });
 
 Tests LLM using remote agents:});
 
@@ -330,7 +340,7 @@ npm run test:e2e -- tests/e2e/remote-integration/
 
 **Stop proxy when done:**- **Test Contexts** (`.contexts/`) - Automatic test metadata capture
 
-```bash
+```````bash
 
 npm run test:litellm-stopView HTML report:
 
@@ -396,21 +406,19 @@ npm run test:ui- ✅ Tool calling patterns
 
 npm run test:coverage## Validation Types (YAML Tests)
 
-```
+```````
 
-| Type              | Description                    | Example               |
+| Type | Description | Example |
 
 ### Targeted Test Runs| ----------------- | ------------------------------ | --------------------- |
 
-| `contains`        | String must be in response     | `value: "Mary"`       |
+| `contains` | String must be in response | `value: "Mary"` |
 
-```bash| `not_contains`    | String must NOT be in response | `value: "error"`      |
+```bash| `not_contains`   | String must NOT be in response |`value: "error"` |
 
-# Run specific test file| `regex`           | Regex pattern match            | `pattern: "\\*\\w+"`  |
+# Run specific test file| `regex` | Regex pattern match | `pattern: "\\*\\w+"` |
 
-npm run test:unit -- tests/unit/utils/path-resolution/bmad-path-resolver.test.ts| `response_length` | Length within range            | `min: 100, max: 5000` |
-
-
+npm run test:unit -- tests/unit/utils/path-resolution/bmad-path-resolver.test.ts| `response_length` | Length within range | `min: 100, max: 5000` |
 
 # Run tests matching pattern## Coverage
 
@@ -441,14 +449,13 @@ After running tests, reports are generated in `test-results/`:- Lines: 60%
 - **`test-results.json`** - Structured JSON data (all test types combined)
 
 - **`test-results.html`** - Interactive HTML report with tree view## CI/CD
-
   - Click tests in left sidebar to view details
 
   - Collapsible sections for chat conversations, errors, metadataDefault CI runs only unit + integration tests for speed and cost:
 
   - Full test data available as JSON
 
-```bash
+````bash
 
 **View HTML report:**npm test  # Fast, free, no external dependencies
 
@@ -466,13 +473,13 @@ RUN_E2E=true npm run test:e2e   # E2E tests
 
 ## 🎯 Test Type Decision TreeRUN_E2E=true npm run test:llm   # LLM tests (requires API keys)
 
-```
+````
 
 **Choose your test type:**
 
 ## Troubleshooting
 
-```
+````
 
 ┌─ Testing a single function/module?### Tests Not Running
 
@@ -516,7 +523,7 @@ npm run test:coverage
 
 ### Rich Data Collectionopen coverage/index.html
 
-```
+````
 
 All tests automatically capture:
 
@@ -526,9 +533,9 @@ All tests automatically capture:
 
 - ✅ Error details (stack traces, diffs)```bash
 
-- ✅ Hook execution statuslsof -i :4000                  # Find process using port
+- ✅ Hook execution statuslsof -i :4000 # Find process using port
 
-npm run test:litellm-stop      # Stop proxy
+npm run test:litellm-stop # Stop proxy
 
 **E2E tests additionally capture:**```
 
@@ -544,7 +551,6 @@ npm run test:litellm-stop      # Stop proxy
 
 ### Custom Reporters- [`LLM-SETUP.md`](./LLM-SETUP.md) - LiteLLM proxy configuration
 
-
 - **BMAD Reporter**: Captures rich test context
 - **Console Reporter**: Standard Vitest output
 - **HTML Reporter**: Interactive tree-view report
@@ -552,6 +558,7 @@ npm run test:litellm-stop      # Stop proxy
 ### Parallel Execution
 
 Tests run in parallel by default for speed:
+
 - Unit tests: Full parallelism
 - Integration tests: Full parallelism
 - E2E tests: Full parallelism (each test isolated)
@@ -582,7 +589,10 @@ describe('myFunction', () => {
 
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { MCPClientFixture, createMCPClient } from '../../support/mcp-client-fixture';
+import {
+  MCPClientFixture,
+  createMCPClient,
+} from '../../support/mcp-client-fixture';
 
 describe('MCP Integration', () => {
   let mcpClient: MCPClientFixture;
@@ -607,8 +617,15 @@ describe('MCP Integration', () => {
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { LLMClient } from '../../support/llm-client';
-import { MCPClientFixture, createMCPClient } from '../../support/mcp-client-fixture';
-import { startChatConversation, addChatMessage, finalizeChatConversation } from '../../framework/core/test-context';
+import {
+  MCPClientFixture,
+  createMCPClient,
+} from '../../support/mcp-client-fixture';
+import {
+  startChatConversation,
+  addChatMessage,
+  finalizeChatConversation,
+} from '../../framework/core/test-context';
 
 describe('LLM Workflow', () => {
   let llm: LLMClient;
@@ -630,9 +647,14 @@ describe('LLM Workflow', () => {
     addChatMessage('user', 'Load the analyst agent');
 
     // LLM calls tool via MCP
-    const response = await llm.sendMessage('Use the tool to load analyst agent', [mcpClient.getTools()]);
+    const response = await llm.sendMessage(
+      'Use the tool to load analyst agent',
+      [mcpClient.getTools()],
+    );
 
-    addChatMessage('assistant', response.text, { toolCalls: response.toolCalls });
+    addChatMessage('assistant', response.text, {
+      toolCalls: response.toolCalls,
+    });
 
     expect(response.toolCalls).toHaveLength(1);
     expect(response.text).toContain('Mary');
@@ -659,6 +681,7 @@ npm run test:unit -- --reporter=verbose
 ### Import Errors After Moving Files
 
 Update import paths to match new directory depth:
+
 - 2 levels deep: `../../src/`
 - 3 levels deep: `../../../src/`
 
@@ -712,4 +735,7 @@ npm run test:litellm-logs
 **Last Updated:** January 2025
 **Test Framework Version:** 2.0.0
 **Total Tests:** 464 tests (416 unit + 34 integration + 14 e2e)
-```````
+
+```
+
+```

@@ -17,7 +17,11 @@ import { join } from 'node:path';
 const LLM_MODEL = 'gpt-4.1';
 const LLM_TEMPERATURE = 0.1;
 
-describe('Remote Discovery LLM Integration', () => {
+// Skip test suite if LiteLLM is not available
+// Default to localhost:4000 if LITELLM_PROXY_URL not explicitly set
+const skipE2E = process.env.SKIP_LLM_TESTS === 'true';
+
+describe.skipIf(skipE2E)('Remote Discovery LLM Integration', () => {
   let mcpClient: MCPClientFixture;
   let llmClient: LLMClient;
 

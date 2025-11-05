@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   createTestFixture,
   type TestFixture,
-} from '../helpers/test-fixtures.js';
+} from '../../helpers/test-fixtures.js';
 import { resolveBmadPaths } from '../../../src/utils/bmad-path-resolver.js';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -56,11 +56,17 @@ export interface CacheMetadata {
 export class GitSourceResolver {
   private cacheDir: string;
   private autoUpdate: boolean;
+  private cacheTTL: number; // Time-to-live in seconds
 
-  constructor(cacheDir?: string, autoUpdate: boolean = true) {
+  constructor(
+    cacheDir?: string,
+    autoUpdate: boolean = false,
+    cacheTTL: number = 86400,
+  ) {
     this.cacheDir =
       cacheDir || path.join(os.homedir(), '.bmad', 'cache', 'git');
     this.autoUpdate = autoUpdate;
+    this.cacheTTL = cacheTTL * 1000; // Convert to milliseconds
   }
 
   /**
@@ -107,20 +113,25 @@ export class GitSourceResolver {
     // Check if cache exists AND matches the exact URL spec
     const cacheExists = await this.pathExists(cachePath);
     if (cacheExists) {
+      // Wait for any ongoing clone operation to complete
+      await this.waitForCloneCompletion(cachePath);
+
       const metadata = await this.loadMetadata(cachePath);
 
       if (this.isValidCache(metadata, gitUrl, spec)) {
         // Cache exists and URL matches
-        if (this.autoUpdate) {
-          // Auto-update enabled → PULL LATEST
+        const shouldUpdate = this.shouldUpdateCache(metadata);
+
+        if (shouldUpdate) {
+          // Auto-update enabled OR cache expired → PULL LATEST
           logger.info(
             `Updating cached repo: ${spec.org}/${spec.repo}#${spec.ref}`,
           );
           await this.updateRepository(spec, cachePath, gitUrl);
         } else {
-          // Auto-update disabled → USE CACHED VERSION
+          // Auto-update disabled AND cache fresh → USE CACHED VERSION
           logger.info(
-            `Using cached repo (auto-update disabled): ${spec.org}/${spec.repo}#${spec.ref}`,
+            `Using cached repo (auto-update disabled, cache fresh): ${spec.org}/${spec.repo}#${spec.ref}`,
           );
         }
       } else {
@@ -205,6 +216,73 @@ export class GitSourceResolver {
     // Only validate ref (branch/tag) matches
     // Subpath is applied after cache resolution, so changes don't invalidate cache
     return metadata.ref === spec.ref;
+  }
+
+  /**
+   * Determine if cache should be updated based on TTL and autoUpdate
+   *
+   * @param metadata - Cache metadata with lastPull timestamp
+   * @returns true if cache should be updated, false to use cached version
+   */
+  private shouldUpdateCache(metadata: CacheMetadata | null): boolean {
+    // If autoUpdate is enabled, always update
+    if (this.autoUpdate) {
+      return true;
+    }
+
+    // If no metadata or no lastPull, update to refresh metadata
+    if (!metadata?.lastPull) {
+      return true;
+    }
+
+    // Check if cache has expired based on TTL
+    const lastPullTime = new Date(metadata.lastPull).getTime();
+    const now = Date.now();
+    const cacheAge = now - lastPullTime;
+
+    const expired = cacheAge > this.cacheTTL;
+    if (expired) {
+      logger.info(
+        `Cache expired (age: ${Math.floor(cacheAge / 1000)}s, TTL: ${this.cacheTTL / 1000}s)`,
+      );
+    }
+
+    return expired;
+  }
+
+  /**
+   * Wait for an ongoing clone operation to complete
+   *
+   * If .bmad-cache.json doesn't exist but the directory does, another process
+   * might be cloning. Wait up to 30 seconds for it to complete.
+   */
+  private async waitForCloneCompletion(cachePath: string): Promise<void> {
+    const maxWaitMs = 30000; // 30 seconds
+    const pollInterval = 500; // Check every 500ms
+    const metadataPath = path.join(cachePath, '.bmad-cache.json');
+
+    let waited = 0;
+    while (waited < maxWaitMs) {
+      const metadataExists = await this.pathExists(metadataPath);
+      if (metadataExists) {
+        logger.debug(`Clone completed (waited ${waited}ms)`);
+        return; // Clone completed
+      }
+
+      // Check if git directory exists - if not, no clone in progress
+      const gitDir = path.join(cachePath, '.git');
+      const gitExists = await this.pathExists(gitDir);
+      if (!gitExists) {
+        logger.debug(`No .git directory found, assuming failed clone`);
+        return; // No clone in progress
+      }
+
+      // Still cloning, wait a bit longer
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      waited += pollInterval;
+    }
+
+    logger.warn(`Timeout waiting for clone completion after ${maxWaitMs}ms`);
   }
 
   /**

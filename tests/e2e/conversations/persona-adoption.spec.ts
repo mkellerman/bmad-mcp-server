@@ -7,22 +7,21 @@ import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
 
 /**
- * LLM: Persona adoption smoke test
+ * E2E Test: Persona adoption with LLM
  *
  * Flow:
  * 1) Load an agent via MCP tool (architect)
- * 2) Feed the returned agent content to the LLM as a system message
- * 3) Ask: "What is your name and what are your duties?"
- * 4) Validate the reply reflects the loaded persona (name + role)
+ * 2) Send the agent content to an LLM
+ * 3) Verify the LLM adopts the persona correctly
  *
- * Note: This test requires the LiteLLM proxy running. If it's not running,
- * the test will be skipped without failing the suite.
+ * Requires: LiteLLM proxy running (skip if unavailable)
  */
 
-describe('Persona adoption', () => {
+const skipE2E = process.env.SKIP_LLM_TESTS === 'true';
+
+describe.skipIf(skipE2E)('Persona adoption', () => {
   let mcpClient: MCPClientFixture;
   let llm: LLMClient;
-  let healthy = false;
 
   beforeAll(async () => {
     // Start MCP client
@@ -30,7 +29,10 @@ describe('Persona adoption', () => {
 
     // Init LLM client and check health
     llm = new LLMClient();
-    healthy = await llm.healthCheck();
+    const healthy = await llm.healthCheck();
+    if (!healthy) {
+      throw new Error('❌ LiteLLM proxy not running!');
+    }
   });
 
   afterAll(async () => {
@@ -38,15 +40,6 @@ describe('Persona adoption', () => {
   });
 
   it('should respond in persona after loading architect', async () => {
-    if (!healthy) {
-      // Skip when LiteLLM proxy is not running
-      console.warn(
-        '⚠️  Skipping persona adoption test: LiteLLM proxy not running',
-      );
-      expect(true).toBe(true);
-      return;
-    }
-
     // 1) Load the architect agent via MCP tool
     const load = await mcpClient.callTool('bmad', { command: 'architect' });
     expect(load.isError).toBe(false);

@@ -1,11 +1,12 @@
 /**
- * Unit tests for BMADMCPServer
+ * Integration tests for BMADMCPServer initialization
+ * Tests server construction with real BMAD structures and manifest loading
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
-import { BMADMCPServer } from '../../src/server.js';
-import { resolveBmadPaths } from '../../src/utils/bmad-path-resolver.js';
+import { BMADMCPServer } from '../../../src/server.js';
+import { resolveBmadPaths } from '../../../src/utils/bmad-path-resolver.js';
 import {
   createTestFixture,
   createBMADStructure,
@@ -16,9 +17,9 @@ import {
   SAMPLE_AGENT,
   SAMPLE_WORKFLOW,
   type TestFixture,
-} from '../helpers/test-fixtures.js';
+} from '../../helpers/test-fixtures.js';
 
-describe('BMADMCPServer', () => {
+describe('BMADMCPServer Initialization', () => {
   let fixture: TestFixture;
 
   function createServer(baseDir: string): BMADMCPServer {
@@ -28,7 +29,9 @@ describe('BMADMCPServer', () => {
       envVar: undefined,
       userBmadPath: path.join(baseDir, '.bmad'),
     });
-    return new BMADMCPServer(baseDir, discovery);
+    const remoteRegistry = { remotes: new Map<string, string>() }; // Empty registry for tests
+    const version = '0.0.0-test';
+    return new BMADMCPServer(baseDir, discovery, remoteRegistry, version);
   }
 
   beforeEach(() => {

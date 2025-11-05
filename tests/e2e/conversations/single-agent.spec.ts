@@ -1,5 +1,5 @@
 /**
- * Single Agent LLM Test
+ * E2E Test: Single Agent LLM Integration
  * Quick validation that LLM integration works for agent loading
  */
 
@@ -14,22 +14,15 @@ import {
   addChatMessage,
   finalizeChatConversation,
 } from '../../framework/core/test-context.js';
-import fs from 'fs';
-import path from 'path';
 
-const LOG_DIR = path.join(process.cwd(), 'test-results', 'agent-logs');
 const LLM_MODEL = 'gpt-4.1';
 const LLM_TEMPERATURE = 0.1;
 
-function writeLog(filename: string, content: string): void {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-  }
-  const logPath = path.join(LOG_DIR, filename);
-  fs.writeFileSync(logPath, content, 'utf-8');
-}
+// Skip test suite if explicitly disabled
+// Default to localhost:4000 if LITELLM_PROXY_URL not explicitly set
+const skipE2E = process.env.SKIP_LLM_TESTS === 'true';
 
-describe('Single Agent LLM Integration Test', () => {
+describe.skipIf(skipE2E)('Single Agent LLM Integration Test', () => {
   let mcpClient: MCPClientFixture;
   let llmClient: LLMClient;
 
@@ -198,17 +191,7 @@ describe('Single Agent LLM Integration Test', () => {
     // Finalize the chat conversation
     await finalizeChatConversation(totalTokens);
 
-    // Write log
-    const logContent = `USER: #mcp_bmad_bmad ${agentName}\n\nSYSTEM: ${finalResponse}\n\nTEST ANALYSIS: ${finalResponse.length > 0 ? 'Response received' : 'No response'}`;
-
-    const logPath = path.join(LOG_DIR, `${agentName}_test.log`);
-    writeLog(`${agentName}_test.log`, logContent);
-
-    console.log(`Log directory: ${LOG_DIR}`);
-    console.log(`Log path: ${logPath}`);
-    console.log(`Log file exists: ${fs.existsSync(logPath)}`);
-
     expect(finalResponse.length).toBeGreaterThan(0);
-    console.log(`✅ Test complete - log written to ${agentName}_test.log`);
+    console.log(`✅ Test complete`);
   });
 });

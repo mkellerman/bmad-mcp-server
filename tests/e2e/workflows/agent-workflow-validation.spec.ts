@@ -17,8 +17,6 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
-import fs from 'fs';
-import path from 'path';
 
 interface AgentInfo {
   name: string;
@@ -37,24 +35,10 @@ interface MenuCommand {
   label?: string;
 }
 
-// Log directory
-const LOG_DIR = path.join(process.cwd(), 'test-results', 'agent-logs');
-
 // LLM Configuration
 const LLM_MODEL = 'gpt-4.1';
 const LLM_API_KEY = 'sk-test-bmad-1234';
 const LLM_TEMPERATURE = 0.1;
-
-/**
- * Write content to a log file
- */
-function writeLog(filename: string, content: string): void {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-  }
-  const logPath = path.join(LOG_DIR, filename);
-  fs.writeFileSync(logPath, content, 'utf-8');
-}
 
 /**
  * Analyze LLM response for agent adoption
@@ -109,12 +93,16 @@ function analyzeLLMResponse(response: string): {
 function parseAgentList(content: string): AgentInfo[] {
   const agents: AgentInfo[] = [];
 
+  // Extract content from XML tags if present
+  const contentMatch = content.match(/<content>([\s\S]*?)<\/content>/);
+  const actualContent = contentMatch ? contentMatch[1] : content;
+
   // Look for agent entries in format: - icon `load-command`: Title (**DisplayName**) Role
   // Example: - 🤖 `analyst`: Business Analyst (**Mary**) - Lead Analyst
-  const linePattern = /^[-*]\s+[^\s]+\s+`([^`]+)`:\s*(.*)$/gm;
+  const linePattern = /^[-*]\s+[^\s]*\s*`([^`]+)`:\s*(.*)$/gm;
 
   let match;
-  while ((match = linePattern.exec(content)) !== null) {
+  while ((match = linePattern.exec(actualContent)) !== null) {
     const loadCommand = match[1];
     const description = match[2];
 
@@ -140,7 +128,7 @@ function parseAgentList(content: string): AgentInfo[] {
 
   // Also try JSON structured data if available
   try {
-    const jsonMatch = content.match(/```json\s*\n([\s\S]+?)\n```/);
+    const jsonMatch = actualContent.match(/```json\s*\n([\s\S]+?)\n```/);
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[1]);
       if (Array.isArray(data.agents)) {
@@ -168,12 +156,16 @@ function parseAgentList(content: string): AgentInfo[] {
 function parseWorkflowList(content: string): WorkflowInfo[] {
   const workflows: WorkflowInfo[] = [];
 
+  // Extract content from XML tags if present
+  const contentMatch = content.match(/<content>([\s\S]*?)<\/content>/);
+  const actualContent = contentMatch ? contentMatch[1] : content;
+
   // Look for workflow entries in format: - 🔄 `workflow-name`: Description
   // Example: - 🔄 `party-mode`: **Party Planning Mode** - Interactive workflow
-  const linePattern = /^[-*]\s+[^\s]+\s+`([^`]+)`:\s*(.*)$/gm;
+  const linePattern = /^[-*]\s+[^\s]*\s*`([^`]+)`:\s*(.*)$/gm;
 
   let match;
-  while ((match = linePattern.exec(content)) !== null) {
+  while ((match = linePattern.exec(actualContent)) !== null) {
     const name = match[1];
     if (name && name.length > 0 && !name.startsWith('http')) {
       workflows.push({
@@ -185,7 +177,7 @@ function parseWorkflowList(content: string): WorkflowInfo[] {
 
   // Also try JSON structured data
   try {
-    const jsonMatch = content.match(/```json\s*\n([\s\S]+?)\n```/);
+    const jsonMatch = actualContent.match(/```json\s*\n([\s\S]+?)\n```/);
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[1]);
       if (Array.isArray(data.items)) {
@@ -252,7 +244,11 @@ function extractMenuCommands(content: string): MenuCommand[] {
   return commands;
 }
 
-describe('Agent and Workflow Validation', () => {
+// Skip test suite if LiteLLM is not available
+// Default to localhost:4000 if LITELLM_PROXY_URL not explicitly set
+const skipE2E = process.env.SKIP_LLM_TESTS === 'true';
+
+describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
   let mcpClient: MCPClientFixture;
   let llmClient: LLMClient;
   let allAgents: AgentInfo[] = [];
@@ -293,7 +289,7 @@ describe('Agent and Workflow Validation', () => {
       expect(result.content.length).toBeGreaterThan(0);
 
       allAgents = parseAgentList(result.content);
-      console.log(`\nFound ${allAgents.length} agents`);
+      console.log(`Found ${allAgents.length} agents`);
 
       expect(allAgents.length).toBeGreaterThan(0);
     });
@@ -341,9 +337,6 @@ describe('Agent and Workflow Validation', () => {
         console.log(
           `\n🔍 Testing agent through LLM: ${agent.name} (${agent.title || 'no title'})`,
         );
-
-        const sanitizedName = agent.name.replace(/[^a-zA-Z0-9-]/g, '_');
-        const logFilename = `${sanitizedName}.log`;
 
         try {
           // Define the BMAD tool for the LLM
@@ -475,23 +468,6 @@ describe('Agent and Workflow Validation', () => {
             duration: 0,
           });
 
-          // Write structured log
-          const logContent = `USER: #mcp_bmad_bmad ${agent.name}
-
-SYSTEM: ${llmResponse}
-
-TEST ANALYSIS:
-Persona Loaded: ${analysis.personaLoaded ? 'Yes' : 'No'}
-Menu Provided: ${analysis.menuProvided ? 'Yes' : 'No'}
-Menu Items Count: ${analysis.menuCount}
-Has Greeting: ${analysis.hasGreeting ? 'Yes' : 'No'}
-
-TOOL RESPONSE:
-${toolResponse || 'No tool called'}
-`;
-
-          writeLog(logFilename, logContent);
-
           results.push({
             name: agent.name,
             success: true,
@@ -507,21 +483,6 @@ ${toolResponse || 'No tool called'}
           const errorMessage =
             error instanceof Error ? error.message : String(error);
 
-          const logContent = `USER: #mcp_bmad_bmad ${agent.name}
-
-SYSTEM: ERROR
-
-TEST ANALYSIS:
-Persona Loaded: No
-Menu Provided: No
-Menu Items Count: 0
-
-ERROR:
-${errorMessage}
-`;
-
-          writeLog(logFilename, logContent);
-
           results.push({
             name: agent.name,
             success: false,
@@ -535,35 +496,6 @@ ${errorMessage}
         }
       }
 
-      // Write summary log
-      const summary = `=== AGENT LOADING SUMMARY (LLM) ===
-Timestamp: ${new Date().toISOString()}
-Model: ${LLM_MODEL}
-Total Agents: ${results.length}
-Successful: ${results.filter((r) => r.success).length}
-Failed: ${results.filter((r) => !r.success).length}
-Persona Loaded: ${results.filter((r) => r.personaLoaded).length}
-Menu Provided: ${results.filter((r) => r.menuProvided).length}
-Total Menu Items: ${results.reduce((sum, r) => sum + r.menuCount, 0)}
-
-=== DETAILED RESULTS ===
-${results
-  .map(
-    (r) => `
-Agent: ${r.name}
-  Success: ${r.success}
-  Persona Loaded: ${r.personaLoaded}
-  Menu Provided: ${r.menuProvided}
-  Menu Items: ${r.menuCount}
-  ${r.error ? `Error: ${r.error}` : ''}
-`,
-  )
-  .join('\n')}
-
-=== END SUMMARY ===
-`;
-      writeLog('_SUMMARY_agents.log', summary);
-
       console.log('\n📊 Summary:');
       console.log(`   Total: ${results.length}`);
       console.log(`   Success: ${results.filter((r) => r.success).length}`);
@@ -576,7 +508,6 @@ Agent: ${r.name}
       console.log(
         `   Total Menu Items: ${results.reduce((sum, r) => sum + r.menuCount, 0)}`,
       );
-      console.log(`\n📁 Logs written to: ${LOG_DIR}`);
 
       // Test passes if we processed all agents
       expect(results.length).toBe(allAgents.length);
@@ -610,24 +541,6 @@ Agent: ${r.name}
           command: `*${workflow.name}`,
         });
 
-        const sanitizedName = workflow.name.replace(/[^a-zA-Z0-9-]/g, '_');
-        const logFilename = `workflow_${sanitizedName}.log`;
-
-        // Log the response
-        const logContent = `=== Workflow: ${workflow.name} ===
-Command: *${workflow.name}
-Path: ${workflow.path}
-Timestamp: ${new Date().toISOString()}
-
-=== RESPONSE ===
-Error: ${result.isError}
-${result.isError ? 'ERROR MESSAGE:\n' : 'CONTENT:\n'}
-${result.content}
-
-=== END ===
-`;
-        writeLog(logFilename, logContent);
-
         const success = !result.isError;
 
         results.push({
@@ -642,33 +555,10 @@ ${result.content}
         }
       }
 
-      // Write summary log
-      const summary = `=== WORKFLOW EXECUTION SUMMARY ===
-Timestamp: ${new Date().toISOString()}
-Total Workflows: ${results.length}
-Successful: ${results.filter((r) => r.success).length}
-Failed: ${results.filter((r) => !r.success).length}
-
-=== DETAILED RESULTS ===
-${results
-  .map(
-    (r) => `
-Workflow: *${r.name}
-  Success: ${r.success}
-  ${r.error ? `Error: ${r.error}` : ''}
-`,
-  )
-  .join('\n')}
-
-=== END SUMMARY ===
-`;
-      writeLog('_SUMMARY_workflows.log', summary);
-
       console.log('\n📊 Workflow Summary:');
       console.log(`   Total: ${results.length}`);
       console.log(`   Success: ${results.filter((r) => r.success).length}`);
       console.log(`   Failed: ${results.filter((r) => !r.success).length}`);
-      console.log(`\n📁 Logs written to: ${LOG_DIR}`);
 
       // Test passes if we processed all workflows
       expect(results.length).toBe(allWorkflows.length);
@@ -732,29 +622,6 @@ Workflow: *${r.name}
         }
       }
 
-      // Write validation summary
-      const summary = `=== AGENT-WORKFLOW VALIDATION SUMMARY ===
-Timestamp: ${new Date().toISOString()}
-Total Command-Workflow Mappings: ${validationResults.length}
-Valid References: ${validationResults.filter((r) => r.exists).length}
-Invalid References: ${validationResults.filter((r) => !r.exists).length}
-
-=== DETAILED RESULTS ===
-${validationResults
-  .map(
-    (r) => `
-Agent: ${r.agent}
-  Command: ${r.command}
-  Workflow: ${r.workflow}
-  Exists: ${r.exists ? '✅' : '❌'}
-`,
-  )
-  .join('\n')}
-
-=== END SUMMARY ===
-`;
-      writeLog('_SUMMARY_validation.log', summary);
-
       console.log('\n📊 Validation Summary:');
       console.log(`   Total Mappings: ${validationResults.length}`);
       console.log(
@@ -763,7 +630,6 @@ Agent: ${r.agent}
       console.log(
         `   Invalid: ${validationResults.filter((r) => !r.exists).length}`,
       );
-      console.log(`\n📁 Logs written to: ${LOG_DIR}`);
 
       // Test passes - we're just logging, not enforcing
       expect(validationResults.length).toBeGreaterThanOrEqual(0);

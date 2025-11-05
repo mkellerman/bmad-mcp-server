@@ -14,6 +14,7 @@ export interface DiscoveryConfig {
 export interface GitConfig {
   cacheDir: string;
   autoUpdate: boolean;
+  cacheTTL: number; // Time-to-live in seconds
 }
 
 export interface LoggingConfig {
@@ -101,9 +102,17 @@ export function loadConfig(options?: {
 
   const gitCacheDir =
     env.BMAD_GIT_CACHE_DIR || path.join(userBmadPath, 'cache', 'git');
-  const gitAutoUpdate = toBool(env.BMAD_AUTO_UPDATE_GIT, true);
+  const gitAutoUpdate = toBool(env.BMAD_GIT_AUTO_UPDATE, true); // Default true, tests override to false
+  const gitCacheTTL = parseInt(env.BMAD_GIT_CACHE_TTL || '86400', 10); // 24 hours default
 
   const debug = toBool(env.BMAD_DEBUG, false);
+
+  if (debug) {
+    console.error(
+      `🔧 Git config: cacheDir=${gitCacheDir}, autoUpdate=${gitAutoUpdate}, cacheTTL=${gitCacheTTL}s, env.BMAD_GIT_CACHE_DIR=${env.BMAD_GIT_CACHE_DIR}`,
+    );
+  }
+
   const levelEnv = (env.BMAD_LOG_LEVEL || '').toLowerCase();
   const level: LoggingConfig['level'] =
     levelEnv === 'debug' ||
@@ -176,6 +185,7 @@ export function loadConfig(options?: {
     git: {
       cacheDir: gitCacheDir,
       autoUpdate: gitAutoUpdate,
+      cacheTTL: gitCacheTTL,
     },
     logging: {
       debug,

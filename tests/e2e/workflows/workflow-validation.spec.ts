@@ -351,7 +351,11 @@ async function testWorkflow(
   expect(result.testResults.workflowLoaded).toBe(true);
 }
 
-describe('Workflow Validation with LLM', () => {
+// Skip test suite if LiteLLM is not available
+// Default to localhost:4000 if LITELLM_PROXY_URL not explicitly set
+const skipE2E = process.env.SKIP_LLM_TESTS === 'true';
+
+describe.skipIf(skipE2E)('Workflow Validation with LLM', () => {
   let mcpClient: MCPClientFixture;
   let llmClient: LLMClient;
   let discoveredWorkflows: string[] = [];
