@@ -86,18 +86,43 @@ jobs:
           HUSKY: 0
         run: npm ci
 
-      - name: Run tests
+      - name: Run unit tests with coverage
         env:
           CI: true
+          TEST_TYPE: unit
         run: npm run test:coverage
 
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: coverage-vitest
+          name: coverage-unit
           path: coverage/
           if-no-files-found: ignore
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        env:
+          HUSKY: 0
+        run: npm ci
+
+      - name: Run integration tests
+        env:
+          CI: true
+          BMAD_GIT_AUTO_UPDATE: 'false'
+        run: npm run test:integration
 
   build:
     name: Build
@@ -143,7 +168,16 @@ jobs:
   ci-complete:
     name: CI Complete
     runs-on: ubuntu-latest
-    needs: [commitlint, lint, unit-tests, build]
+    needs: [commitlint, lint, unit-tests, integration-tests, build]
+    if: always()
     steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.unit-tests.result }}" != "success" ] || \
+             [ "${{ needs.integration-tests.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
       - name: CI Success
         run: echo "All CI checks passed successfully"
