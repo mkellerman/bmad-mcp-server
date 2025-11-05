@@ -1,3 +1,11 @@
+# [3.1.0](https://github.com/mkellerman/bmad-mcp-server/compare/v3.0.0...v3.1.0) (2025-11-05)
+
+
+### Features
+
+* enhance workflow context with comprehensive placeholder mappings ([f6b2573](https://github.com/mkellerman/bmad-mcp-server/commit/f6b2573aeb1cd039bf9a0f659eae742993503267))
+* enhance workflow context with comprehensive placeholder mappings ([#25](https://github.com/mkellerman/bmad-mcp-server/issues/25)) ([f155868](https://github.com/mkellerman/bmad-mcp-server/commit/f15586856248da0a9cb836c151fe4350167e4d0e))
+
 # [3.0.0](https://github.com/mkellerman/bmad-mcp-server/compare/v2.0.1...v3.0.0) (2025-11-05)
 
 

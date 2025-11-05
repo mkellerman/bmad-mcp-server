@@ -1,6 +1,6 @@
 {
   "name": "bmad-mcp-server",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Model Context Protocol server for BMAD methodology",
   "type": "module",
   "bin": {
