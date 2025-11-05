@@ -1,3 +1,38 @@
+# [3.0.0](https://github.com/mkellerman/bmad-mcp-server/compare/v2.0.1...v3.0.0) (2025-11-05)
+
+
+### Bug Fixes
+
+* apply excludeDirs at all depths and show discovered paths ([b33423c](https://github.com/mkellerman/bmad-mcp-server/commit/b33423cfda0488d443410a56111957101cab8dd0))
+* enforce agents/ directory requirement for agent discovery ([cc63a21](https://github.com/mkellerman/bmad-mcp-server/commit/cc63a21f9790d2c6a61943f172b5485fdf9e1ca4))
+* format agent name extraction for consistency ([305fcc8](https://github.com/mkellerman/bmad-mcp-server/commit/305fcc824feccccb9e964e3dfacca1703d96e034))
+* reduce noise by skipping metadata parsing for non-agent files ([ad2ed0e](https://github.com/mkellerman/bmad-mcp-server/commit/ad2ed0ee5b8d879e070a378bdeeba8e6e5bbd4ce))
+* support marketplace/gallery structure for remote discovery ([20e691e](https://github.com/mkellerman/bmad-mcp-server/commit/20e691ea15f43abc95243c9a93cdb05d8085f9fe))
+* thread rootSearchMaxDepth config through discovery path resolution ([d042c70](https://github.com/mkellerman/bmad-mcp-server/commit/d042c709e14516ac3136283b73ee2ee379b736d1))
+* use actual agent name from MasterRecord instead of display name ([77939a6](https://github.com/mkellerman/bmad-mcp-server/commit/77939a6c7f48989b2b0f2d849f4b5695bdfb9b9b))
+* use js-yaml consistently instead of yaml package ([5bfafd6](https://github.com/mkellerman/bmad-mcp-server/commit/5bfafd6494e0a5a8ab7498afc9f851fd2a08bf24))
+* use named import for js-yaml to ensure consistent usage ([d2d247f](https://github.com/mkellerman/bmad-mcp-server/commit/d2d247fe80027d93d3d668c8c837855825b7487e))
+
+
+### Features
+
+* add centralized configuration system for BMAD discovery and Git settings ([f31b486](https://github.com/mkellerman/bmad-mcp-server/commit/f31b4861d85a3133496c0dd2762899283a4b3c33))
+* enhance agent and workflow instructions with new guidance structure ([c73459d](https://github.com/mkellerman/bmad-mcp-server/commit/c73459dfffe1e0cd569598a589ca2957b23ba5c8))
+* enhance tool parameter description with CRITICAL pass-through instructions ([c14fc39](https://github.com/mkellerman/bmad-mcp-server/commit/c14fc392b4f72c2c3238d185206a9b4b41659fbd))
+* implement numbered list format with pagination ([5c64cb3](https://github.com/mkellerman/bmad-mcp-server/commit/5c64cb3b845029e40cf8eae4be6cd5e56dd8d73a))
+* implement XML-based instruction/content separation ([7ccec32](https://github.com/mkellerman/bmad-mcp-server/commit/7ccec32c872431d890a9a96a99b1e3b14d2cc3a1))
+* improve remote agent handling and tool pass-through ([4fe97eb](https://github.com/mkellerman/bmad-mcp-server/commit/4fe97ebc2c8ddf7801f0947d8aac0b94b9ca06d9))
+* unified testing framework with comprehensive test reorganization ([#23](https://github.com/mkellerman/bmad-mcp-server/issues/23)) ([3bb368f](https://github.com/mkellerman/bmad-mcp-server/commit/3bb368f1d155d7da2e00bf96baf95bb907d295d0))
+* update version to 2.1.0 and enhance workflow and agent instructions handling ([428c062](https://github.com/mkellerman/bmad-mcp-server/commit/428c062a0998a49d5e97796d85f7189429a52256))
+* use proper BMAD discovery for remote agents ([fc06737](https://github.com/mkellerman/bmad-mcp-server/commit/fc06737f377c004238a4f739a7959f1a4f0ea433))
+* wire up all configuration settings ([44abc42](https://github.com/mkellerman/bmad-mcp-server/commit/44abc42f32d46d3e982a98f280817725a7405246))
+
+
+### BREAKING CHANGES
+
+* Configuration now centralized through loadConfig()
+This release introduces v2.1.0 with enhanced configuration management.
+
 ## [2.0.1](https://github.com/mkellerman/bmad-mcp-server/compare/v2.0.0...v2.0.1) (2025-11-05)
 
 
