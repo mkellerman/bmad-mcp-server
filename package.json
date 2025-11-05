@@ -1,6 +1,6 @@
 {
   "name": "bmad-mcp-server",
-  "version": "2.1.0",
+  "version": "2.0.1",
   "description": "Model Context Protocol server for BMAD methodology",
   "type": "module",
   "bin": {
@@ -44,8 +44,8 @@
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@eslint/js": "^9.38.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
@@ -59,7 +59,7 @@
     "lint-staged": "^16.2.6",
     "openai": "^6.7.0",
     "prettier": "^3.4.2",
-    "semantic-release": "^24.0.0",
+    "semantic-release": "^25.0.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.2",
