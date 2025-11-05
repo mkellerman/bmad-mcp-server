@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - v2-node
+
   pull_request:
     branches:
       - main
-      - v2-node
+
   workflow_call:
     outputs:
       artifact-name:
