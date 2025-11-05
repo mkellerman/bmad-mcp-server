@@ -460,29 +460,113 @@ export class BMADMCPServer {
         if (result.context) {
           const context = result.context;
           responseParts.push('## Workflow Context\n');
-          responseParts.push(
-            "**MCP Server Resources (use these, not user's workspace):**\n",
+
+          // Calculate relative paths to save context window space
+          const projectRoot = context.placeholders.project_root;
+          const bmadRoot = context.placeholders.bmad_root;
+          const moduleRoot = path.relative(
+            bmadRoot,
+            context.placeholders.module_root,
           );
-          responseParts.push(`- MCP Server Root: \`${context.mcpResources}\``);
-          responseParts.push(
-            `- Agent Manifest: \`${context.agentManifestPath}\``,
+          const installedPath = path.relative(
+            bmadRoot,
+            context.placeholders.installed_path,
           );
-          responseParts.push(`- Available Agents: ${context.agentCount}\n`);
-          responseParts.push(
-            '**NOTE:** All `{mcp-resources}` references in this workflow point to the MCP server,',
-          );
-          responseParts.push(
-            "not the user's workspace. Use the Agent Roster data provided below.\n",
+          const outputFolder = path.relative(
+            projectRoot,
+            context.placeholders.output_folder,
           );
 
-          // Include agent manifest data inline
-          const agentData = context.agentManifestData;
-          if (agentData && agentData.length > 0) {
-            responseParts.push('**Agent Roster (MCP Server Data):**\n');
-            responseParts.push('```json');
-            responseParts.push(JSON.stringify(agentData, null, 2));
-            responseParts.push('```\n');
+          // Path Resolution Guide
+          responseParts.push('### 📁 Path Placeholders\n');
+          responseParts.push(
+            'The workflow.yaml uses these placeholders for file paths:\n',
+          );
+          responseParts.push('```');
+          responseParts.push(`{project-root}     → ${projectRoot}`);
+          responseParts.push(
+            `{output_folder}    → {project-root}/${outputFolder || 'docs'}`,
+          );
+          responseParts.push(`{bmad_root}        → ${bmadRoot}`);
+          responseParts.push(
+            `{module_root}      → {bmad_root}/${moduleRoot || 'core'}`,
+          );
+          responseParts.push(`{config_source}    → {module_root}/config.yaml`);
+          responseParts.push(
+            `{installed_path}   → {bmad_root}/${installedPath}`,
+          );
+          responseParts.push('```\n');
+
+          // Context explanation
+          responseParts.push('**Understanding the Paths:**');
+          responseParts.push(
+            "- `{project-root}`: User's project directory (where they are working)",
+          );
+          responseParts.push(
+            '- `{output_folder}`: Where to save generated files (relative to project root)',
+          );
+          responseParts.push(
+            '- `{bmad_root}`: BMAD installation root (may be git cache or local install)',
+          );
+          responseParts.push(
+            '- `{module_root}`: Module directory (relative to bmad_root)',
+          );
+          responseParts.push(
+            '- `{config_source}`: Module configuration file with user preferences',
+          );
+          responseParts.push(
+            "- `{installed_path}`: This workflow's directory (relative to bmad_root)\n",
+          );
+
+          // Module and origin information
+          if (context.moduleInfo) {
+            responseParts.push('### 📦 Module Information\n');
+            responseParts.push(`- **Module:** ${context.moduleInfo.name}`);
+            if (context.moduleInfo.version) {
+              responseParts.push(
+                `- **Version:** ${context.moduleInfo.version}`,
+              );
+            }
+            if (context.moduleInfo.bmadVersion) {
+              responseParts.push(
+                `- **BMAD Version:** ${context.moduleInfo.bmadVersion}`,
+              );
+            }
+            responseParts.push('');
           }
+
+          if (context.originInfo) {
+            responseParts.push('### 🌐 Source Information\n');
+            responseParts.push(
+              `- **Loaded From:** ${context.originInfo.displayName}`,
+            );
+            responseParts.push(`- **Source Type:** ${context.originInfo.kind}`);
+            responseParts.push('');
+          }
+
+          // Legacy MCP resources note
+          responseParts.push(
+            '**IMPORTANT:** When the workflow.yaml references files:',
+          );
+          responseParts.push(
+            '1. Replace placeholders with the values shown above',
+          );
+          responseParts.push(
+            '2. Files in `{installed_path}` are workflow resources (templates, etc.)',
+          );
+          responseParts.push(
+            '3. Files in `{output_folder}` are where you save generated content',
+          );
+          responseParts.push(
+            '4. Config values come from `{config_source}` (user preferences)\n',
+          );
+
+          // Agent roster (keep compact for now)
+          responseParts.push(`### 👥 Available Agents\n`);
+          responseParts.push(`Total: ${context.agentCount} agents\n`);
+          responseParts.push(
+            'Use the agent names from the master manifest when needed.\n',
+          );
         }
 
         // Add workflow YAML

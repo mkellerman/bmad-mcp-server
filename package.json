@@ -33,7 +33,8 @@
     "guard:src-js": "node scripts/guard-src-js.mjs",
     "precommit": "npm run guard:src-js && npm run lint:fix && npm run format",
     "doctor:show": "node scripts/show-doctor.mjs",
-    "bmad": "node scripts/run-bmad.mjs"
+    "bmad": "node scripts/run-bmad.mjs",
+    "cli": "node scripts/bmad-cli.mjs"
   },
   "files": [
     "build/"

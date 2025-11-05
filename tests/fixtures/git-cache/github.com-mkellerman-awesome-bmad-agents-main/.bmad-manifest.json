@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "gitCommit": "460b5a09a0c404a4546459c6d1edc324ad42043a",
+  "buildTime": "2025-11-05T22:22:01.988Z",
+  "repoPath": "/Users/mkellerman/GitHub/bmad-mcp-server/tests/fixtures/git-cache/github.com-mkellerman-awesome-bmad-agents-main",
+  "agents": [
+    {
+      "name": "debug",
+      "displayName": "Diana",
+      "title": "Debug Specialist",
+      "description": "Debug Specialist",
+      "path": "/Users/mkellerman/GitHub/bmad-mcp-server/tests/fixtures/git-cache/github.com-mkellerman-awesome-bmad-agents-main/agents/debug-diana-v6/agents/debug.md",
+      "moduleName": "debug-diana-v6"
+    }
+  ],
+  "workflows": []
+}
