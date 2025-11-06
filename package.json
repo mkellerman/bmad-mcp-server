@@ -1,6 +1,6 @@
 {
   "name": "bmad-mcp-server",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "description": "Model Context Protocol server for BMAD methodology",
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc && chmod +x build/index.js",
-    "clean": "rm -rf build/ coverage/ test-results/ playwright-report/ master-manifest.json bin/graph .bmad/cache/",
+    "clean": "rm -rf build/ coverage/ test-results/ .bmad/cache/",
     "clean:all": "npm run clean && rm -rf node_modules/ package-lock.json",
     "prepare": "npm run build || true",
     "start": "node build/index.js",
@@ -22,7 +22,6 @@
     "test:e2e": "TEST_TYPE=e2e vitest run",
     "test:llm": "npm run test:e2e",
     "test:all": "npm run test:unit; npm run test:integration; npm run test:e2e",
-    "test:report": "node scripts/generate-html-report.mjs test-results/test-results.json",
     "test:litellm-start": "docker-compose -f tests/e2e/framework/docker-compose.yml up -d",
     "test:litellm-stop": "docker-compose -f tests/e2e/framework/docker-compose.yml down",
     "test:litellm-logs": "docker-compose -f tests/e2e/framework/docker-compose.yml logs -f",
@@ -30,11 +29,12 @@
     "lint": "eslint . --ext .ts,.js,.mjs",
     "lint:fix": "eslint . --ext .ts,.js,.mjs --fix",
     "format": "prettier --write .",
-    "guard:src-js": "node scripts/guard-src-js.mjs",
-    "precommit": "npm run guard:src-js && npm run lint:fix && npm run format",
-    "doctor:show": "node scripts/show-doctor.mjs",
-    "bmad": "node scripts/run-bmad.mjs",
-    "cli": "node scripts/bmad-cli.mjs"
+    "precommit": "npm run lint:fix && npm run format",
+    "cli": "node scripts/bmad-cli.mjs",
+    "cli:list-tools": "node scripts/bmad-cli.mjs tools/list",
+    "cli:list-resources": "node scripts/bmad-cli.mjs resources/list",
+    "cli:list-agents": "node scripts/show-list-agents.mjs",
+    "cli:list-workflows": "node scripts/show-list-workflows.mjs"
   },
   "files": [
     "build/"

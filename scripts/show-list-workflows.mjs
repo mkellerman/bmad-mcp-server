@@ -1,57 +1,32 @@
 #!/usr/bin/env node
 /**
- * Show sample output from enhanced list-workflows command
+ * Display raw list-workflows output for troubleshooting
+ * This is a convenience wrapper around bmad-cli.mjs
+ *
+ * Usage: node scripts/show-list-workflows.mjs
  */
 
-import { resolveBmadPaths } from '../build/utils/bmad-path-resolver.js';
-import { MasterManifestService } from '../build/services/master-manifest-service.js';
-import { handleListCommand } from '../build/tools/internal/list.js';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const cliPath = path.join(__dirname, 'bmad-cli.mjs');
 
-const projectRoot = path.resolve(__dirname, '..');
-const userBmadPath = path.join(process.env.HOME || '~', '.bmad');
+console.log('Fetching workflow list via bmad-cli...\n');
 
-const discovery = resolveBmadPaths({
-  cwd: projectRoot,
-  cliArgs: [],
-  envVar: process.env.BMAD_ROOT,
-  userBmadPath,
-});
-
-const masterService = new MasterManifestService(discovery, projectRoot);
-const master = masterService.get();
-
-const ctx = {
-  resolved: {
-    agents: master.agents,
-    workflows: master.workflows,
-    tasks: master.tasks,
+const child = spawn(
+  'node',
+  [
+    cliPath,
+    'tools/call',
+    '{"name":"bmad-resources","arguments":{"operation":"workflows"}}',
+  ],
+  {
+    stdio: 'inherit',
   },
-  master,
-  discovery,
-};
+);
 
-const result = handleListCommand('*list-workflows', ctx);
-
-console.log('=== MARKDOWN OUTPUT ===\n');
-console.log(result.content);
-
-if (result.structuredData) {
-  console.log('\n=== STRUCTURED DATA SUMMARY ===\n');
-  console.log('Total workflows:', result.structuredData.summary.total);
-  console.log(
-    'Modules:',
-    Object.keys(result.structuredData.summary.byGroup).join(', '),
-  );
-  console.log(
-    'First 3 workflows:',
-    result.structuredData.items
-      .slice(0, 3)
-      .map((w) => w.name)
-      .join(', '),
-  );
-}
+child.on('exit', (code) => {
+  process.exit(code || 0);
+});

@@ -1,9 +1,34 @@
 /**
- * BMAD MCP Server - Main server implementation with unified tool.
+ * BMAD MCP Server - Lite Multi-Tool with Git Support
  *
- * This server exposes BMAD methodology through the Model Context Protocol,
- * using a single unified 'bmad' tool with instruction-based routing.
- * The LLM processes files according to BMAD methodology instructions.
+ * Tool-per-agent architecture + Git remote sources.
+ * Combines the best of both worlds: simple architecture + Git flexibility.
+ *
+ * @remarks
+ * This server implements the Model Context Protocol (MCP) to expose BMAD (Business Methodology Automation and Delivery)
+ * agents and workflows as MCP tools. It supports multiple source types:
+ * - Project-local BMAD installation
+ * - User-global BMAD installation
+ * - Git remote repositories (via git+ URLs)
+ *
+ * The server provides three main MCP tool categories:
+ * 1. **Agent Tools**: One tool per BMAD agent (e.g., `bmad-pm`, `bmad-architect`)
+ * 2. **Workflow Tool**: Execute BMAD workflows (`bmad-workflow`)
+ * 3. **Resources Tool**: Access BMAD files and metadata (`bmad-resources`)
+ *
+ * @example
+ * ```typescript
+ * // Basic usage with project-local BMAD
+ * const server = new BMADServerLiteMultiToolGit();
+ * await server.start();
+ *
+ * // With custom project root and Git remotes
+ * const server = new BMADServerLiteMultiToolGit(
+ *   '/path/to/project',
+ *   ['git+https://github.com/user/bmad-custom.git']
+ * );
+ * await server.start();
+ * ```
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -11,234 +36,74 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  Tool,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
   TextContent,
+  Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
-import type { Agent } from './types/index.js';
+import { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
+import type { Workflow } from './types/index.js';
 import {
-  resolveBmadPaths,
-  type BmadPathResolution,
-} from './utils/bmad-path-resolver.js';
-import { UnifiedBMADTool, buildToolDescription } from './tools/index.js';
-import { getWorkflowInstructions } from './tools/common/workflow-instructions.js';
-import { MasterManifestService } from './services/master-manifest-service.js';
-import { convertAgents } from './utils/master-manifest-adapter.js';
-import { GitSourceResolver } from './utils/git-source-resolver.js';
-import logger, { configureLogger } from './utils/logger.js';
-import {
-  parseRemoteArgs,
-  type RemoteRegistry,
-} from './utils/remote-registry.js';
-import loadConfig from './config.js';
+  SERVER_CONFIG,
+  TOOL_NAMES,
+  TOOL_DESCRIPTIONS,
+  getAgentInstructions,
+  getWorkflowInstructions,
+} from './config.js';
 
-// Compute __dirname - use import.meta.url when available (production)
-// Fall back to build directory for test environments
-function getDirname(): string {
-  try {
-    if (import.meta?.url) {
-      return path.dirname(fileURLToPath(import.meta.url));
-    }
-  } catch {
-    // Fall through to fallback
-  }
-  // Fallback for test environments - assume we're in build/
-  return path.join(process.cwd(), 'build');
-}
-
-const __dirname = getDirname();
-
-/**
- * Format MCP tool response with XML-structured instructions and content.
- *
- * Strategy:
- * 1. Use XML tags to clearly separate instructions from user-facing content
- * 2. LLMs are trained to respect XML tag boundaries (recommended by OpenAI & Anthropic)
- * 3. Instructions in <instructions> tags guide LLM behavior
- * 4. Content in <content> tags is displayed to user without modification
- * 5. Optional structured data in <context> tags for LLM queries only
- *
- * Benefits:
- * - Clear boundaries prevent instruction leakage into user output
- * - Parseable structure for easy content extraction
- * - Follows industry best practices for prompt engineering
- *
- * @param displayContent - Content to show the user (markdown, formatted text)
- * @param contextData - Optional structured data for LLM queries (not displayed)
- * @returns MCP TextContent array with XML-structured response
- */
-function formatMCPResponse(
-  displayContent: string,
-  contextData?: unknown,
-): TextContent[] {
-  const response: TextContent[] = [];
-
-  // Primary response with XML-structured instructions and content
-  response.push({
-    type: 'text',
-    text: `<instructions>
-You are providing information from the BMAD system to the user. Your task is to present this information clearly and accurately.
-
-Display the content in the <content> tags below EXACTLY as written. Do not summarize, paraphrase, or modify it in any way. Present it to the user as-is.
-</instructions>
-
-<content>
-${displayContent}
-</content>`,
-  } as TextContent);
-
-  // Optional structured data for queries (marked as context-only)
-  if (contextData) {
-    response.push({
-      type: 'text',
-      text: `
-<context>
-<instructions>
-The following structured data is provided for your use in answering follow-up questions. Do NOT display this data to the user unless specifically asked about it.
-</instructions>
-
-<data format="json">
-${JSON.stringify(contextData, null, 2)}
-</data>
-</context>`,
-    } as TextContent);
-  }
-
-  return response;
-}
-
-/**
- * MCP Server for BMAD methodology with unified tool interface.
- *
- * Exposes a single 'bmad' tool that uses instruction-based routing:
- * - `bmad` → Load bmad-master agent (default)
- * - `bmad <agent-name>` → Load specified agent
- * - `bmad *<workflow-name>` → Execute specified workflow
- *
- * The server acts as a file proxy - no parsing or transformation.
- * LLM processes files using BMAD methodology loaded in context.
- */
-export class BMADMCPServer {
-  private bmadRoot: string;
-  private projectRoot: string;
-  private unifiedTool: UnifiedBMADTool;
-  private masterService: MasterManifestService;
-  private agents: Agent[];
+export class BMADServerLiteMultiToolGit {
   private server: Server;
-  private discovery: BmadPathResolution;
-  private version: string;
-  private remoteRegistry: RemoteRegistry;
+  private loader: ResourceLoaderGit;
+  private agentMetadata: AgentMetadata[] = [];
+  private workflows: Workflow[] = [];
+  private cachedResources: Array<{
+    uri: string;
+    name: string;
+    description: string;
+    mimeType: string;
+  }> = [];
+  private initialized = false;
 
-  constructor(
-    bmadRoot: string,
-    discovery: BmadPathResolution,
-    remoteRegistry: RemoteRegistry,
-    version: string = 'unknown',
-  ) {
-    this.version = version;
-    this.discovery = discovery;
-    this.remoteRegistry = remoteRegistry;
-    this.bmadRoot = path.resolve(bmadRoot);
-    this.projectRoot = this.bmadRoot;
-
-    // Build master manifest at startup with error handling
-    // This inventories all BMAD resources from all discovered locations
-    try {
-      this.masterService = new MasterManifestService(discovery);
-      this.masterService.generate();
-    } catch (error) {
-      // If no valid BMAD installations, create empty manifest
-      // This allows the server to run with only remote agents
-      const hasValidInstallations = discovery.activeLocations.length > 0;
-      if (!hasValidInstallations) {
-        console.error(
-          '⚠️  No local BMAD installations - running in remote-only mode',
-        );
-        this.masterService = new MasterManifestService(discovery);
-        // The service will handle empty installations gracefully
-      } else {
-        console.error('❌ Failed to build master manifest');
-        console.error(
-          `   Error: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        throw new Error(
-          `Master manifest generation failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
-
-    // Convert master manifest agents to legacy Agent interface
-    // This enables backward compatibility with existing code
-    try {
-      const masterData = this.masterService.get();
-      this.agents = convertAgents(masterData.agents);
-      const agentCount = this.agents.length;
-      if (agentCount > 0) {
-        console.error(`Loaded ${agentCount} agents from master manifest`);
-      } else {
-        console.error('No local agents loaded - use remotes to load agents');
-      }
-    } catch (error) {
-      console.error('❌ Failed to process agents');
-      console.error(
-        `   Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw new Error(
-        `Agent processing failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    // Initialize unified tool with master manifest service
-    try {
-      this.unifiedTool = new UnifiedBMADTool({
-        bmadRoot: this.projectRoot,
-        discovery,
-        masterManifestService: this.masterService,
-        remoteRegistry: this.remoteRegistry,
-      });
-
-      // Show final summary
-      const masterData = this.masterService.get();
-      const hasErrors = discovery.locations.some(
-        (loc) => loc.status !== 'valid',
-      );
-      const errorSuffix = hasErrors ? ' (some sources failed)' : '';
-
-      console.error('BMAD MCP Server initialized successfully');
-
-      if (this.agents.length > 0) {
-        console.error(
-          `\n📊 Ready: ${this.agents.length} agents, ${masterData.workflows.length} workflows, ${masterData.tasks.length} tasks${errorSuffix}`,
-        );
-      } else {
-        console.error('\n📊 Ready: Remote-only mode (no local agents)');
-        console.error(`💡 Load agents with: bmad *list-agents @awesome`);
-      }
-      console.error('📡 Server running on stdio');
-    } catch (error) {
-      console.error('❌ Failed to initialize unified tool');
-      console.error(
-        `   Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw new Error(
-        `Unified tool initialization failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    // Create MCP server with protocol handlers
+  /**
+   * Creates a new BMAD MCP Server instance
+   *
+   * @param projectRoot - Optional project root directory. If not provided, uses current working directory.
+   *                     This is where the server looks for project-local BMAD installations.
+   * @param gitRemotes - Optional array of Git remote URLs (git+ protocol) to load additional BMAD content from.
+   *                    URLs should be in format: `git+https://github.com/user/repo.git` or `git+ssh://git@github.com/user/repo.git`
+   *
+   * @remarks
+   * The server automatically discovers BMAD content from multiple sources in priority order:
+   * 1. Project-local: `{projectRoot}/bmad/` directory
+   * 2. User-global: `~/.bmad/` directory
+   * 3. Git remotes: Specified git+ URLs (cloned to cache)
+   *
+   * @example
+   * ```typescript
+   * // Use current directory as project root
+   * const server = new BMADServerLiteMultiToolGit();
+   *
+   * // Specify custom project root
+   * const server = new BMADServerLiteMultiToolGit('/path/to/my/project');
+   *
+   * // Add Git remote sources
+   * const server = new BMADServerLiteMultiToolGit(
+   *   undefined,
+   *   ['git+https://github.com/company/bmad-extensions.git']
+   * );
+   * ```
+   */
+  constructor(projectRoot?: string, gitRemotes?: string[]) {
+    this.loader = new ResourceLoaderGit(projectRoot, gitRemotes);
     this.server = new Server(
       {
-        name: 'bmad-mcp-server',
-        version: this.version,
+        name: SERVER_CONFIG.name,
+        version: SERVER_CONFIG.version,
       },
       {
         capabilities: {
           tools: {},
-          prompts: {},
+          resources: {},
         },
       },
     );
@@ -247,690 +112,970 @@ export class BMADMCPServer {
   }
 
   /**
-   * Setup MCP server request handlers
+   * Pre-load all agents, workflows, and resources into memory
+   *
+   * @privateRemarks
+   * This method performs eager loading of all BMAD content to ensure fast response times
+   * for MCP requests. It discovers content from all configured sources and builds
+   * in-memory caches for optimal performance.
+   *
+   * Loading sequence:
+   * 1. Load agent metadata from all sources
+   * 2. Load workflow names from all sources
+   * 3. Build complete file manifest with MIME types
+   * 4. Mark server as initialized
+   *
+   * @throws Will throw if any BMAD source fails to load
+   */
+  private async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    // Load all agents with metadata
+    this.agentMetadata = await this.loader.listAgentsWithMetadata();
+
+    // Load all workflows with metadata
+    this.workflows = await this.loader.listWorkflowsWithMetadata();
+
+    // Pre-build resource list - expose ALL files from BMAD sources
+    this.cachedResources = [];
+
+    // Get all files from BMAD installation
+    const allFiles = await this.loader.listAllFiles();
+
+    for (const file of allFiles) {
+      // Determine mime type
+      let mimeType = 'text/plain';
+      if (file.relativePath.endsWith('.md')) mimeType = 'text/markdown';
+      else if (
+        file.relativePath.endsWith('.yaml') ||
+        file.relativePath.endsWith('.yml')
+      )
+        mimeType = 'application/x-yaml';
+      else if (file.relativePath.endsWith('.json'))
+        mimeType = 'application/json';
+      else if (file.relativePath.endsWith('.xml')) mimeType = 'application/xml';
+      else if (file.relativePath.endsWith('.csv')) mimeType = 'text/csv';
+
+      this.cachedResources.push({
+        uri: `bmad://${file.relativePath}`,
+        name: file.relativePath,
+        description: `BMAD resource: ${file.relativePath} (source: ${file.source})`,
+        mimeType,
+      });
+    }
+
+    this.initialized = true;
+  }
+
+  /**
+   * Sets up all MCP request handlers for the server
+   *
+   * @privateRemarks
+   * Configures handlers for the three main MCP protocol methods:
+   * - `ListResources`: Returns all available BMAD files as MCP resources
+   * - `ReadResource`: Loads and returns content of specific BMAD files
+   * - `ListTools`: Returns all available BMAD agents and built-in tools
+   * - `CallTool`: Executes agent tools, workflows, or resource operations
+   *
+   * All handlers ensure initialization before processing requests.
    */
   private setupHandlers(): void {
-    // List available prompts (BMAD agents)
-    this.server.setRequestHandler(ListPromptsRequestSchema, () => {
-      logger.info(
-        `list_prompts called - returning ${this.agents.length} agents`,
-      );
+    // List available resources (agent-scoped workflows and agents)
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      await this.initialize();
+      return { resources: this.cachedResources };
+    });
 
-      return {
-        prompts: this.agents.map((agent) => {
-          // Use agent name as prompt name (with bmad- prefix if not present)
-          let promptName = agent.name || '';
-          if (!promptName.startsWith('bmad-')) {
-            promptName = `bmad-${promptName}`;
-          }
+    // Read a specific resource
+    this.server.setRequestHandler(
+      ReadResourceRequestSchema,
+      async (request) => {
+        const uri = request.params.uri;
 
-          // Create description from agent metadata
-          const displayName = agent.displayName || agent.name;
-          const title = agent.title || 'BMAD Agent';
-          const description = `${displayName} - ${title}`;
+        // Parse URI: bmad://path/to/file.ext
+        const pathMatch = uri.match(/^bmad:\/\/(.+)$/);
+        if (!pathMatch) {
+          throw new Error(`Invalid resource URI: ${uri}`);
+        }
+
+        const relativePath = pathMatch[1];
+
+        try {
+          const content = await this.loader.loadFile(relativePath);
+
+          // Determine mime type
+          let mimeType = 'text/plain';
+          if (relativePath.endsWith('.md')) mimeType = 'text/markdown';
+          else if (
+            relativePath.endsWith('.yaml') ||
+            relativePath.endsWith('.yml')
+          )
+            mimeType = 'application/x-yaml';
+          else if (relativePath.endsWith('.json'))
+            mimeType = 'application/json';
+          else if (relativePath.endsWith('.xml')) mimeType = 'application/xml';
+          else if (relativePath.endsWith('.csv')) mimeType = 'text/csv';
 
           return {
-            name: promptName,
-            description,
+            contents: [
+              {
+                uri,
+                mimeType,
+                text: content,
+              },
+            ],
           };
-        }),
-      };
-    });
-
-    // Get a specific prompt (BMAD agent)
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      const name = request.params.name;
-      logger.info(`get_prompt called for: ${name}`);
-
-      // Normalize agent name (handle both "analyst" and "bmad-analyst")
-      const agentNameStripped = name.replace('bmad-', '');
-
-      // Find agent in manifest - try both with and without prefix
-      let agent: Agent | undefined;
-      let agentName: string | undefined;
-      for (const a of this.agents) {
-        const manifestName = a.name;
-        if (manifestName === agentNameStripped || manifestName === name) {
-          agent = a;
-          agentName = manifestName;
-          break;
+        } catch (error) {
+          throw new Error(
+            `Resource not found: ${relativePath} (${error instanceof Error ? error.message : String(error)})`,
+          );
         }
-      }
+      },
+    );
 
-      if (!agent || !agentName) {
-        // Agent not found
-        const errorMsg = `Agent '${name}' not found. Available agents: ${this.agents.map((a) => a.name).join(', ')}`;
-        logger.warn(errorMsg);
-        return {
-          description: 'Error: Agent not found',
-          messages: [
-            {
-              role: 'user',
-              content: {
-                type: 'text',
-                text: errorMsg,
-              },
-            },
-          ],
-        };
-      }
+    // List available tools (dynamically generated from available agents)
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      // Ensure initialized
+      await this.initialize();
 
-      // Use unified tool to load agent
-      const result = await this.unifiedTool.execute(agentName);
+      const tools: Tool[] = [];
 
-      if (!result.success) {
-        return {
-          description: 'Error loading agent',
-          messages: [
-            {
-              role: 'user',
-              content: {
-                type: 'text',
-                text: result.error ?? 'Unknown error',
-              },
-            },
-          ],
-        };
-      }
+      // Create one tool per agent
+      for (const agent of this.agentMetadata) {
+        const toolName = agent.module
+          ? `${agent.module}-${agent.name}`
+          : `bmad-${agent.name}`;
 
-      return {
-        description: `BMAD Agent: ${result.displayName} - ${agent.title ?? ''}`,
-        messages: [
-          {
-            role: 'user',
-            content: {
-              type: 'text',
-              text: result.content ?? '',
-            },
-          },
-        ],
-      };
-    });
-
-    // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, () => {
-      logger.info('list_tools called - returning unified bmad tool');
-
-      // Get master manifest data for dynamic tool description
-      const masterData = this.masterService.get();
-      const agents = masterData.agents
-        .filter((a) => a.name) // Filter out agents without names
-        .map((a) => ({
-          name: a.name!,
-          description: a.description,
-        }));
-      const workflows = masterData.workflows
-        .filter((w) => w.name) // Filter out workflows without names
-        .map((w) => ({
-          name: w.name!,
-          description: w.description,
-        }));
-
-      // Build dynamic tool description with full inventory
-      const description = buildToolDescription(agents, workflows);
-
-      const tools: Tool[] = [
-        {
-          name: 'bmad',
-          description,
+        tools.push({
+          name: toolName,
+          description: this.formatAgentDescription(agent),
           inputSchema: {
             type: 'object',
             properties: {
-              command: {
+              message: {
                 type: 'string',
-                description:
-                  "CRITICAL: Pass the user's EXACT command string with ZERO modifications. " +
-                  'Do NOT remove @ symbols, do NOT strip remote references, do NOT parse arguments. ' +
-                  'If user says "*list-agents @awesome", you MUST pass "*list-agents @awesome". ' +
-                  'If user says "*list-modules @myorg", you MUST pass "*list-modules @myorg". ' +
-                  "Examples of CORRECT usage: '', 'analyst', '*party-mode', '*list-agents @awesome', '*list-modules @myorg'",
+                description: `Your message or question for ${agent.displayName}`,
               },
             },
-            required: ['command'],
+            required: ['message'],
           },
+        });
+      }
+
+      // Add workflow execution tool
+      tools.push({
+        name: TOOL_NAMES.workflow,
+        description: TOOL_DESCRIPTIONS.workflow,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workflow: {
+              type: 'string',
+              description: 'Workflow name (without the * prefix)',
+            },
+            context: {
+              type: 'string',
+              description: 'Optional context or parameters for the workflow',
+            },
+          },
+          required: ['workflow'],
         },
-      ];
+      });
+
+      // Add comprehensive resource and discovery tool
+      tools.push({
+        name: TOOL_NAMES.resources,
+        description: TOOL_DESCRIPTIONS.resources,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: [
+                'read',
+                'list',
+                'modules',
+                'agents',
+                'workflows',
+                'search',
+              ],
+              description:
+                'Operation type:\n' +
+                '- read: Get file content from bmad:// URI\n' +
+                '- list: List all available resource files (optionally filtered by pattern)\n' +
+                '- modules: Show all loaded BMAD modules\n' +
+                '- agents: List all available agents with metadata\n' +
+                '- workflows: List all available workflows\n' +
+                '- search: Fuzzy search agents/workflows by name/title/description',
+            },
+            uri: {
+              type: 'string',
+              description:
+                'The bmad:// URI to read (required for operation=read). Example: "bmad://core/config.yaml"',
+            },
+            pattern: {
+              type: 'string',
+              description:
+                'Glob pattern to filter resources (optional for operation=list). Example: "core/workflows/**/*.yaml"',
+            },
+            query: {
+              type: 'string',
+              description:
+                'Search query (required for operation=search). Searches in name, title, and description fields.',
+            },
+            type: {
+              type: 'string',
+              enum: ['agents', 'workflows', 'all'],
+              description:
+                'What to search (for operation=search). Default: all',
+            },
+          },
+          required: ['operation'],
+        },
+      });
 
       return { tools };
     });
 
-    // Call a tool
+    // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-      logger.info(
-        `call_tool called: ${name} with args: ${JSON.stringify(args)}`,
-      );
+      const toolName = request.params.name;
+      const args = request.params.arguments ?? {};
 
-      if (name !== 'bmad') {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Error: Unknown tool '${name}'. Only 'bmad' tool is available.`,
-            } as TextContent,
-          ],
-          isError: true,
-        };
-      }
-
-      const command = (args?.command as string) ?? '';
-      logger.info(`Executing bmad tool with command: '${command}'`);
-
-      // Execute through unified tool
-      const result = await this.unifiedTool.execute(command);
-
-      // Check if error occurred
-      if (!result.success) {
-        const errorText = result.error ?? 'Unknown error occurred';
-        logger.error(`BMAD tool error: ${errorText}`);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: errorText,
-            } as TextContent,
-          ],
-          isError: true,
-        };
-      }
-
-      // Success - format response based on type
-      if (result.type === 'agent') {
-        // Return raw agent content without display-only wrapper so the LLM
-        // can interpret and adopt the agent instructions (enables LOADED ack)
-        return {
-          content: [
-            {
-              type: 'text',
-              text: result.content ?? '',
-            } as TextContent,
-          ],
-        };
-      } else if (result.type === 'workflow') {
-        // Workflow executed successfully
-        const responseParts: string[] = [];
-        responseParts.push(`# Workflow: ${result.name}`);
-        responseParts.push(`\n**Description:** ${result.description ?? ''}\n`);
-
-        // Add execution guidance at the top (before workflow content)
-        responseParts.push(getWorkflowInstructions());
-
-        // Add workflow context (server paths and agent manifest)
-        if (result.context) {
-          const context = result.context;
-          responseParts.push('## Workflow Context\n');
-
-          // Calculate relative paths to save context window space
-          const projectRoot = context.placeholders.project_root;
-          const bmadRoot = context.placeholders.bmad_root;
-          const moduleRoot = path.relative(
-            bmadRoot,
-            context.placeholders.module_root,
-          );
-          const installedPath = path.relative(
-            bmadRoot,
-            context.placeholders.installed_path,
-          );
-          const outputFolder = path.relative(
-            projectRoot,
-            context.placeholders.output_folder,
-          );
-
-          // Path Resolution Guide
-          responseParts.push('### 📁 Path Placeholders\n');
-          responseParts.push(
-            'The workflow.yaml uses these placeholders for file paths:\n',
-          );
-          responseParts.push('```');
-          responseParts.push(`{project-root}     → ${projectRoot}`);
-          responseParts.push(
-            `{output_folder}    → {project-root}/${outputFolder || 'docs'}`,
-          );
-          responseParts.push(`{bmad_root}        → ${bmadRoot}`);
-          responseParts.push(
-            `{module_root}      → {bmad_root}/${moduleRoot || 'core'}`,
-          );
-          responseParts.push(`{config_source}    → {module_root}/config.yaml`);
-          responseParts.push(
-            `{installed_path}   → {bmad_root}/${installedPath}`,
-          );
-          responseParts.push('```\n');
-
-          // Context explanation
-          responseParts.push('**Understanding the Paths:**');
-          responseParts.push(
-            "- `{project-root}`: User's project directory (where they are working)",
-          );
-          responseParts.push(
-            '- `{output_folder}`: Where to save generated files (relative to project root)',
-          );
-          responseParts.push(
-            '- `{bmad_root}`: BMAD installation root (may be git cache or local install)',
-          );
-          responseParts.push(
-            '- `{module_root}`: Module directory (relative to bmad_root)',
-          );
-          responseParts.push(
-            '- `{config_source}`: Module configuration file with user preferences',
-          );
-          responseParts.push(
-            "- `{installed_path}`: This workflow's directory (relative to bmad_root)\n",
-          );
-
-          // Module and origin information
-          if (context.moduleInfo) {
-            responseParts.push('### 📦 Module Information\n');
-            responseParts.push(`- **Module:** ${context.moduleInfo.name}`);
-            if (context.moduleInfo.version) {
-              responseParts.push(
-                `- **Version:** ${context.moduleInfo.version}`,
-              );
-            }
-            if (context.moduleInfo.bmadVersion) {
-              responseParts.push(
-                `- **BMAD Version:** ${context.moduleInfo.bmadVersion}`,
-              );
-            }
-            responseParts.push('');
-          }
-
-          if (context.originInfo) {
-            responseParts.push('### 🌐 Source Information\n');
-            responseParts.push(
-              `- **Loaded From:** ${context.originInfo.displayName}`,
-            );
-            responseParts.push(`- **Source Type:** ${context.originInfo.kind}`);
-            responseParts.push('');
-          }
-
-          // Legacy MCP resources note
-          responseParts.push(
-            '**IMPORTANT:** When the workflow.yaml references files:',
-          );
-          responseParts.push(
-            '1. Replace placeholders with the values shown above',
-          );
-          responseParts.push(
-            '2. Files in `{installed_path}` are workflow resources (templates, etc.)',
-          );
-          responseParts.push(
-            '3. Files in `{output_folder}` are where you save generated content',
-          );
-          responseParts.push(
-            '4. Config values come from `{config_source}` (user preferences)\n',
-          );
-
-          // Agent roster (keep compact for now)
-          responseParts.push(`### 👥 Available Agents\n`);
-          responseParts.push(`Total: ${context.agentCount} agents\n`);
-          responseParts.push(
-            'Use the agent names from the master manifest when needed.\n',
-          );
-        }
-
-        // Add workflow YAML
-        if (result.workflowYaml) {
-          responseParts.push('## Workflow Configuration\n');
-          responseParts.push(`**File:** \`${result.path}\`\n`);
-          responseParts.push('```yaml');
-          responseParts.push(result.workflowYaml);
-          responseParts.push('```\n');
-        }
-
-        // Add instructions if available
-        if (result.instructions) {
-          responseParts.push('## Workflow Instructions\n');
-          responseParts.push('```markdown');
-          responseParts.push(result.instructions);
-          responseParts.push('```\n');
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: responseParts.join('\n'),
-            } as TextContent,
-          ],
-        };
-      } else if (
-        result.type === 'list' ||
-        result.type === 'help' ||
-        result.type === 'diagnostic'
+      // Handle agent tools (format: {module}-{agent} or bmad-{agent})
+      if (
+        toolName !== TOOL_NAMES.workflow &&
+        toolName !== TOOL_NAMES.resources &&
+        !toolName.startsWith(TOOL_NAMES.workflow) &&
+        !toolName.startsWith(TOOL_NAMES.resources)
       ) {
-        // For list/diagnostic commands with structured data, include it as context
-        if (result.structuredData) {
-          return {
-            content: formatMCPResponse(
-              result.content ?? '',
-              result.structuredData,
-            ),
-          };
-        }
+        // Try to match against known agents
+        const agent = this.agentMetadata.find((a) => {
+          const expectedName = a.module
+            ? `${a.module}-${a.name}`
+            : `bmad-${a.name}`;
+          return expectedName === toolName;
+        });
 
-        // Legacy format without structured data
-        return {
-          content: formatMCPResponse(result.content ?? ''),
-        };
-      } else {
-        // Unknown result type - dump as JSON for debugging
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(result, null, 2),
-            } as TextContent,
-          ],
-        };
+        if (agent) {
+          const message =
+            typeof args === 'object' && args !== null && 'message' in args
+              ? String(args.message)
+              : '';
+          return await this.invokeAgent(agent.name, message);
+        }
       }
+
+      // Handle workflow tool
+      if (toolName === TOOL_NAMES.workflow) {
+        const workflow =
+          typeof args === 'object' && args !== null && 'workflow' in args
+            ? String(args.workflow)
+            : '';
+        const context =
+          typeof args === 'object' && args !== null && 'context' in args
+            ? String(args.context)
+            : '';
+        return await this.executeWorkflow(workflow, context);
+      }
+
+      // Handle resources tool (read, list, discovery, search)
+      if (toolName === TOOL_NAMES.resources) {
+        const operation =
+          typeof args === 'object' && args !== null && 'operation' in args
+            ? String(args.operation)
+            : 'list';
+
+        switch (operation) {
+          case 'read': {
+            const uri =
+              typeof args === 'object' && args !== null && 'uri' in args
+                ? String(args.uri)
+                : '';
+            return await this.readResource(uri);
+          }
+          case 'list': {
+            const pattern =
+              typeof args === 'object' && args !== null && 'pattern' in args
+                ? String(args.pattern)
+                : undefined;
+            return await this.listResources(pattern);
+          }
+          case 'modules':
+            return await this.listModules();
+          case 'agents':
+            return await this.listAgents();
+          case 'workflows':
+            return await this.listWorkflows();
+          case 'search': {
+            const query =
+              typeof args === 'object' && args !== null && 'query' in args
+                ? String(args.query)
+                : '';
+            const type =
+              typeof args === 'object' && args !== null && 'type' in args
+                ? String(args.type)
+                : 'all';
+            return await this.searchResources(query, type);
+          }
+          default:
+            throw new Error(`Unknown operation: ${operation}`);
+        }
+      }
+
+      throw new Error(`Unknown tool: ${toolName}`);
     });
   }
 
   /**
-   * Run the MCP server
+   * Formats agent metadata into a human-readable description for MCP tool listings
+   *
+   * @param agent - Agent metadata containing display name, title, description, etc.
+   * @returns Formatted description string suitable for MCP tool descriptions
+   *
+   * @privateRemarks
+   * Creates a structured description that includes:
+   * - Agent display name and title
+   * - Description (if available)
+   * - Persona/role information
+   * - Available workflow actions (with workflow names for direct invocation)
+   *
+   * The enhanced workflow section helps LLMs understand:
+   * 1. What workflows this agent can guide them through
+   * 2. How to invoke workflows directly using bmad-workflow tool
+   * 3. When to use the agent vs. when to go straight to a workflow
+   *
+   * Used by the ListTools handler to provide rich tool descriptions.
    */
-  async run(): Promise<void> {
+  private formatAgentDescription(agent: AgentMetadata): string {
+    const parts: string[] = [];
+
+    // Instructions section
+    parts.push('**Instructions**:');
+    parts.push('');
+    parts.push(
+      `Use this tool when the user requests the BMAD '${agent.name}' agent.`,
+    );
+    parts.push(
+      'Use this tool if the related task fits this agents duties and responsabilities.',
+    );
+    parts.push('');
+
+    // Agent Details section
+    parts.push('**Agent Details**:');
+    parts.push('');
+    parts.push(`Agent: ${agent.name}`);
+    parts.push(`Module: ${agent.module}`);
+    parts.push('');
+    parts.push(`Name: ${agent.displayName}`);
+    parts.push(`Title: ${agent.title}`);
+    parts.push('');
+
+    // Description (if present and different from title)
+    if (agent.description && agent.description !== agent.title) {
+      parts.push(`Description: ${agent.description}`);
+      parts.push('');
+    }
+
+    // Available Workflows section
+    if (
+      agent.workflowMenuItems &&
+      agent.workflowMenuItems.length > 0 &&
+      agent.workflows &&
+      agent.workflows.length > 0
+    ) {
+      parts.push('**Available Workflows**:');
+      parts.push('');
+
+      agent.workflows.forEach((workflow, index) => {
+        const description =
+          (agent.workflowMenuItems && agent.workflowMenuItems[index]) || '';
+        parts.push(`- ${workflow}: ${description}`);
+      });
+
+      parts.push('');
+      parts.push('**Workflow Invocation**: ');
+      parts.push('');
+      parts.push('Use bmad-workflow tool to run any workflow directly.');
+      parts.push(
+        `Example: bmad-workflow({ workflow: "${agent.workflows[0]}" })`,
+      );
+    }
+
+    return parts.join('\n');
+  }
+
+  /**
+   * Invokes a BMAD agent by loading its definition and creating an execution context
+   *
+   * @param agentName - Name of the agent to invoke (without module prefix)
+   * @param message - User's message/question for the agent
+   * @returns MCP tool response containing the agent execution context
+   *
+   * @privateRemarks
+   * This method:
+   * 1. Loads the agent's XML definition from BMAD sources
+   * 2. Translates filesystem paths to MCP resource URIs
+   * 3. Creates a structured prompt with agent instructions and resource access guide
+   * 4. Returns formatted content for the MCP client to execute
+   *
+   * The agent execution follows BMAD methodology where agents must fully embody
+   * their persona and follow activation instructions precisely.
+   *
+   * @throws Returns error response if agent cannot be found or loaded
+   */
+  private async invokeAgent(
+    agentName: string,
+    _message: string,
+  ): Promise<{ content: TextContent[] }> {
+    try {
+      const resource = await this.loader.loadAgent(agentName);
+      // const metadata = this.agentMetadata.find((a) => a.name === agentName);
+
+      // Translate filesystem paths to MCP resource URIs
+      // Replace {project-root}/bmad/ with bmad://
+      let agentContent = resource.content;
+      agentContent = agentContent.replace(
+        /\{project-root\}\/bmad\//g,
+        'bmad://',
+      );
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${getAgentInstructions()}
+
+---
+
+<instructions>
+${agentContent}
+</instructions>`,
+          },
+        ],
+      };
+    } catch {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Agent not found: ${agentName}
+
+Available agents:
+${this.agentMetadata.map((a) => `- ${a.module ? `${a.module}-${a.name}` : `bmad-${a.name}`}`).join('\n')}
+
+Use bmad-resources with operation=agents to see all available agents.`,
+          },
+        ],
+      };
+    }
+  }
+
+  /**
+   * Executes a BMAD workflow by loading its configuration and creating an execution context
+   *
+   * @param workflowName - Name of the workflow to execute (without module prefix)
+   * @param context - Optional context or parameters for the workflow execution
+   * @returns MCP tool response containing the workflow execution context
+   *
+   * @privateRemarks
+   * This method:
+   * 1. Loads the workflow's XML configuration from BMAD sources
+   * 2. Creates a structured prompt with workflow instructions and resource access guide
+   * 3. Includes user-provided context if specified
+   * 4. Returns formatted content for the MCP client to execute
+   *
+   * Workflows follow BMAD methodology and must load the workflow execution engine
+   * and follow all steps in the workflow configuration precisely.
+   *
+   * @throws Returns error response if workflow cannot be found or loaded
+   */
+  private async executeWorkflow(
+    workflowName: string,
+    context?: string,
+  ): Promise<{ content: TextContent[] }> {
+    try {
+      const resource = await this.loader.loadWorkflow(workflowName);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${getWorkflowInstructions(workflowName, context)}
+
+---
+
+<instructions>
+You are executing the BMAD workflow: ${workflowName}
+</instructions>
+
+<workflow-config>
+${resource.content}
+</workflow-config>`,
+          },
+        ],
+      };
+    } catch {
+      const workflows = await this.loader.listWorkflows();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Workflow not found: ${workflowName}
+
+Available workflows:
+${workflows.map((w) => `- ${w}`).join('\n')}
+
+Use bmad-resources with operation=workflows to see all available workflows.`,
+          },
+        ],
+      };
+    }
+  }
+
+  /**
+   * Reads and formats a BMAD resource file for MCP response
+   *
+   * @param uri - BMAD resource URI in format `bmad://path/to/file.ext`
+   * @returns MCP tool response containing the formatted file content
+   *
+   * @privateRemarks
+   * This method:
+   * 1. Parses the bmad:// URI to extract the relative file path
+   * 2. Loads the file content using the resource loader
+   * 3. Determines appropriate syntax highlighting language based on file extension
+   * 4. Returns formatted content with proper code block syntax highlighting
+   *
+   * Used by the bmad-resources tool with operation="read".
+   *
+   * @throws Returns error response if URI is invalid or file cannot be loaded
+   */
+  private async readResource(uri: string): Promise<{ content: TextContent[] }> {
+    try {
+      // Parse URI: bmad://path/to/file.ext
+      const pathMatch = uri.match(/^bmad:\/\/(.+)$/);
+      if (!pathMatch) {
+        throw new Error(
+          `Invalid resource URI: ${uri}. Expected format: bmad://path/to/file`,
+        );
+      }
+
+      const relativePath = pathMatch[1];
+      const content = await this.loader.loadFile(relativePath);
+
+      // Determine file extension for syntax highlighting
+      const ext = relativePath.split('.').pop()?.toLowerCase() || 'txt';
+      const langMap: Record<string, string> = {
+        md: 'markdown',
+        yaml: 'yaml',
+        yml: 'yaml',
+        json: 'json',
+        xml: 'xml',
+        csv: 'csv',
+        ts: 'typescript',
+        js: 'javascript',
+      };
+      const lang = langMap[ext] || 'text';
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📄 **${uri}**\n\n\`\`\`${lang}\n${content}\n\`\`\``,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Failed to read ${uri}\n\nError: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+
+  private async listResources(
+    pattern?: string,
+  ): Promise<{ content: TextContent[] }> {
+    try {
+      await this.initialize();
+
+      let resources = this.cachedResources;
+
+      // Apply pattern filter if provided (simple glob matching)
+      if (pattern) {
+        const patternRegex = new RegExp(
+          '^' +
+            pattern
+              .replace(/\*\*/g, '.*')
+              .replace(/\*/g, '[^/]*')
+              .replace(/\?/g, '.') +
+            '$',
+        );
+        resources = resources.filter((r) => {
+          const path = r.uri.replace('bmad://', '');
+          return patternRegex.test(path);
+        });
+      }
+
+      const resourceList = resources.map((r) => `- ${r.uri}`).join('\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📋 **Available BMAD Resources** (${resources.length} files)\n\n${resourceList}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Failed to list resources\n\nError: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+
+  private async listModules(): Promise<{ content: TextContent[] }> {
+    await this.initialize();
+
+    // Extract unique modules from agents
+    const modules = new Set<string>();
+    this.agentMetadata.forEach((a) => {
+      if (a.module) {
+        modules.add(a.module);
+      }
+    });
+
+    const moduleList = Array.from(modules).sort();
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `📦 **Loaded BMAD Modules** (${moduleList.length})\n\n${moduleList.map((m) => `- ${m}`).join('\n')}`,
+        },
+      ],
+    };
+  }
+
+  private async listAgents(): Promise<{ content: TextContent[] }> {
+    await this.initialize();
+
+    const agents = this.agentMetadata;
+    const agentList = agents
+      .map((a) => {
+        const toolName = a.module ? `${a.module}-${a.name}` : `bmad-${a.name}`;
+        const title = a.title ? ` (${a.title})` : '';
+        const desc = a.description ? `\n  ${a.description}` : '';
+        return `**${toolName}** - ${a.displayName}${title}${desc}`;
+      })
+      .join('\n\n');
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `🤖 **Available BMAD Agents** (${agents.length})\n\n${agentList}\n\n**Usage:** Invoke any agent by its tool name with a message parameter.`,
+        },
+      ],
+    };
+  }
+
+  private async listWorkflows(): Promise<{ content: TextContent[] }> {
+    await this.initialize();
+
+    // Build workflow metadata map for descriptions (from CSV manifest)
+    const workflowMetadata = new Map<string, Workflow>();
+    this.workflows.forEach((w) => {
+      workflowMetadata.set(w.name, w);
+    });
+
+    // Group by module → agent → workflows (using agents as source of truth)
+    const byModule = new Map<
+      string,
+      Map<string, Array<{ name: string; description: string }>>
+    >();
+    const seenWorkflows = new Set<string>();
+
+    for (const agent of this.agentMetadata) {
+      if (!agent.workflows || agent.workflows.length === 0) continue;
+
+      const module = agent.module || 'unknown';
+      if (!byModule.has(module)) {
+        byModule.set(module, new Map());
+      }
+      const agentMap = byModule.get(module)!;
+
+      const agentKey = `${agent.displayName} (${agent.name})`;
+      if (!agentMap.has(agentKey)) {
+        agentMap.set(agentKey, []);
+      }
+
+      const workflowList = agentMap.get(agentKey)!;
+
+      // Add workflows from agent (with descriptions from menu items)
+      for (let i = 0; i < agent.workflows.length; i++) {
+        const workflowPath = agent.workflows[i];
+        // Extract workflow name from path
+        const match = workflowPath.match(/\/workflows\/([^/]+)\//);
+        const workflowName = match ? match[1] : workflowPath;
+
+        // Get description from agent's menu items or fallback to CSV metadata
+        let description = '';
+        if (agent.workflowMenuItems && agent.workflowMenuItems[i]) {
+          description = agent.workflowMenuItems[i];
+        } else if (workflowMetadata.has(workflowName)) {
+          description =
+            workflowMetadata.get(workflowName)!.description ||
+            'No description available';
+        } else {
+          description = 'No description available';
+        }
+
+        workflowList.push({ name: workflowName, description });
+        seenWorkflows.add(workflowName);
+      }
+    }
+
+    // Add standalone workflows (workflows not associated with any agent)
+    const standaloneByModule = new Map<
+      string,
+      Array<{ name: string; description: string }>
+    >();
+    for (const workflow of this.workflows) {
+      if (!seenWorkflows.has(workflow.name)) {
+        const module = workflow.module || 'unknown';
+        if (!standaloneByModule.has(module)) {
+          standaloneByModule.set(module, []);
+        }
+        standaloneByModule.get(module)!.push({
+          name: workflow.name,
+          description: workflow.description || 'No description available',
+        });
+        seenWorkflows.add(workflow.name);
+      }
+    }
+
+    // Sort modules (core first, then alphabetically)
+    const allModules = new Set([
+      ...byModule.keys(),
+      ...standaloneByModule.keys(),
+    ]);
+    const sortedModules = Array.from(allModules).sort((a, b) => {
+      if (a === 'core') return -1;
+      if (b === 'core') return 1;
+      return a.localeCompare(b);
+    });
+
+    // Count total workflows
+    let totalWorkflows = 0;
+    for (const agentMap of byModule.values()) {
+      for (const workflows of agentMap.values()) {
+        totalWorkflows += workflows.length;
+      }
+    }
+    for (const workflows of standaloneByModule.values()) {
+      totalWorkflows += workflows.length;
+    }
+
+    // Build output grouped by module → agent → workflows
+    const sections: string[] = [];
+    sections.push(`# BMAD Workflows (${totalWorkflows})\n`);
+
+    for (const module of sortedModules) {
+      const agentMap = byModule.get(module);
+      const standaloneWorkflows = standaloneByModule.get(module) || [];
+      const totalCount =
+        (agentMap ? Array.from(agentMap.values()).flat().length : 0) +
+        standaloneWorkflows.length;
+
+      sections.push(`## ${module.toUpperCase()} (${totalCount})\n`);
+
+      // Show agent-scoped workflows first
+      if (agentMap) {
+        const sortedAgents = Array.from(agentMap.keys()).sort();
+        for (const agentKey of sortedAgents) {
+          const workflows = agentMap.get(agentKey)!;
+          sections.push(`### ${agentKey}\n`);
+          workflows.forEach((w) => {
+            sections.push(`- **${w.name}**: ${w.description}\n`);
+          });
+        }
+      }
+
+      // Show standalone workflows last
+      if (standaloneWorkflows.length > 0) {
+        sections.push(`### Standalone Workflows\n`);
+        standaloneWorkflows.forEach((w) => {
+          sections.push(`- **${w.name}**: ${w.description}\n`);
+        });
+      }
+    }
+
+    sections.push('---\n');
+    sections.push('## Workflow Invocation\n');
+    sections.push(
+      'Use the `bmad-workflow` tool to execute any workflow directly.\n',
+    );
+    sections.push('**Example:**\n');
+    sections.push('```\nbmad-workflow({ workflow: "prd" })\n```');
+
+    const workflowList = sections.join('\n');
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: workflowList,
+        },
+      ],
+    };
+  }
+
+  private async searchResources(
+    query: string,
+    type: string,
+  ): Promise<{ content: TextContent[] }> {
+    await this.initialize();
+
+    if (!query.trim()) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '❌ Search query cannot be empty',
+          },
+        ],
+      };
+    }
+
+    const searchQuery = query.toLowerCase();
+    const results: string[] = [];
+
+    // Search agents
+    if (type === 'agents' || type === 'all') {
+      const matchedAgents = this.agentMetadata.filter((a) => {
+        const searchableText = [
+          a.name,
+          a.displayName,
+          a.title,
+          a.description,
+          a.module,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        // Simple fuzzy matching: check if all query words are in the searchable text
+        const queryWords = searchQuery.split(/\s+/);
+        return queryWords.every((word) => searchableText.includes(word));
+      });
+
+      if (matchedAgents.length > 0) {
+        results.push(`## 🤖 Agents (${matchedAgents.length} matches)\n`);
+        matchedAgents.forEach((a) => {
+          const toolName = a.module
+            ? `${a.module}-${a.name}`
+            : `bmad-${a.name}`;
+          results.push(
+            `**${toolName}** - ${a.displayName}${a.title ? ` (${a.title})` : ''}`,
+          );
+          if (a.description) {
+            results.push(`  ${a.description}`);
+          }
+        });
+      }
+    }
+
+    // Search workflows
+    if (type === 'workflows' || type === 'all') {
+      const matchedWorkflows = this.workflows.filter(
+        (w) =>
+          w.name.toLowerCase().includes(searchQuery) ||
+          (w.description &&
+            w.description.toLowerCase().includes(searchQuery)) ||
+          (w.module && w.module.toLowerCase().includes(searchQuery)),
+      );
+
+      if (matchedWorkflows.length > 0) {
+        if (results.length > 0) results.push('\n---\n');
+        results.push(`## Workflows (${matchedWorkflows.length} matches)\n`);
+        matchedWorkflows.forEach((w) => {
+          const module = w.module ? `[${w.module}]` : '';
+          const description = w.description || 'No description available';
+          results.push(`- **${w.name}** ${module}: ${description}\n`);
+        });
+      }
+    }
+
+    if (results.length === 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🔍 No results found for "${query}"\n\nTry:\n- Using fewer or different search terms\n- Checking spelling\n- Using bmad-resources with operation=agents or operation=workflows to browse all options`,
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `🔍 **Search Results for "${query}"**\n\n${results.join('\n')}`,
+        },
+      ],
+    };
+  }
+
+  /**
+   * Starts the MCP server and begins listening for requests
+   *
+   * @returns Promise that resolves when the server is fully initialized and ready to accept connections
+   *
+   * @remarks
+   * This method:
+   * 1. Establishes the stdio transport connection with the MCP client
+   * 2. Pre-loads all BMAD agents, workflows, and resources into memory
+   * 3. Sets up all MCP request handlers
+   * 4. Logs initialization status to stderr
+   *
+   * The server will continue running until the process is terminated.
+   * All BMAD content is loaded eagerly on startup for optimal performance.
+   *
+   * @example
+   * ```typescript
+   * const server = new BMADServerLiteMultiToolGit();
+   * await server.start(); // Server is now running and ready
+   * ```
+   *
+   * @throws Will throw if the MCP transport connection fails
+   * @throws Will throw if BMAD content loading fails during initialization
+   */
+  async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('BMAD MCP Server running on stdio');
-  }
-}
 
-/**
- * Main entry point for BMAD MCP Server
- */
-export async function main(): Promise<void> {
-  const packageRoot = path.resolve(__dirname, '..');
-  const cwd = process.cwd();
-  // Support multiple paths as CLI arguments (argv[2], argv[3], ...)
-  // Filter out commands (starting with * or --) to only keep paths
-  const allArgs = process.argv.length > 2 ? process.argv.slice(2) : [];
-  const config = loadConfig({ argv: allArgs });
+    // Pre-load all data into memory
+    await this.initialize();
 
-  // Configure logger with settings from config
-  configureLogger({
-    debug: config.logging.debug,
-    level: config.logging.level,
-  });
-
-  // Parse --remote arguments for dynamic agent loading
-  const remoteRegistry = parseRemoteArgs(allArgs);
-  console.error(`🌐 Registered ${remoteRegistry.remotes.size} remote(s)`);
-
-  // Parse --mode flag (preserve validation behavior)
-  const modeArg = allArgs.find((arg) => arg.startsWith('--mode='));
-  const modeValue = modeArg?.split('=')[1];
-  const envMode = process.env.BMAD_DISCOVERY_MODE;
-  const rawMode = modeValue || envMode || 'auto';
-  if (rawMode !== 'auto' && rawMode !== 'strict') {
-    console.error(`❌ Invalid discovery mode: ${rawMode}`);
-    console.error('   Valid modes: auto, strict');
-    throw new Error(`Invalid BMAD_DISCOVERY_MODE: ${rawMode}`);
-  }
-  const mode: 'auto' | 'strict' = config.discovery.mode;
-
-  // Filter CLI args (exclude commands and flags)
-  const cliArgs = allArgs.filter(
-    (arg) => !arg.startsWith('*') && !arg.startsWith('--'),
-  );
-
-  // Read version from package.json
-  let version = 'unknown';
-  try {
-    const packageJsonPath = path.join(packageRoot, 'package.json');
-    const packageJsonContent = readFileSync(packageJsonPath, 'utf-8');
-    const packageJson = JSON.parse(packageJsonContent) as { version?: string };
-    version = packageJson.version ?? 'unknown';
-  } catch (error) {
-    console.error('Failed to read package.json:', error);
-    // Silently fall back to 'unknown' if package.json can't be read
-  }
-
-  console.error(`🚀 BMAD MCP Server v${version}\n`);
-
-  console.error('📦 Loading sources...');
-
-  // Process CLI args to resolve git+ URLs to local paths
-  const gitResolver = new GitSourceResolver(
-    config.git.cacheDir,
-    config.git.autoUpdate,
-    config.git.cacheTTL,
-  );
-  const processedCliArgs: string[] = [];
-  const sourceResults: Array<{
-    type: 'git' | 'local';
-    name: string;
-    status: 'success' | 'error' | 'warning';
-    error?: string;
-    agentCount?: number;
-  }> = [];
-
-  for (let i = 0; i < cliArgs.length; i++) {
-    const arg = cliArgs[i];
-
-    if (GitSourceResolver.isGitUrl(arg)) {
-      try {
-        const localPath = await gitResolver.resolve(arg);
-        processedCliArgs.push(localPath);
-
-        // Extract repo name for display
-        const match = arg.match(/github\.com\/([^/]+\/[^#]+)/);
-        const repoName = match ? match[1].replace('.git', '') : 'git-repo';
-
-        sourceResults.push({
-          type: 'git',
-          name: repoName,
-          status: 'success',
-        });
-      } catch (error) {
-        const match = arg.match(/github\.com\/([^/]+\/[^#]+)/);
-        const repoName = match ? match[1].replace('.git', '') : 'git-repo';
-
-        sourceResults.push({
-          type: 'git',
-          name: repoName,
-          status: 'error',
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Continue with other sources
-      }
-    } else {
-      processedCliArgs.push(arg);
-
-      // Extract meaningful name from path
-      const pathName = path.basename(arg);
-      sourceResults.push({
-        type: 'local',
-        name: pathName,
-        status: 'success', // Will be updated after discovery
-      });
-    }
-  }
-
-  // Check if all sources failed in strict mode
-  const hasGitErrors = sourceResults.some(
-    (r) => r.type === 'git' && r.status === 'error',
-  );
-  const hasAnySources = cliArgs.length > 0;
-  const allSourcesFailed =
-    hasAnySources && processedCliArgs.length === 0 && mode === 'strict';
-
-  if (allSourcesFailed && hasGitErrors) {
-    console.error('\n💥 Fatal: All git sources failed to load');
-    console.error('━'.repeat(60));
-    console.error('\nFailed sources:');
-    sourceResults
-      .filter((r) => r.status === 'error')
-      .forEach((r) => {
-        console.error(`   ✗ ${r.name}`);
-        if (r.error) {
-          console.error(`     → ${r.error}`);
-        }
-      });
-    console.error('\n💡 Troubleshooting tips:');
-    console.error('   • Check your internet connection');
-    console.error('   • Verify repository URLs are correct');
-    console.error('   • Ensure you have access to private repositories');
-    console.error('   • Try running with --mode=auto for local discovery');
+    // Log to stderr (stdout is for MCP protocol)
+    const gitPaths = this.loader.getResolvedGitPaths();
+    console.error('BMAD MCP Server started');
     console.error(
-      '\n   See: https://docs.bmad.dev/troubleshooting#git-sources',
+      `Loaded ${this.agentMetadata.length} agents, ${this.workflows.length} workflows, ${this.cachedResources.length} resources`,
     );
-    throw new Error('All configured sources failed to load');
-  }
-
-  const envVar = config.discovery.envRoot;
-
-  const discovery = resolveBmadPaths({
-    cwd,
-    cliArgs: processedCliArgs,
-    envVar,
-    userBmadPath: config.discovery.userBmadPath,
-    mode,
-    rootSearchMaxDepth: config.discovery.rootSearchMaxDepth,
-    includeUserBmad: config.discovery.includeUserBmad,
-    excludeDirs: config.discovery.excludeDirs,
-  });
-
-  // Update source results based on discovery
-  discovery.locations.forEach((loc) => {
-    if (loc.source === 'cli') {
-      const index = parseInt(loc.displayName.match(/\d+/)?.[0] || '1') - 1;
-      if (sourceResults[index]) {
-        if (loc.status !== 'valid') {
-          sourceResults[index].status =
-            loc.status === 'not-found' ? 'error' : 'warning';
-          sourceResults[index].error = loc.details || `${loc.status}`;
-        }
-      }
+    if (gitPaths.size > 0) {
+      console.error(`Git remotes resolved: ${gitPaths.size}`);
     }
-  });
-
-  // Display streamlined source results
-  sourceResults.forEach((result) => {
-    const statusIcon =
-      result.status === 'success'
-        ? '✅'
-        : result.status === 'warning'
-          ? '⚠️'
-          : '❌';
-
-    if (result.type === 'git') {
-      if (result.status === 'success') {
-        // Get version info from discovery
-        const location = discovery.locations.find(
-          (loc) => loc.source === 'cli',
-        );
-        const version = location?.version ? ` (${location.version})` : '';
-        console.error(`   ${statusIcon} Git: ${result.name}${version}`);
-      } else {
-        const errorMsg = result.error?.includes('not found')
-          ? 'Repository not found'
-          : 'Failed to resolve';
-        console.error(`   ${statusIcon} Git: ${result.name} - ${errorMsg}`);
-      }
-    } else {
-      if (result.status === 'success') {
-        console.error(`   ${statusIcon} Local: ${result.name}`);
-      } else {
-        const errorMsg = result.error?.includes('not found')
-          ? 'Path not found'
-          : result.error || 'Invalid';
-        console.error(`   ${statusIcon} Local: ${result.name} - ${errorMsg}`);
-      }
-    }
-  });
-
-  // Show discovered BMAD installations
-  const validLocations = discovery.locations.filter(
-    (l) => l.status === 'valid',
-  );
-  if (validLocations.length > 0) {
-    console.error(`\n📂 Found ${validLocations.length} BMAD installation(s):`);
-    validLocations.forEach((loc) => {
-      const isActive =
-        loc.resolvedRoot === discovery.activeLocation.resolvedRoot;
-      const marker = isActive ? '→' : ' ';
-      const versionStr = loc.version ? ` (${loc.version})` : '';
-      const sourceStr =
-        loc.source === 'cli'
-          ? 'CLI'
-          : loc.source === 'env'
-            ? 'ENV'
-            : loc.source === 'user'
-              ? 'User'
-              : loc.source === 'project'
-                ? 'Project'
-                : loc.source;
-      console.error(
-        `   ${marker} [${sourceStr}] ${loc.resolvedRoot}${versionStr}`,
-      );
-    });
-  }
-
-  const activeRoot = discovery.activeLocation.resolvedRoot;
-
-  if (!activeRoot || discovery.activeLocation.status !== 'valid') {
-    console.error('\n⚠️  Warning: No BMAD installations found');
-    console.error('━'.repeat(60));
-    console.error('\n� You can load agents dynamically using remotes:');
-    console.error('   bmad *list-agents @awesome');
-    console.error('   bmad *list-workflows @awesome');
-    console.error('\n📚 Or provide BMAD sources:');
-    console.error('   • Git: git+https://github.com/org/repo#branch:/path');
-    console.error('   • Local: /path/to/bmad/installation');
-    console.error('\n🔧 Configuration modes:');
-    console.error('   • --mode=auto   : Auto-discover from project/user dirs');
-    console.error('   • --mode=strict : Use only explicitly provided sources');
-    console.error('\n   See: https://docs.bmad.dev/configuration\n');
-
-    // Create a minimal server with no BMAD root
-    // This allows remote agent loading to work
-    const emptyRoot = process.cwd();
-    try {
-      const server = new BMADMCPServer(
-        emptyRoot,
-        discovery,
-        remoteRegistry,
-        version,
-      );
-      await server.run();
-    } catch (error) {
-      console.error('\n❌ Server Initialization Failed');
-      console.error('━'.repeat(60));
-      console.error(
-        'Error Details:',
-        error instanceof Error ? error.message : String(error),
-      );
-      throw error;
-    }
-    return;
-  }
-
-  try {
-    const server = new BMADMCPServer(
-      activeRoot,
-      discovery,
-      remoteRegistry,
-      version,
-    );
-    await server.run();
-  } catch (error) {
-    console.error('\n❌ Server Initialization Failed');
-    console.error('━'.repeat(60));
-    console.error(
-      'Error Details:',
-      error instanceof Error ? error.message : String(error),
-    );
-    if (error instanceof Error && error.stack) {
-      console.error('\nStack Trace:');
-      console.error(error.stack);
-    }
-    console.error('\n💡 Troubleshooting Tips:');
-    console.error('   • Verify BMAD installation is complete');
-    console.error('   • Check file permissions');
-    console.error('   • Ensure manifest files are valid YAML');
-    console.error('   • Try running with --mode=auto for more flexibility');
-    throw error;
   }
 }

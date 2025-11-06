@@ -1,12 +1,19 @@
 {
   "servers": {
+    // "bmad-full": {
+    //   "command": "node",
+    //   "args": [
+    //     "${workspaceFolder}/build/index.js",
+    //     "git+https://github.com/bmad-code-org/BMAD-METHOD#main:/bmad",
+    //     "git+https://github.com/mkellerman/awesome-bmad-agents#main:/agents/debug-diana-v6",
+    //     "--mode=strict"
+    //   ]
+    // },
     "bmad": {
       "command": "node",
       "args": [
         "${workspaceFolder}/build/index.js",
-        "git+https://github.com/bmad-code-org/BMAD-METHOD#main:/bmad",
-        "git+https://github.com/mkellerman/awesome-bmad-agents#main:/agents/debug-diana-v6",
-        "--mode=strict"
+        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad"
       ]
     }
   }

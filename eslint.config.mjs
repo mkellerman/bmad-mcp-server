@@ -18,6 +18,7 @@ export default tseslint.config(
       '**/*.d.ts',
       'tests/support/fixtures/**',
       '.bmad/**',
+      '_deprecated/**',
     ],
   },
   {
@@ -47,6 +48,10 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       'no-console': ['warn', { allow: ['error', 'warn'] }],
     },
   },

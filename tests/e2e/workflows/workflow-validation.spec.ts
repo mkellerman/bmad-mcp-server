@@ -15,8 +15,6 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
-import fs from 'fs';
-import path from 'path';
 
 interface TestResult {
   userInput: string;
@@ -37,43 +35,21 @@ const LLM_MODEL = 'gpt-4.1';
 const LLM_API_KEY = 'sk-test-bmad-1234';
 const LLM_TEMPERATURE = 0.1;
 
-// Helper to discover all available workflows from the master manifest
+// Helper to discover all available workflows using MCP resources API
 async function discoverWorkflows(): Promise<string[]> {
   try {
-    // Read the master manifest JSON file directly
-    const manifestPath = path.join(process.cwd(), 'master-manifest.json');
+    // In the lite architecture, we discover workflows by scanning the bmad directory
+    // Use a static list of known test workflows for now
+    // TODO: Could enhance this to use bmad-resources tool to list workflows dynamically
 
-    if (!fs.existsSync(manifestPath)) {
-      console.warn('Master manifest not found, using fallback workflow list');
-      return ['core/brainstorming', 'core/party-mode'];
-    }
+    const knownWorkflows = ['party-mode', 'brainstorming'];
 
-    const manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-
-    // Only include modules that are actually loaded in the test environment
-    const loadedModules = ['bmad-core', 'bmb', 'core', 'bmad-test-fixtures'];
-
-    // Extract workflow names using fully qualified names (module/name) for all workflows
-    const workflows = manifestData.workflows
-      .filter(
-        (workflow: any) =>
-          workflow.exists &&
-          workflow.status === 'verified' &&
-          workflow.name &&
-          loadedModules.includes(workflow.moduleName),
-      ) // Only include loaded modules
-      .map((workflow: any) => `${workflow.moduleName}/${workflow.name}`) // Always use module/name format
-      .filter((name: string) => name && typeof name === 'string')
-      .filter(
-        (name: string, index: number, self: string[]) =>
-          self.indexOf(name) === index,
-      ); // unique only
-
-    return workflows.sort();
+    console.log('Using known workflow list for lite architecture');
+    return knownWorkflows.sort();
   } catch (error) {
     console.error('Failed to discover workflows:', error);
     // Return a minimal set if discovery fails
-    return ['core/brainstorming', 'core/party-mode'];
+    return ['party-mode', 'brainstorming'];
   }
 }
 
@@ -159,13 +135,13 @@ function analyzeLLMResponse(response: string): {
   };
 }
 
-// Main function to load workflow through LLM
+// Simulate loading a workflow through LLM using the lite architecture bmad-workflow tool
 async function loadWorkflowThroughLLM(
   workflowName: string,
   llmClient: LLMClient,
   mcpClient: MCPClientFixture,
 ): Promise<TestResult> {
-  const userInput = `#mcp_bmad_bmad *${workflowName}`;
+  const userInput = `#mcp_bmad_bmad-workflow {"workflow": "${workflowName}"}`;
 
   const result: TestResult = {
     userInput,
@@ -181,23 +157,22 @@ async function loadWorkflowThroughLLM(
   };
 
   try {
-    // Define the BMAD tool for LLM
-    const bmadTool = {
+    // Define the BMAD workflow tool for LLM (lite architecture)
+    const workflowTool = {
       type: 'function',
       function: {
-        name: 'mcp_bmad_bmad',
-        description:
-          'Unified BMAD tool. Use *workflow-name format for workflows.',
+        name: 'mcp_bmad_bmad-workflow',
+        description: 'Execute BMAD workflows by name.',
         parameters: {
           type: 'object',
           properties: {
-            command: {
+            workflow: {
               type: 'string',
               description:
-                'Workflow command with asterisk prefix (e.g., "*party-mode")',
+                'Name of the workflow to execute (e.g., "party-mode", "brainstorming")',
             },
           },
-          required: ['command'],
+          required: ['workflow'],
         },
       },
     };
@@ -209,16 +184,16 @@ async function loadWorkflowThroughLLM(
         {
           role: 'system',
           content:
-            'You are a helpful assistant. When asked to load a workflow, use the mcp_bmad_bmad tool with the workflow name prefixed with an asterisk.',
+            'You are a helpful assistant. When asked to load a workflow, use the mcp_bmad_bmad-workflow tool with the workflow name.',
         },
         {
           role: 'user',
-          content: `Use the tool to load the *${workflowName} workflow`,
+          content: `Use the tool to load the ${workflowName} workflow`,
         },
       ],
       {
         temperature: LLM_TEMPERATURE,
-        tools: [bmadTool],
+        tools: [workflowTool],
       },
     );
 
@@ -232,11 +207,11 @@ async function loadWorkflowThroughLLM(
       if (toolFunc) {
         const args = JSON.parse(toolFunc.arguments);
         console.log(
-          `\ncall_tool called: bmad with args: ${JSON.stringify(args)}`,
+          `\ncall_tool called: bmad-workflow with args: ${JSON.stringify(args)}`,
         );
 
         // Execute the MCP tool
-        const toolResult = await mcpClient.callTool('bmad', args);
+        const toolResult = await mcpClient.callTool('bmad-workflow', args);
         result.toolResponse = toolResult.content;
 
         // Send result back to LLM for final response
@@ -249,7 +224,7 @@ async function loadWorkflowThroughLLM(
             },
             {
               role: 'user',
-              content: `Use the tool to load the *${workflowName} workflow`,
+              content: `Use the tool to load the ${workflowName} workflow`,
             },
             {
               role: 'assistant',
@@ -378,9 +353,7 @@ describe.skipIf(skipE2E)('Workflow Validation with LLM', () => {
 
     // Discover all workflows
     discoveredWorkflows = await discoverWorkflows();
-    console.log(
-      `\n📋 Discovered ${discoveredWorkflows.length} workflows from master manifest`,
-    );
+    console.log(`\n📋 Discovered ${discoveredWorkflows.length} workflows`);
     console.log(`Workflows: ${discoveredWorkflows.join(', ')}\n`);
   }, 60000);
 

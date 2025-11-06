@@ -11,6 +11,9 @@ build/
 dist/
 *.tsbuildinfo
 
+# Deprecated code (archived during migration)
+_deprecated/
+
 # Disallow committed JS in src (TS sources only)
 src/**/*.js
 
