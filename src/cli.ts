@@ -453,13 +453,15 @@ async function tuiList(engine: BMADEngine) {
 
   s.stop(result?.success ? pc.green('✓ Loaded') : pc.red('✗ Failed'));
 
+  // Show raw output and exit
   if (result?.success) {
-    clack.note(
-      result.text,
-      pc.cyan(`${what.charAt(0).toUpperCase() + what.slice(1)}`),
-    );
+    /* eslint-disable no-console */
+    console.log('\n' + result.text);
+    /* eslint-enable no-console */
+    process.exit(0);
   } else {
     clack.log.error(result?.error || 'Unknown error');
+    process.exit(1);
   }
 }
 
@@ -493,10 +495,15 @@ async function tuiSearch(engine: BMADEngine) {
 
   s.stop(result.success ? pc.green('✓ Found results') : pc.red('✗ Failed'));
 
+  // Show raw output and exit
   if (result.success) {
-    clack.note(result.text, pc.cyan('Search Results'));
+    /* eslint-disable no-console */
+    console.log('\n' + result.text);
+    /* eslint-enable no-console */
+    process.exit(0);
   } else {
     clack.log.error(result.error || 'Unknown error');
+    process.exit(1);
   }
 }
 
@@ -558,13 +565,15 @@ async function tuiRead(engine: BMADEngine) {
 
   readS.stop(result.success ? pc.green('✓ Read complete') : pc.red('✗ Failed'));
 
+  // Show raw output and exit
   if (result.success) {
-    clack.note(
-      result.text,
-      pc.cyan(`${what.charAt(0).toUpperCase() + what.slice(1)} Details`),
-    );
+    /* eslint-disable no-console */
+    console.log('\n' + result.text);
+    /* eslint-enable no-console */
+    process.exit(0);
   } else {
     clack.log.error(result.error || 'Unknown error');
+    process.exit(1);
   }
 }
 
@@ -645,10 +654,15 @@ async function tuiExecute(engine: BMADEngine) {
 
   execS.stop(result.success ? pc.green('✓ Executed') : pc.red('✗ Failed'));
 
+  // Show raw output and exit
   if (result.success) {
-    clack.note(result.text, pc.cyan('Execution Result'));
+    /* eslint-disable no-console */
+    console.log('\n' + result.text);
+    /* eslint-enable no-console */
+    process.exit(0);
   } else {
     clack.log.error(result.error || 'Unknown error');
+    process.exit(1);
   }
 }
 
