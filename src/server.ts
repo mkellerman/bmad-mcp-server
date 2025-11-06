@@ -45,8 +45,8 @@ import { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
 import type { Workflow } from './types/index.js';
 import {
   SERVER_CONFIG,
-  TOOL_NAMES,
-  TOOL_DESCRIPTIONS,
+  // TOOL_NAMES, // TODO: Re-enable when unified tool is implemented
+  // TOOL_DESCRIPTIONS, // TODO: Re-enable when unified tool is implemented
   getAgentInstructions,
   getWorkflowInstructions,
 } from './config.js';
@@ -240,190 +240,83 @@ export class BMADServerLiteMultiToolGit {
 
       const tools: Tool[] = [];
 
-      // Create one tool per agent
-      for (const agent of this.agentMetadata) {
-        const toolName = agent.module
-          ? `${agent.module}-${agent.name}`
-          : `bmad-${agent.name}`;
+      // ============================================================================
+      // TODO: REFACTOR TO UNIFIED BMAD TOOL
+      // ============================================================================
+      // These individual agent tools are being phased out in favor of a single
+      // unified 'bmad' tool that handles all agent/workflow/resource operations.
+      //
+      // Current architecture: One tool per agent (bmm-analyst, bmm-architect, etc.)
+      // New architecture: Single 'bmad' tool with operations: list, read, execute
+      //
+      // See: src/tools/bmad-unified.ts for new implementation
+      // See: test-prompts.json for test specification
+      //
+      // Keeping old tool registration code commented below for reference.
+      // Will be removed once new tool is fully tested and validated.
+      // ============================================================================
 
-        tools.push({
-          name: toolName,
-          description: this.formatAgentDescription(agent),
-          inputSchema: {
-            type: 'object',
-            properties: {
-              message: {
-                type: 'string',
-                description: `Your message or question for ${agent.displayName}`,
-              },
-            },
-            required: ['message'],
-          },
-        });
-      }
+      // OLD CODE - Create one tool per agent
+      // Disabled during refactor to unified tool approach
+      // for (const agent of this.agentMetadata) {
+      //   const toolName = agent.module
+      //     ? `${agent.module}-${agent.name}`
+      //     : `bmad-${agent.name}`;
+      //   tools.push({ ...agentToolDefinition... });
+      // }
 
-      // Add workflow execution tool
-      tools.push({
-        name: TOOL_NAMES.workflow,
-        description: TOOL_DESCRIPTIONS.workflow,
-        inputSchema: {
-          type: 'object',
-          properties: {
-            workflow: {
-              type: 'string',
-              description: 'Workflow name (without the * prefix)',
-            },
-            context: {
-              type: 'string',
-              description: 'Optional context or parameters for the workflow',
-            },
-          },
-          required: ['workflow'],
-        },
-      });
+      // OLD CODE - Workflow tool
+      // tools.push({ name: TOOL_NAMES.workflow, ...workflowToolDefinition... });
 
-      // Add comprehensive resource and discovery tool
-      tools.push({
-        name: TOOL_NAMES.resources,
-        description: TOOL_DESCRIPTIONS.resources,
-        inputSchema: {
-          type: 'object',
-          properties: {
-            operation: {
-              type: 'string',
-              enum: [
-                'read',
-                'list',
-                'modules',
-                'agents',
-                'workflows',
-                'search',
-              ],
-              description:
-                'Operation type:\n' +
-                '- read: Get file content from bmad:// URI\n' +
-                '- list: List all available resource files (optionally filtered by pattern)\n' +
-                '- modules: Show all loaded BMAD modules\n' +
-                '- agents: List all available agents with metadata\n' +
-                '- workflows: List all available workflows\n' +
-                '- search: Fuzzy search agents/workflows by name/title/description',
-            },
-            uri: {
-              type: 'string',
-              description:
-                'The bmad:// URI to read (required for operation=read). Example: "bmad://core/config.yaml"',
-            },
-            pattern: {
-              type: 'string',
-              description:
-                'Glob pattern to filter resources (optional for operation=list). Example: "core/workflows/**/*.yaml"',
-            },
-            query: {
-              type: 'string',
-              description:
-                'Search query (required for operation=search). Searches in name, title, and description fields.',
-            },
-            type: {
-              type: 'string',
-              enum: ['agents', 'workflows', 'all'],
-              description:
-                'What to search (for operation=search). Default: all',
-            },
-          },
-          required: ['operation'],
-        },
-      });
+      // OLD CODE - Resources tool
+      // tools.push({ name: TOOL_NAMES.resources, ...resourcesToolDefinition... });
+
+      // ============================================================================
+      // NEW: Unified BMAD Tool (to be implemented)
+      // ============================================================================
+      // TODO: Import and register unified bmad tool here
+      // import { createBMADTool } from './tools/bmad-unified.js';
+      // tools.push(createBMADTool(this.agentMetadata, this.workflows));
+      // ============================================================================
 
       return { tools };
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, (request) => {
       const toolName = request.params.name;
-      const args = request.params.arguments ?? {};
+      // const args = request.params.arguments ?? {}; // TODO: Re-enable when unified tool is implemented
 
-      // Handle agent tools (format: {module}-{agent} or bmad-{agent})
-      if (
-        toolName !== TOOL_NAMES.workflow &&
-        toolName !== TOOL_NAMES.resources &&
-        !toolName.startsWith(TOOL_NAMES.workflow) &&
-        !toolName.startsWith(TOOL_NAMES.resources)
-      ) {
-        // Try to match against known agents
-        const agent = this.agentMetadata.find((a) => {
-          const expectedName = a.module
-            ? `${a.module}-${a.name}`
-            : `bmad-${a.name}`;
-          return expectedName === toolName;
-        });
+      // ============================================================================
+      // TODO: REFACTOR TOOL CALL HANDLER
+      // ============================================================================
+      // Old handlers for individual agent tools, workflow tool, and resources tool
+      // are disabled during migration to unified bmad tool.
+      //
+      // New handler will route all calls through single bmad tool implementation.
+      // ============================================================================
 
-        if (agent) {
-          const message =
-            typeof args === 'object' && args !== null && 'message' in args
-              ? String(args.message)
-              : '';
-          return await this.invokeAgent(agent.name, message);
-        }
-      }
+      // Placeholder - will be replaced with unified tool handler
+      throw new Error(
+        `Tool system disabled during refactor. Tool '${toolName}' not available. ` +
+          `See src/tools/bmad-unified.ts for new implementation.`,
+      );
 
-      // Handle workflow tool
-      if (toolName === TOOL_NAMES.workflow) {
-        const workflow =
-          typeof args === 'object' && args !== null && 'workflow' in args
-            ? String(args.workflow)
-            : '';
-        const context =
-          typeof args === 'object' && args !== null && 'context' in args
-            ? String(args.context)
-            : '';
-        return await this.executeWorkflow(workflow, context);
-      }
+      // OLD CODE - Agent tool handler (disabled)
+      // if (toolName !== TOOL_NAMES.workflow && toolName !== TOOL_NAMES.resources) {
+      //   const agent = this.agentMetadata.find(...);
+      //   if (agent) return await this.invokeAgent(agent.name, message);
+      // }
 
-      // Handle resources tool (read, list, discovery, search)
-      if (toolName === TOOL_NAMES.resources) {
-        const operation =
-          typeof args === 'object' && args !== null && 'operation' in args
-            ? String(args.operation)
-            : 'list';
+      // OLD CODE - Workflow tool handler (disabled)
+      // if (toolName === TOOL_NAMES.workflow) {
+      //   return await this.executeWorkflow(workflow, context);
+      // }
 
-        switch (operation) {
-          case 'read': {
-            const uri =
-              typeof args === 'object' && args !== null && 'uri' in args
-                ? String(args.uri)
-                : '';
-            return await this.readResource(uri);
-          }
-          case 'list': {
-            const pattern =
-              typeof args === 'object' && args !== null && 'pattern' in args
-                ? String(args.pattern)
-                : undefined;
-            return await this.listResources(pattern);
-          }
-          case 'modules':
-            return await this.listModules();
-          case 'agents':
-            return await this.listAgents();
-          case 'workflows':
-            return await this.listWorkflows();
-          case 'search': {
-            const query =
-              typeof args === 'object' && args !== null && 'query' in args
-                ? String(args.query)
-                : '';
-            const type =
-              typeof args === 'object' && args !== null && 'type' in args
-                ? String(args.type)
-                : 'all';
-            return await this.searchResources(query, type);
-          }
-          default:
-            throw new Error(`Unknown operation: ${operation}`);
-        }
-      }
-
-      throw new Error(`Unknown tool: ${toolName}`);
+      // OLD CODE - Resources tool handler (disabled)
+      // if (toolName === TOOL_NAMES.resources) {
+      //   switch (operation) { case 'read': ... case 'list': ... }
+      // }
     });
   }
 

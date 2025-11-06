@@ -1,0 +1,260 @@
+{
+  "description": "Test specification for unified BMAD tool - User interaction patterns and expected tool calls",
+  "version": "1.0.0",
+  "patterns": [
+    {
+      "pattern": "Discovery",
+      "description": "User wants to discover available agents, workflows, or capabilities",
+      "tests": [
+        {
+          "id": "discovery-1",
+          "prompt": "Show me all available agents",
+          "expectedCall": {
+            "operation": "list",
+            "query": "agents"
+          }
+        },
+        {
+          "id": "discovery-2",
+          "prompt": "What agents do you have?",
+          "expectedCall": {
+            "operation": "list",
+            "query": "agents"
+          }
+        },
+        {
+          "id": "discovery-3",
+          "prompt": "List workflows",
+          "expectedCall": {
+            "operation": "list",
+            "query": "workflows"
+          }
+        },
+        {
+          "id": "discovery-4",
+          "prompt": "What can BMAD help me with?",
+          "expectedCall": {
+            "operation": "list",
+            "query": "agents"
+          },
+          "note": "May also list workflows - either acceptable"
+        },
+        {
+          "id": "discovery-5",
+          "prompt": "Show me all BMM agents",
+          "expectedCall": {
+            "operation": "list",
+            "module": "bmm",
+            "query": "agents"
+          }
+        },
+        {
+          "id": "discovery-6",
+          "prompt": "What workflows are available?",
+          "expectedCall": {
+            "operation": "list",
+            "query": "workflows"
+          }
+        },
+        {
+          "id": "discovery-7",
+          "prompt": "List everything in core module",
+          "expectedCall": {
+            "operation": "list",
+            "module": "core"
+          }
+        }
+      ]
+    },
+    {
+      "pattern": "Capability Query",
+      "description": "User asks who can help with a specific task or capability",
+      "tests": [
+        {
+          "id": "capability-1",
+          "prompt": "Is anyone available to help me debug this issue?",
+          "expectedCall": null,
+          "note": "LLM should answer from tool description without calling tool - 'Diana (debug agent) can help with debugging'"
+        },
+        {
+          "id": "capability-2",
+          "prompt": "Which agent handles architecture?",
+          "expectedCall": null,
+          "note": "LLM should answer from tool description - 'Winston (architect agent)'"
+        },
+        {
+          "id": "capability-3",
+          "prompt": "Who should I talk to about testing?",
+          "expectedCall": null,
+          "note": "LLM should answer from tool description - 'Murat (tea agent)'"
+        },
+        {
+          "id": "capability-4",
+          "prompt": "What can the architect do?",
+          "expectedCall": {
+            "operation": "read",
+            "agent": "architect"
+          },
+          "note": "Read full agent definition for detailed capabilities"
+        },
+        {
+          "id": "capability-5",
+          "prompt": "Can BMAD help with documentation?",
+          "expectedCall": null,
+          "note": "LLM should answer from tool description - 'Paige (tech-writer agent)'"
+        }
+      ]
+    },
+    {
+      "pattern": "Direct Intent",
+      "description": "User directly requests an action without specifying agent",
+      "tests": [
+        {
+          "id": "intent-1",
+          "prompt": "Help me debug this issue",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "debug",
+            "message": "Help me debug this issue"
+          }
+        },
+        {
+          "id": "intent-2",
+          "prompt": "Create an architecture for my project",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "architect",
+            "message": "Create an architecture for my project"
+          }
+        },
+        {
+          "id": "intent-3",
+          "prompt": "I need a PRD",
+          "expectedCall": {
+            "operation": "execute",
+            "workflow": "prd",
+            "message": "I need a PRD"
+          }
+        },
+        {
+          "id": "intent-4",
+          "prompt": "Review this code",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "debug",
+            "message": "Review this code"
+          },
+          "note": "Code review could route to debug or dev agent - both acceptable"
+        },
+        {
+          "id": "intent-5",
+          "prompt": "Start planning my project",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "pm",
+            "message": "Start planning my project"
+          }
+        }
+      ]
+    },
+    {
+      "pattern": "Explicit Routing",
+      "description": "User explicitly specifies which agent or workflow they want",
+      "tests": [
+        {
+          "id": "explicit-1",
+          "prompt": "I want to talk to Winston about architecture",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "architect",
+            "message": "I want to talk to Winston about architecture"
+          }
+        },
+        {
+          "id": "explicit-2",
+          "prompt": "Load Mary and let's brainstorm",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "analyst",
+            "message": "Load Mary and let's brainstorm"
+          }
+        },
+        {
+          "id": "explicit-3",
+          "prompt": "Get Diana to help debug",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "debug",
+            "message": "Get Diana to help debug"
+          }
+        },
+        {
+          "id": "explicit-4",
+          "prompt": "Run the PRD workflow",
+          "expectedCall": {
+            "operation": "execute",
+            "workflow": "prd",
+            "message": "Run the PRD workflow"
+          }
+        },
+        {
+          "id": "explicit-5",
+          "prompt": "Ask Diana to look into this bug",
+          "expectedCall": {
+            "operation": "execute",
+            "agent": "debug",
+            "message": "Ask Diana to look into this bug"
+          }
+        }
+      ]
+    },
+    {
+      "pattern": "Multi-Agent",
+      "description": "User requests multiple agents in discussion (party-mode)",
+      "tests": [
+        {
+          "id": "multi-1",
+          "prompt": "Start a party mode with the planning team",
+          "expectedCall": {
+            "operation": "execute",
+            "workflow": "party-mode",
+            "message": "Start discussion with planning team: analyst, pm, architect"
+          }
+        },
+        {
+          "id": "multi-2",
+          "prompt": "I need Mary and Winston to discuss this",
+          "expectedCall": {
+            "operation": "execute",
+            "workflow": "party-mode",
+            "message": "Start discussion with analyst (Mary) and architect (Winston)"
+          }
+        },
+        {
+          "id": "multi-3",
+          "prompt": "Get the whole development team together",
+          "expectedCall": {
+            "operation": "execute",
+            "workflow": "party-mode",
+            "message": "Start discussion with development team: dev, tea, debug"
+          }
+        },
+        {
+          "id": "multi-4",
+          "prompt": "Start party mode with Mary and Winston",
+          "expectedCall": {
+            "operation": "execute",
+            "workflow": "party-mode",
+            "message": "Start discussion with analyst and architect"
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Tool description should be rich enough that Capability Query questions can be answered without tool calls",
+    "LLM uses agent displayName (Mary, Winston, Diana) to map to agent IDs (analyst, architect, debug)",
+    "Module parameter is optional unless there's a name collision",
+    "Message parameter should preserve user's original intent and context"
+  ]
+}
