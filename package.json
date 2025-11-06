@@ -20,7 +20,7 @@
     "test:unit": "TEST_TYPE=unit vitest run",
     "test:integration": "TEST_TYPE=integration vitest run",
     "test:e2e": "TEST_TYPE=e2e vitest run",
-    "test:llm": "npm run test:e2e",
+    "test:llm": "vitest run --config vitest.config.llm.ts",
     "test:all": "npm run test:unit; npm run test:integration; npm run test:e2e",
     "test:litellm-start": "docker-compose -f tests/e2e/framework/docker-compose.yml up -d",
     "test:litellm-stop": "docker-compose -f tests/e2e/framework/docker-compose.yml down",
