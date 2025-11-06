@@ -28,8 +28,8 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
     // Start MCP client
     mcpClient = await createMCPClient();
 
-    // Init LLM client and verify it's running
-    llm = new LLMClient();
+    // Init LLM client with dynamic port and verify it's running
+    llm = await LLMClient.create();
     await verifyLiteLLMRunning(() => llm.healthCheck());
   });
 

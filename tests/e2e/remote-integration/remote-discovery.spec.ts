@@ -36,7 +36,7 @@ describe.skipIf(skipE2E)('Remote Discovery LLM Integration', () => {
     }
 
     mcpClient = await createMCPClient();
-    llmClient = new LLMClient();
+    llmClient = await LLMClient.create();
 
     // Verify LiteLLM is running (global setup should have started it)
     await verifyLiteLLMRunning(() => llmClient.healthCheck());

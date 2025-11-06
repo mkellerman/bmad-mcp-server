@@ -29,7 +29,7 @@ describe.skipIf(skipE2E)('Single Agent LLM Integration Test', () => {
 
   beforeAll(async () => {
     mcpClient = await createMCPClient();
-    llmClient = new LLMClient();
+    llmClient = await LLMClient.create();
 
     // Verify LiteLLM is running (global setup should have started it)
     await verifyLiteLLMRunning(() => llmClient.healthCheck());

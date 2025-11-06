@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { getLiteLLMPort } from './litellm-helper.mjs';
 
 /**
  * LLM Client for communicating with LiteLLM Proxy
@@ -19,6 +20,17 @@ export class LLMClient {
       baseURL: this.baseURL,
       apiKey: this.apiKey,
     });
+  }
+
+  /**
+   * Initialize with the detected LiteLLM port
+   */
+  static async create(
+    apiKey: string = process.env.LITELLM_PROXY_API_KEY || 'sk-test-bmad-1234',
+  ): Promise<LLMClient> {
+    const port = await getLiteLLMPort();
+    const baseURL = `http://localhost:${port}`;
+    return new LLMClient(baseURL, apiKey);
   }
 
   /**

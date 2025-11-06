@@ -341,7 +341,7 @@ describe.skipIf(skipE2E)('Workflow Validation with LLM', () => {
     mcpClient = await createMCPClient();
 
     // Initialize LLM client (baseURL, apiKey)
-    llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
+    llmClient = await LLMClient.create(LLM_API_KEY);
 
     // Verify LiteLLM is running (global setup should have started it)
     await verifyLiteLLMRunning(() => llmClient.healthCheck());
