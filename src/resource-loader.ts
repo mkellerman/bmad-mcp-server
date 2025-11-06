@@ -36,6 +36,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import { load as parseYaml } from 'js-yaml';
 import { XMLParser } from 'fast-xml-parser';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
 import type { Workflow } from './types/index.js';
@@ -48,12 +49,6 @@ import type { Workflow } from './types/index.js';
 const AGENT_IDENTITY_MAX_LENGTH = 500;
 
 /** Regex patterns for parsing BMAD content */
-
-/** Extract description from YAML frontmatter */
-const YAML_DESCRIPTION_REGEX = /description:\s*['"]?([^'"\n]+)['"]?/;
-
-/** Extract title from YAML frontmatter */
-const YAML_TITLE_REGEX = /title:\s*['"]?([^'"\n]+)['"]?/;
 
 /** Extract agent XML block from content */
 const AGENT_XML_REGEX = /<agent[\s\S]*?<\/agent>/i;
@@ -850,14 +845,26 @@ export class ResourceLoaderGit {
       // Extract from YAML frontmatter first
       const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
       if (yamlMatch) {
-        const yaml = yamlMatch[1];
-        const descMatch = yaml.match(YAML_DESCRIPTION_REGEX);
-        if (descMatch) {
-          metadata.description = descMatch[1];
-        }
-        const titleMatch = yaml.match(YAML_TITLE_REGEX);
-        if (titleMatch) {
-          metadata.title = titleMatch[1];
+        try {
+          // Parse YAML frontmatter using js-yaml library
+          // YAML parser returns untyped objects - disable type checking for this section
+          /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+          const frontmatter = parseYaml(yamlMatch[1]) as any;
+
+          if (frontmatter && typeof frontmatter === 'object') {
+            if (
+              frontmatter.description &&
+              typeof frontmatter.description === 'string'
+            ) {
+              metadata.description = frontmatter.description;
+            }
+            if (frontmatter.title && typeof frontmatter.title === 'string') {
+              metadata.title = frontmatter.title;
+            }
+          }
+          /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+        } catch {
+          // Failed to parse YAML frontmatter, skip it
         }
       }
 
