@@ -56,10 +56,45 @@ export class BMADUnifiedReporter {
   constructor(outputDir = 'test-results', jsonFilename = 'test-results.json') {
     this.outputDir = outputDir;
     // Use TEST_TYPE subdirectory if available (unit, integration, e2e)
-    const testType = process.env.TEST_TYPE || 'default';
+    // If TEST_TYPE is 'all', map it to 'default' for now, but we should infer from test path
+    let testType = process.env.TEST_TYPE || 'default';
+    if (testType === 'all') {
+      testType = 'default';
+    }
     this.testResultsDir = path.join(outputDir, '.results', testType);
     this.jsonFilename = jsonFilename;
     this.initialize();
+  }
+
+  /**
+   * Infer test type from file path
+   */
+  private inferTestTypeFromPath(filePath: string): string {
+    const normalized = filePath.toLowerCase();
+    if (normalized.includes('/unit/')) return 'unit';
+    if (normalized.includes('/integration/')) return 'integration';
+    if (normalized.includes('/e2e/')) return 'e2e';
+    return 'default';
+  }
+
+  /**
+   * Get test results directory for a specific test (infers from path if needed)
+   */
+  private getTestResultsDir(filePath?: string): string {
+    const envTestType = process.env.TEST_TYPE;
+
+    // If TEST_TYPE is explicitly set (not 'all'), use it
+    if (envTestType && envTestType !== 'all') {
+      return this.testResultsDir;
+    }
+
+    // Otherwise infer from file path
+    if (filePath) {
+      const inferredType = this.inferTestTypeFromPath(filePath);
+      return path.join(this.outputDir, '.results', inferredType);
+    }
+
+    return this.testResultsDir;
   }
 
   /**
@@ -74,8 +109,11 @@ export class BMADUnifiedReporter {
    * Add a test result - writes immediately to individual JSON file
    */
   async addTest(suiteName: string, test: TestResult): Promise<void> {
+    // Determine the correct results directory (infer from file path if needed)
+    const resultsDir = this.getTestResultsDir(test.filePath);
+
     // Ensure output directories exist
-    await fs.mkdir(this.testResultsDir, { recursive: true });
+    await fs.mkdir(resultsDir, { recursive: true });
 
     // Create a unique filename for this test result (lowercase-kebab)
     const safeTestId = test.id
@@ -89,7 +127,7 @@ export class BMADUnifiedReporter {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
     const filename = `${safeSuiteName}--${safeTestId}.json`;
-    const filePath = path.join(this.testResultsDir, filename);
+    const filePath = path.join(resultsDir, filename);
 
     // Write test result with suite info
     const fragment = {

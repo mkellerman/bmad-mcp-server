@@ -22,7 +22,7 @@
     "test:e2e": "TEST_TYPE=e2e vitest run",
     "test:llm": "npm run test:e2e",
     "test:all": "npm run test:unit; npm run test:integration; npm run test:e2e",
-    "test:clean": "rm -rf test-results/.contexts test-results/.results/default* test-results/.results/unit* test-results/.results/e2e* test-results/test-results.* coverage/",
+    "test:clean": "rm -rf test-results/.contexts test-results/.results/default* test-results/.results/unit* test-results/.results/integration* test-results/.results/e2e* test-results/test-results.* coverage/",
     "test:litellm-start": "docker-compose -f tests/e2e/framework/docker-compose.yml up -d",
     "test:litellm-stop": "docker-compose -f tests/e2e/framework/docker-compose.yml down",
     "test:litellm-logs": "docker-compose -f tests/e2e/framework/docker-compose.yml logs -f",
