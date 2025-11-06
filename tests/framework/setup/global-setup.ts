@@ -22,22 +22,16 @@ export async function setup() {
   // Set git auto-update to false for all tests to prevent git lock conflicts
   process.env.BMAD_GIT_AUTO_UPDATE = 'false';
 
-  const testType = process.env.TEST_TYPE || 'unknown';
+  const testType = process.env.TEST_TYPE || 'default';
   const resultsDir = path.join(
     process.cwd(),
     'test-results/.results',
-    testType,
-  );
-  const contextsDir = path.join(
-    process.cwd(),
-    'test-results/.contexts',
     testType,
   );
 
   try {
     // Remove old fragments and contexts for this test type only
     await fs.rm(resultsDir, { recursive: true, force: true });
-    await fs.rm(contextsDir, { recursive: true, force: true });
     console.log(`🧹 Cleaned old ${testType} test results and contexts`);
   } catch {
     // Directories don't exist, that's fine
