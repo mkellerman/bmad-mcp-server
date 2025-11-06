@@ -85,7 +85,8 @@ Each operation is implemented in its own TypeScript file for clarity, testabilit
 **Purpose**: Run agents or workflows with user messages
 
 - **Execute Types**: `agent`, `workflow`
-- **Required**: User message/context
+- **Required Parameters**: Agent or workflow name
+- **Optional Parameters**: Message/context (some agents/workflows may work without it)
 - **Returns**: Execution result with outputs
 - **Read-only**: ❌ No
 - **Side effects**: ⚠️ **May create files, modify workspace**
@@ -93,7 +94,7 @@ Each operation is implemented in its own TypeScript file for clarity, testabilit
 **Examples**:
 
 ```javascript
-// Execute agent
+// Execute agent with message
 {
   operation: "execute",
   type: "agent",
@@ -101,13 +102,20 @@ Each operation is implemented in its own TypeScript file for clarity, testabilit
   message: "Help me brainstorm a mobile app idea"
 }
 
-// Execute workflow
+// Execute workflow without message (uses defaults or prompts)
 {
   operation: "execute",
   type: "workflow",
-  workflow: "prd",
+  workflow: "workflow-status"
+}
+
+// Execute with module hint
+{
+  operation: "execute",
+  type: "agent",
+  agent: "debug",
   module: "bmm",
-  message: "Create PRD for e-commerce platform"
+  message: "Analyze this error"
 }
 ```
 

@@ -57,8 +57,8 @@ export interface ExecuteParams {
   agent?: string;
   /** Workflow name (for workflow execution) */
   workflow?: string;
-  /** User message/context */
-  message: string;
+  /** User message/context (optional - some agents/workflows may work without initial message) */
+  message?: string;
   /** Module hint (for disambiguation) */
   module?: string;
 }

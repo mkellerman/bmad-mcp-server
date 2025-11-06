@@ -143,7 +143,7 @@ export function createBMADTool(
         message: {
           type: 'string',
           description:
-            "For execute operation: User's message, question, or context. Required when executing agents/workflows.",
+            "For execute operation: User's message, question, or context. Optional - some agents/workflows may work without an initial message.",
         },
       },
       required: ['operation'],

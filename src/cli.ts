@@ -251,14 +251,14 @@ async function handleExecuteCommand(engine: BMADEngine, args: CliArgs) {
 
   switch (args.subcommand) {
     case 'agent':
-      if (!args.message) {
-        throw new Error('Message is required for agent execution');
-      }
-      return engine.executeAgent({ agent: args.target, message: args.message });
+      return engine.executeAgent({
+        agent: args.target,
+        message: args.message,
+      });
     case 'workflow':
       return engine.executeWorkflow({
         workflow: args.target,
-        message: args.message || '',
+        message: args.message,
       });
     default:
       throw new Error(
@@ -392,11 +392,12 @@ ${pc.bold('COMMANDS:')}
 
   ${pc.cyan('execute')} <type> <name> [options]  # Execute agent or workflow
     bmad execute agent dev --message "Create a login form"
-    bmad execute workflow debug-inspect --message "Fix the bug"
+    bmad execute workflow debug-inspect
+    bmad execute agent analyst -m "Help with project planning"
 
 ${pc.bold('OPTIONS:')}
   --json                      # Output in JSON format (for scripting)
-  --message, -m <text>        # Message for execution
+  --message, -m <text>        # Message for execution (optional)
   --type <agents|workflows|all>  # Filter search results
   --help, -h                  # Show this help message
 
@@ -625,18 +626,13 @@ async function tuiExecute(engine: BMADEngine) {
     return;
   }
 
-  // Get message
+  // Get message (optional)
   const message = await clack.text({
-    message: `Enter message for ${what}:`,
-    placeholder: what === 'agent' ? 'Required' : 'Optional',
+    message: `Enter message for ${what} (optional):`,
+    placeholder: 'Press Enter to skip',
   });
 
   if (clack.isCancel(message)) {
-    return;
-  }
-
-  if (what === 'agent' && !message) {
-    clack.log.error('Message is required for agent execution');
     return;
   }
 
@@ -646,10 +642,13 @@ async function tuiExecute(engine: BMADEngine) {
 
   const result =
     what === 'agent'
-      ? await engine.executeAgent({ agent: selected, message: message || '' })
+      ? await engine.executeAgent({
+          agent: selected,
+          message: message || undefined,
+        })
       : await engine.executeWorkflow({
           workflow: selected,
-          message: message || '',
+          message: message || undefined,
         });
 
   execS.stop(result.success ? pc.green('✓ Executed') : pc.red('✗ Failed'));

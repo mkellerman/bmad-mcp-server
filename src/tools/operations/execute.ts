@@ -29,8 +29,8 @@ export interface ExecuteOperationParams {
   agent?: string;
   /** Workflow name (for type=workflow) */
   workflow?: string;
-  /** User message/context (REQUIRED) */
-  message: string;
+  /** User message/context (optional - some agents/workflows may work without initial message) */
+  message?: string;
   /** Optional module hint for disambiguation */
   module?: string;
 }
@@ -50,7 +50,7 @@ export async function executeExecuteOperation(
   const execParams: ExecuteParams = {
     agent: params.agent,
     workflow: params.workflow,
-    message: params.message,
+    message: params.message || '', // Default to empty string if not provided
     module: params.module,
   };
 
@@ -106,16 +106,12 @@ export function validateExecuteParams(params: unknown): string | undefined {
     return `Invalid type: ${p.type}. Must be one of: ${validTypes.join(', ')}`;
   }
 
-  if (!p.message) {
-    return 'Missing required parameter: message';
-  }
-
-  if (typeof p.message !== 'string') {
-    return 'Parameter "message" must be a string';
-  }
-
-  if (p.message.trim().length === 0) {
-    return 'Parameter "message" cannot be empty';
+  // Message is optional, but if provided must be valid
+  if (p.message !== undefined) {
+    if (typeof p.message !== 'string') {
+      return 'Parameter "message" must be a string';
+    }
+    // Allow empty string - some agents/workflows might accept it
   }
 
   // Type-specific validation
@@ -147,8 +143,8 @@ export function validateExecuteParams(params: unknown): string | undefined {
  */
 export function getExecuteExamples(): string[] {
   return [
-    'Execute agent: { operation: "execute", type: "agent", agent: "analyst", message: "Help me brainstorm a mobile app" }',
-    'Execute with module: { operation: "execute", type: "agent", agent: "debug", module: "bmm", message: "Analyze this error" }',
-    'Execute workflow: { operation: "execute", type: "workflow", workflow: "prd", message: "Create PRD for e-commerce platform" }',
+    'Execute agent with message: { operation: "execute", type: "agent", agent: "analyst", message: "Help me brainstorm a mobile app" }',
+    'Execute workflow without message: { operation: "execute", type: "workflow", workflow: "workflow-status" }',
+    'Execute with module hint: { operation: "execute", type: "agent", agent: "debug", module: "bmm", message: "Analyze this error" }',
   ];
 }
