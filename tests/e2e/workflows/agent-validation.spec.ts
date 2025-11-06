@@ -15,7 +15,7 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
-import { ensureLiteLLMRunning } from '../../support/litellm-helper';
+import { verifyLiteLLMRunning } from '../../support/litellm-helper.mjs';
 import fs from 'fs';
 import path from 'path';
 
@@ -330,8 +330,8 @@ describe.skipIf(skipE2E)('Agent Validation with LLM', () => {
     mcpClient = await createMCPClient();
     llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
 
-    // Ensure LiteLLM is running (auto-start if needed)
-    await ensureLiteLLMRunning(() => llmClient.healthCheck());
+    // Verify LiteLLM is running (global setup should have started it)
+    await verifyLiteLLMRunning(() => llmClient.healthCheck());
   });
 
   afterAll(async () => {

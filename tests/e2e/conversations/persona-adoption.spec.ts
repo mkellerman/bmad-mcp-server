@@ -5,7 +5,7 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
-import { ensureLiteLLMRunning } from '../../support/litellm-helper';
+import { verifyLiteLLMRunning } from '../../support/litellm-helper.mjs';
 
 /**
  * E2E Test: Persona adoption with LLM
@@ -28,9 +28,9 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
     // Start MCP client
     mcpClient = await createMCPClient();
 
-    // Init LLM client and ensure it's running
+    // Init LLM client and verify it's running
     llm = new LLMClient();
-    await ensureLiteLLMRunning(() => llm.healthCheck());
+    await verifyLiteLLMRunning(() => llm.healthCheck());
   });
 
   afterAll(async () => {

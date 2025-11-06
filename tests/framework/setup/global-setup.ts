@@ -3,9 +3,12 @@
  *
  * This setup cleans up old test result fragments before tests run
  * and generates the final report after all tests complete.
+ *
+ * For E2E tests, it also ensures LiteLLM proxy is running.
  */
 
 import { reporter } from '../core/reporter.js';
+import { startLiteLLMProxy } from '../../support/litellm-helper.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -38,6 +41,36 @@ export async function setup() {
     console.log(`🧹 Cleaned old ${testType} test results and contexts`);
   } catch {
     // Directories don't exist, that's fine
+  }
+
+  // For E2E tests, ensure LiteLLM proxy is running
+  if (testType === 'e2e' && process.env.SKIP_LLM_TESTS !== 'true') {
+    console.log('\n🔍 Checking LiteLLM proxy for E2E tests...');
+
+    // Check if already running
+    try {
+      const response = await fetch('http://localhost:4000/health/readiness');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'healthy') {
+          console.log('✅ LiteLLM proxy already running\n');
+          return;
+        }
+      }
+    } catch {
+      // Not running, will try to start
+    }
+
+    // Try to start it
+    const started = await startLiteLLMProxy();
+    if (!started) {
+      console.warn(
+        '\n⚠️  LiteLLM proxy could not be started automatically.',
+        '\n   E2E tests will be skipped.',
+        '\n   To run E2E tests, start it manually:',
+        '\n   npm run test:litellm-start\n',
+      );
+    }
   }
 }
 

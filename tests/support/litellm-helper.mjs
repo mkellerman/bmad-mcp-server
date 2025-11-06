@@ -13,7 +13,7 @@ const execAsync = promisify(exec);
  * Start LiteLLM proxy using docker-compose
  * Returns true if successfully started or already running
  */
-export async function startLiteLLMProxy(): Promise<boolean> {
+export async function startLiteLLMProxy() {
   try {
     console.log('🚀 Starting LiteLLM proxy...');
 
@@ -22,7 +22,7 @@ export async function startLiteLLMProxy(): Promise<boolean> {
       await execAsync('npm run test:litellm-start');
     } catch (error) {
       // Check if it's already running
-      const err = error as Error;
+      const err = error;
       if (err.message.includes('already in use')) {
         console.log('ℹ️  Container already exists, checking health...');
       } else {
@@ -64,10 +64,11 @@ export async function startLiteLLMProxy(): Promise<boolean> {
 /**
  * Ensure LiteLLM proxy is running, start it if necessary
  * Throws an error if proxy cannot be started
+ *
+ * NOTE: In most cases, you should call verifyLiteLLMRunning() instead.
+ * The global setup already starts LiteLLM for E2E tests.
  */
-export async function ensureLiteLLMRunning(
-  healthCheck: () => Promise<boolean>,
-): Promise<void> {
+export async function ensureLiteLLMRunning(healthCheck) {
   let healthy = await healthCheck();
 
   if (!healthy) {
@@ -90,4 +91,24 @@ export async function ensureLiteLLMRunning(
   } else {
     console.log('✅ LiteLLM health check passed\n');
   }
+}
+
+/**
+ * Verify LiteLLM proxy is running (without trying to start it)
+ * Use this in individual E2E tests - the global setup handles starting.
+ * Throws an error if proxy is not running.
+ */
+export async function verifyLiteLLMRunning(healthCheck) {
+  const healthy = await healthCheck();
+
+  if (!healthy) {
+    throw new Error(
+      '❌ LiteLLM proxy is not running!\n\n' +
+        '   The global setup should have started it automatically.\n' +
+        '   If this failed, start it manually:\n' +
+        '   npm run test:litellm-start\n',
+    );
+  }
+
+  console.log('✅ LiteLLM health check passed\n');
 }

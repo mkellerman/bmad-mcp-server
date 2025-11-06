@@ -9,7 +9,7 @@ import {
   createMCPClient,
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
-import { ensureLiteLLMRunning } from '../../support/litellm-helper';
+import { verifyLiteLLMRunning } from '../../support/litellm-helper.mjs';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
 import { rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -38,8 +38,8 @@ describe.skipIf(skipE2E)('Remote Discovery LLM Integration', () => {
     mcpClient = await createMCPClient();
     llmClient = new LLMClient();
 
-    // Ensure LiteLLM is running (auto-start if needed)
-    await ensureLiteLLMRunning(() => llmClient.healthCheck());
+    // Verify LiteLLM is running (global setup should have started it)
+    await verifyLiteLLMRunning(() => llmClient.healthCheck());
   });
 
   afterAll(async () => {

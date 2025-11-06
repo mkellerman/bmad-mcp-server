@@ -16,7 +16,7 @@ import {
   createMCPClient,
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
-import { ensureLiteLLMRunning } from '../../support/litellm-helper';
+import { verifyLiteLLMRunning } from '../../support/litellm-helper.mjs';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
 
 interface AgentInfo {
@@ -259,8 +259,8 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
     mcpClient = await createMCPClient();
     llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
 
-    // Ensure LiteLLM is running (auto-start if needed)
-    await ensureLiteLLMRunning(() => llmClient.healthCheck());
+    // Verify LiteLLM is running (global setup should have started it)
+    await verifyLiteLLMRunning(() => llmClient.healthCheck());
 
     console.log(`🤖 Model: ${LLM_MODEL}`);
   }, 30000);
