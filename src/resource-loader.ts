@@ -38,6 +38,7 @@ import { join, basename, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { load as parseYaml } from 'js-yaml';
 import { XMLParser } from 'fast-xml-parser';
+import { parse as parseCsv } from 'csv-parse/sync';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
 import type { Workflow } from './types/index.js';
 
@@ -1069,71 +1070,23 @@ export class ResourceLoaderGit {
       // Load workflow-manifest.csv
       const manifestContent = await this.loadFile('_cfg/workflow-manifest.csv');
 
-      // Parse CSV properly handling quoted multi-line fields
-      const workflows: Workflow[] = [];
-      const rows: string[][] = [];
-      let currentRow: string[] = [];
-      let currentField = '';
-      let inQuotes = false;
+      // Parse CSV using csv-parse library - returns array of objects with column headers as keys
+      const records: Array<Record<string, string>> = parseCsv(manifestContent, {
+        columns: true, // Use first row as headers
+        skip_empty_lines: true,
+        trim: true,
+        relaxColumnCount: true, // Handle rows with different column counts
+      });
 
-      for (let i = 0; i < manifestContent.length; i++) {
-        const char = manifestContent[i];
-        const nextChar = manifestContent[i + 1];
-
-        if (char === '"') {
-          // Handle escaped quotes ("")
-          if (inQuotes && nextChar === '"') {
-            currentField += '"';
-            i++; // Skip next quote
-          } else {
-            inQuotes = !inQuotes;
-          }
-        } else if (char === ',' && !inQuotes) {
-          currentRow.push(currentField);
-          currentField = '';
-        } else if (char === '\n' && !inQuotes) {
-          currentRow.push(currentField);
-          if (currentRow.some((f) => f.trim())) {
-            // Skip empty rows
-            rows.push(currentRow);
-          }
-          currentRow = [];
-          currentField = '';
-        } else if (char === '\r' && nextChar === '\n' && !inQuotes) {
-          // Handle CRLF
-          currentRow.push(currentField);
-          if (currentRow.some((f) => f.trim())) {
-            rows.push(currentRow);
-          }
-          currentRow = [];
-          currentField = '';
-          i++; // Skip \n
-        } else {
-          currentField += char;
-        }
-      }
-
-      // Add last row if not empty
-      if (currentField || currentRow.length > 0) {
-        currentRow.push(currentField);
-        if (currentRow.some((f) => f.trim())) {
-          rows.push(currentRow);
-        }
-      }
-
-      // Skip header row and parse data
-      for (let i = 1; i < rows.length; i++) {
-        const fields = rows[i];
-        if (fields.length >= 5) {
-          workflows.push({
-            name: fields[0].trim(),
-            description: fields[1].trim(),
-            module: fields[2].trim(),
-            path: fields[3].trim(),
-            standalone: fields[4].trim().toLowerCase() === 'true',
-          });
-        }
-      }
+      // Map parsed records to Workflow objects
+      const workflows: Workflow[] = records.map((record) => ({
+        name: record.name || '',
+        description: record.description || '',
+        module: record.module || 'unknown',
+        path: record.path || '',
+        ...(record.trigger && { trigger: record.trigger }),
+        standalone: record.standalone?.toLowerCase() === 'true',
+      }));
 
       return workflows;
     } catch {
