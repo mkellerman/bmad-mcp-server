@@ -18,8 +18,13 @@
  *
  * Interactive mode (no args):
  *   bmad
+ *
+ * Environment Variables:
+ *   BMAD_ROOT - Path to BMAD directory (overrides default .bmad location)
  */
 
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import * as clack from '@clack/prompts';
 import pc from 'picocolors';
 import { BMADEngine } from './core/bmad-engine.js';
@@ -42,6 +47,63 @@ interface CliArgs {
 // Main Entry Point
 // ============================================================================
 
+/**
+ * Load environment variables and determine BMAD root path
+ *
+ * Returns the path to search for BMAD content.
+ * ResourceLoaderGit will look for:
+ * - {returnedPath}/bmad directory OR
+ * - {returnedPath}/.bmad directory OR
+ * - Treat {returnedPath} itself as bmad root if it has module structure
+ *
+ * Priority order:
+ * 1. BMAD_ROOT environment variable (if set) - can point to parent or bmad dir itself
+ * 2. Load .env file and use BMAD_ROOT from there
+ * 3. Default to current working directory
+ */
+function loadBmadRoot(): string {
+  const projectRoot = process.cwd();
+
+  // Try to load .env from project root (simple parser to avoid noisy dotenv v17)
+  const envPath = join(projectRoot, '.env');
+  if (existsSync(envPath)) {
+    try {
+      const envContent = readFileSync(envPath, 'utf-8');
+      const lines = envContent.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        // Skip comments and empty lines
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        // Parse KEY=value
+        const match = trimmed.match(/^([A-Z_]+)=(.*)$/);
+        if (match) {
+          const [, key, value] = match;
+          // Only set if not already in environment
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    } catch {
+      // Ignore errors reading .env
+    }
+  }
+
+  // BMAD_ROOT can point to:
+  // - Parent directory containing bmad/ (e.g., /project)
+  // - The bmad directory itself (e.g., /project/bmad or /tests/fixtures/bmad)
+  // - Relative path (resolved from current directory)
+  // ResourceLoaderGit will auto-detect the structure
+  let bmadRoot = process.env.BMAD_ROOT || projectRoot;
+
+  // If relative path, resolve it from project root
+  if (bmadRoot && !bmadRoot.startsWith('/')) {
+    bmadRoot = join(projectRoot, bmadRoot);
+  }
+
+  return bmadRoot;
+}
+
 async function main() {
   const args = parseArgs();
 
@@ -61,12 +123,12 @@ async function main() {
 // ============================================================================
 
 async function initializeEngine(silent: boolean): Promise<BMADEngine> {
-  const projectRoot = process.cwd();
+  const bmadRoot = loadBmadRoot();
   const gitRemotes = process.argv
     .slice(2)
     .filter((arg) => arg.startsWith('git+'));
 
-  const engine = new BMADEngine(projectRoot, gitRemotes);
+  const engine = new BMADEngine(bmadRoot, gitRemotes);
 
   if (silent) {
     await engine.initialize();
