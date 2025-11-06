@@ -343,13 +343,13 @@ describe.skipIf(skipE2E)('Workflow Validation with LLM', () => {
     llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
 
     // Verify LiteLLM is available
-    try {
-      await llmClient.healthCheck();
-      console.log('✅ LiteLLM health check passed\n');
-    } catch (error) {
-      console.error('❌ LiteLLM health check failed:', error);
-      throw error;
+    const healthy = await llmClient.healthCheck();
+    if (!healthy) {
+      throw new Error(
+        '❌ LiteLLM proxy is not running!\n\n   Start it with:\n   npm run test:litellm-start\n',
+      );
     }
+    console.log('✅ LiteLLM health check passed\n');
 
     // Discover all workflows
     discoveredWorkflows = await discoverWorkflows();
