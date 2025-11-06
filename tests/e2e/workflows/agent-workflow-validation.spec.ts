@@ -18,6 +18,7 @@ import {
 import { LLMClient } from '../../support/llm-client';
 import { verifyLiteLLMRunning } from '../../support/litellm-helper.mjs';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
+import { XMLParser } from 'fast-xml-parser';
 
 interface AgentInfo {
   name: string;
@@ -40,6 +41,50 @@ interface MenuCommand {
 const LLM_MODEL = 'gpt-4.1';
 const LLM_API_KEY = 'sk-test-bmad-1234';
 const LLM_TEMPERATURE = 0.1;
+
+/**
+ * Count menu items from agent XML content
+ * Uses proper XML parser to extract <item cmd="*..."> entries from the <menu> section
+ */
+function countMenuItemsFromXML(content: string): number {
+  try {
+    // Extract the full <agent>...</agent> XML block
+    const agentMatch = content.match(/<agent[\s\S]*?<\/agent>/i);
+    if (!agentMatch) {
+      return 0;
+    }
+
+    const agentXml = agentMatch[0];
+
+    // Parse XML using fast-xml-parser
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+    });
+
+    const parsed = parser.parse(agentXml);
+
+    // Navigate to menu items
+    if (!parsed.agent?.menu?.item) {
+      return 0;
+    }
+
+    const items = parsed.agent.menu.item;
+
+    // Handle single item (not an array) or array of items
+    if (Array.isArray(items)) {
+      // Count items that have cmd attribute starting with *
+      return items.filter((item: any) => item['@_cmd']?.startsWith('*')).length;
+    } else if (items['@_cmd']?.startsWith('*')) {
+      return 1;
+    }
+
+    return 0;
+  } catch (error) {
+    console.error('Error parsing XML:', error);
+    return 0;
+  }
+}
 
 /**
  * Analyze LLM response for agent adoption
@@ -89,109 +134,56 @@ function analyzeLLMResponse(response: string): {
 }
 
 /**
- * Parse agent list from *list-agents response
+ * Parse agent list from bmad-resources response (v4 format)
  */
 function parseAgentList(content: string): AgentInfo[] {
   const agents: AgentInfo[] = [];
 
-  // Extract content from XML tags if present
-  const contentMatch = content.match(/<content>([\s\S]*?)<\/content>/);
-  const actualContent = contentMatch ? contentMatch[1] : content;
-
-  // Look for agent entries in format: - icon `load-command`: Title (**DisplayName**) Role
-  // Example: - 🤖 `analyst`: Business Analyst (**Mary**) - Lead Analyst
-  const linePattern = /^[-*]\s+[^\s]*\s*`([^`]+)`:\s*(.*)$/gm;
+  // New v4 format from bmad-resources:
+  // **bmm-analyst** - Mary (Business Analyst)
+  // **bmm-architect** - Winston (Architect)
+  const v4Pattern = /\*\*([a-z]+-[a-z-]+)\*\*\s*-\s*([^(]+)\(([^)]+)\)/gm;
 
   let match;
-  while ((match = linePattern.exec(actualContent)) !== null) {
-    const loadCommand = match[1];
-    const description = match[2];
+  while ((match = v4Pattern.exec(content)) !== null) {
+    const toolName = match[1]; // e.g., "bmm-analyst"
+    const displayName = match[2].trim(); // e.g., "Mary"
+    const title = match[3].trim(); // e.g., "Business Analyst"
 
-    if (
-      loadCommand &&
-      loadCommand.length > 0 &&
-      !loadCommand.startsWith('http')
-    ) {
-      // Extract display name from (**Name**) if present
-      const displayNameMatch = description.match(/\(\*\*([^*]+)\*\*\)/);
-      const displayName = displayNameMatch ? displayNameMatch[1] : undefined;
+    // Extract module from tool name (e.g., "bmm" from "bmm-analyst")
+    const moduleParts = toolName.split('-');
+    const module = moduleParts[0]; // First part is the module
 
-      // Extract title (first part before (**
-      const titleMatch = description.match(/^([^(]+)/);
-      const title = titleMatch ? titleMatch[1].trim() : undefined;
-
-      agents.push({
-        name: loadCommand,
-        title: displayName || title,
-      });
-    }
-  }
-
-  // Also try JSON structured data if available
-  try {
-    const jsonMatch = actualContent.match(/```json\s*\n([\s\S]+?)\n```/);
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[1]);
-      if (Array.isArray(data.agents)) {
-        data.agents.forEach((item: any) => {
-          if (item.name || item.loadCommand) {
-            agents.push({
-              name: item.loadCommand || item.name,
-              module: item.module,
-              title: item.displayName || item.title || item.description,
-            });
-          }
-        });
-      }
-    }
-  } catch {
-    // JSON parsing failed, continue with regex results
+    agents.push({
+      name: toolName,
+      module,
+      title: `${displayName} (${title})`,
+    });
   }
 
   return agents;
 }
 
 /**
- * Parse workflow list from *list-workflows response
+ * Parse workflow list from bmad-resources response (v4 format)
  */
 function parseWorkflowList(content: string): WorkflowInfo[] {
   const workflows: WorkflowInfo[] = [];
 
-  // Extract content from XML tags if present
-  const contentMatch = content.match(/<content>([\s\S]*?)<\/content>/);
-  const actualContent = contentMatch ? contentMatch[1] : content;
-
-  // Look for workflow entries in format: - 🔄 `workflow-name`: Description
-  // Example: - 🔄 `party-mode`: **Party Planning Mode** - Interactive workflow
-  const linePattern = /^[-*]\s+[^\s]*\s*`([^`]+)`:\s*(.*)$/gm;
+  // New v4 format from bmad-resources:
+  // - **party-mode**: Group chat with all agents
+  // - **audit-workflow**: Audit existing workflows...
+  const v4Pattern = /^-\s+\*\*([a-z0-9-]+)\*\*:\s*(.+)$/gm;
 
   let match;
-  while ((match = linePattern.exec(actualContent)) !== null) {
-    const name = match[1];
-    if (name && name.length > 0 && !name.startsWith('http')) {
-      workflows.push({
-        name,
-        path: name,
-      });
-    }
-  }
+  while ((match = v4Pattern.exec(content)) !== null) {
+    const name = match[1]; // e.g., "party-mode"
+    // match[2] contains the description, not currently used
 
-  // Also try JSON structured data
-  try {
-    const jsonMatch = actualContent.match(/```json\s*\n([\s\S]+?)\n```/);
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[1]);
-      if (Array.isArray(data.items)) {
-        data.items.forEach((item: any) => {
-          workflows.push({
-            name: item.name || item.id,
-            path: item.path || item.name,
-          });
-        });
-      }
-    }
-  } catch {
-    // JSON parsing failed, continue with regex results
+    workflows.push({
+      name,
+      path: name, // In v4, workflow name is the identifier
+    });
   }
 
   return workflows;
@@ -199,47 +191,52 @@ function parseWorkflowList(content: string): WorkflowInfo[] {
 
 /**
  * Extract menu commands from agent content
- * Looks for menu items in XML/markdown that have workflow attributes
+ * Uses XML parser to extract menu items with workflow attributes
  */
 function extractMenuCommands(content: string): MenuCommand[] {
   const commands: MenuCommand[] = [];
 
-  // Look for <item> tags with workflow attribute
-  // Example: <item cmd="*inspect" workflow="{project-root}/bmad/debug/workflows/inspect/workflow.yaml">
-  const xmlPattern =
-    /<item\s+cmd=["'](\*[^"']+)["'](?:\s+workflow=["']([^"']+)["'])?[^>]*>([^<]*)<\/item>/gi;
-
-  let match;
-  while ((match = xmlPattern.exec(content)) !== null) {
-    const trigger = match[1];
-    const workflow = match[2];
-    const label = match[3];
-
-    if (trigger && trigger !== '*exit' && trigger !== '*help') {
-      commands.push({
-        trigger,
-        workflow,
-        label: label?.trim(),
-      });
+  try {
+    // Extract the <agent>...</agent> XML block
+    const agentMatch = content.match(/<agent[\s\S]*?<\/agent>/i);
+    if (!agentMatch) {
+      return commands;
     }
-  }
 
-  // Also look for markdown list format
-  // Example: - `*inspect` — Execute comprehensive Fagan inspection workflow
-  const mdPattern = /^\s*[-*]\s*`(\*[a-z0-9-]+)`\s*[—–-]\s*(.+?)$/gim;
-  while ((match = mdPattern.exec(content)) !== null) {
-    const trigger = match[1];
-    const label = match[2];
+    // Parse XML using fast-xml-parser
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+      textNodeName: '#text',
+    });
 
-    if (trigger && trigger !== '*exit' && trigger !== '*help') {
-      // Check if this command already exists (XML takes precedence)
-      if (!commands.find((c) => c.trigger === trigger)) {
+    const parsed = parser.parse(agentMatch[0]);
+
+    // Navigate to menu items
+    if (!parsed.agent?.menu?.item) {
+      return commands;
+    }
+
+    const items = Array.isArray(parsed.agent.menu.item)
+      ? parsed.agent.menu.item
+      : [parsed.agent.menu.item];
+
+    for (const item of items) {
+      const trigger = item['@_cmd'];
+      const workflow = item['@_workflow'];
+      const label = item['#text'] || '';
+
+      if (trigger && trigger !== '*exit' && trigger !== '*help') {
         commands.push({
-          trigger,
-          label: label?.trim(),
+          trigger: String(trigger),
+          workflow: workflow ? String(workflow) : undefined,
+          label: String(label).trim(),
         });
       }
     }
+  } catch (error) {
+    // If XML parsing fails, return empty array
+    console.error('Failed to parse agent XML for menu commands:', error);
   }
 
   return commands;
@@ -271,8 +268,8 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
 
   describe('Discovery Commands', () => {
     it('should list all agents via *list-agents', async () => {
-      const result = await mcpClient.callTool('bmad', {
-        command: '*list-agents',
+      const result = await mcpClient.callTool('bmad-resources', {
+        operation: 'agents',
       });
 
       expect(result.isError).toBe(false);
@@ -286,8 +283,8 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
     });
 
     it('should list all workflows via *list-workflows', async () => {
-      const result = await mcpClient.callTool('bmad', {
-        command: '*list-workflows',
+      const result = await mcpClient.callTool('bmad-resources', {
+        operation: 'workflows',
       });
 
       expect(result.isError).toBe(false);
@@ -305,8 +302,8 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
     it('should load ALL agents through LLM and analyze responses', async () => {
       // Wait for agents list to be populated
       if (allAgents.length === 0) {
-        const result = await mcpClient.callTool('bmad', {
-          command: '*list-agents',
+        const result = await mcpClient.callTool('bmad-resources', {
+          operation: 'agents',
         });
         allAgents = parseAgentList(result.content);
       }
@@ -426,8 +423,31 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
             llmResponse = llmClient.getResponseText(followUpCompletion);
           }
 
-          // Analyze the LLM's response
+          // Analyze the LLM's response for persona adoption
           const analysis = analyzeLLMResponse(llmResponse);
+
+          // Count actual menu items from the agent XML content by reading the agent file
+          let actualMenuCount = 0;
+          try {
+            // Construct agent file URI (e.g., bmad://bmm/agents/analyst.md)
+            // Agent names are like "bmm-analyst", "core-bmad-master", etc.
+            const parts = agent.name.split('-');
+            const module = parts[0]; // "bmm", "core", "cis", etc.
+            const agentName = parts.slice(1).join('-'); // "analyst", "bmad-master", etc.
+            const agentUri = `bmad://${module}/agents/${agentName}.md`;
+
+            const agentFileResult = await mcpClient.callTool('bmad-resources', {
+              operation: 'read',
+              uri: agentUri,
+            });
+
+            const agentFileContent = agentFileResult.content;
+            actualMenuCount = countMenuItemsFromXML(agentFileContent);
+          } catch (error) {
+            console.log(
+              `  ⚠️  Could not read agent file for menu counting: ${error}`,
+            );
+          }
 
           // Capture LLM interaction for HTML report
           await addLLMInteraction({
@@ -464,11 +484,11 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
             success: true,
             personaLoaded: analysis.personaLoaded,
             menuProvided: analysis.menuProvided,
-            menuCount: analysis.menuCount,
+            menuCount: actualMenuCount,
           });
 
           console.log(
-            `  ✅ Success - Persona: ${analysis.personaLoaded}, Menu: ${analysis.menuProvided} (${analysis.menuCount} items)`,
+            `  ✅ Success - Persona: ${analysis.personaLoaded}, Menu: ${analysis.menuProvided} (${actualMenuCount} items)`,
           );
         } catch (error) {
           const errorMessage =

@@ -36,6 +36,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import { XMLParser } from 'fast-xml-parser';
 import { GitSourceResolver } from './utils/git-source-resolver.js';
 import type { Workflow } from './types/index.js';
 
@@ -57,20 +58,19 @@ const YAML_TITLE_REGEX = /title:\s*['"]?([^'"\n]+)['"]?/;
 /** Extract agent XML block from content */
 const AGENT_XML_REGEX = /<agent[\s\S]*?<\/agent>/i;
 
-/** Extract persona XML block from agent */
-const PERSONA_XML_REGEX = /<persona[^>]*>([\s\S]*?)<\/persona>/i;
-
-/** Extract role from persona XML */
-const ROLE_XML_REGEX = /<role>(.*?)<\/role>/i;
-
-/** Extract identity from persona XML */
-const IDENTITY_XML_REGEX = /<identity>(.*?)<\/identity>/i;
-
-/** Extract capabilities XML block from agent */
-const CAPABILITIES_XML_REGEX = /<capabilities[^>]*>([\s\S]*?)<\/capabilities>/i;
-
-/** Extract individual capability from capabilities block */
-const CAPABILITY_XML_REGEX = /<capability[^>]*>(.*?)<\/capability>/gi;
+/**
+ * XML Parser instance for parsing agent XML content
+ * Configured to preserve attributes and handle text nodes properly
+ */
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+  parseTagValue: false, // Keep values as strings
+  trimValues: true,
+  ignoreDeclaration: true,
+  ignorePiTags: true,
+});
 
 export interface ResourcePaths {
   projectRoot: string;
@@ -869,31 +869,50 @@ export class ResourceLoaderGit {
 
       const xmlContent = xmlMatch[0];
 
-      // Parse <agent> tag attributes
-      const agentTagMatch = xmlContent.match(
-        /<agent[^>]*\s+name="([^"]+)"[^>]*\s+title="([^"]+)"/,
-      );
-      if (agentTagMatch) {
-        metadata.displayName = agentTagMatch[1];
-        metadata.title = agentTagMatch[2];
+      // Parse XML using fast-xml-parser
+      // XML parser returns untyped objects - disable type checking for this section
+      /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+      let parsed: any;
+      try {
+        parsed = xmlParser.parse(xmlContent);
+      } catch {
+        // If XML parsing fails, return basic metadata
+        return metadata;
       }
 
-      // Extract persona (combine all child elements into summary)
-      const personaMatch = xmlContent.match(PERSONA_XML_REGEX);
-      if (personaMatch) {
-        const personaXml = personaMatch[1];
+      const agent = parsed.agent;
+      if (!agent) {
+        return metadata;
+      }
+
+      // Extract agent attributes (name, title)
+      if (agent['@_name']) {
+        metadata.displayName = agent['@_name'];
+      }
+      if (agent['@_title']) {
+        metadata.title = agent['@_title'];
+      }
+
+      // Extract persona (combine role and identity)
+      if (agent.persona) {
         const parts: string[] = [];
 
         // Extract role
-        const roleMatch = personaXml.match(ROLE_XML_REGEX);
-        if (roleMatch) {
-          parts.push(roleMatch[1].trim().replace(/\s+/g, ' '));
+        if (agent.persona.role) {
+          const roleText =
+            typeof agent.persona.role === 'string'
+              ? agent.persona.role
+              : agent.persona.role['#text'] || '';
+          parts.push(String(roleText).trim().replace(/\s+/g, ' '));
         }
 
         // Extract identity
-        const identityMatch = personaXml.match(IDENTITY_XML_REGEX);
-        if (identityMatch) {
-          const identity = identityMatch[1].trim().replace(/\s+/g, ' ');
+        if (agent.persona.identity) {
+          const identityText =
+            typeof agent.persona.identity === 'string'
+              ? agent.persona.identity
+              : agent.persona.identity['#text'] || '';
+          const identity = String(identityText).trim().replace(/\s+/g, ' ');
           parts.push(identity.substring(0, AGENT_IDENTITY_MAX_LENGTH));
         }
 
@@ -903,45 +922,52 @@ export class ResourceLoaderGit {
       }
 
       // Extract capabilities
-      const capabilitiesMatch = xmlContent.match(CAPABILITIES_XML_REGEX);
-      if (capabilitiesMatch) {
+      if (agent.capabilities?.capability) {
         const capabilities: string[] = [];
-        const capabilityRegex = CAPABILITY_XML_REGEX;
-        let capMatch;
-        while (
-          (capMatch = capabilityRegex.exec(capabilitiesMatch[1])) !== null
-        ) {
-          const text = capMatch[1].trim().replace(/\s+/g, ' ');
-          if (text) capabilities.push(text);
+        const caps = Array.isArray(agent.capabilities.capability)
+          ? agent.capabilities.capability
+          : [agent.capabilities.capability];
+
+        for (const cap of caps) {
+          const text =
+            typeof cap === 'string' ? cap : cap['#text'] || cap || '';
+          const trimmed = String(text).trim().replace(/\s+/g, ' ');
+          if (trimmed) {
+            capabilities.push(trimmed);
+          }
         }
+
         if (capabilities.length > 0) {
           metadata.capabilities = capabilities.slice(0, 5);
         }
       }
 
       // Extract menu items and workflows
-      const menuMatch = xmlContent.match(/<menu[^>]*>([\s\S]*?)<\/menu>/i);
-      if (menuMatch) {
+      if (agent.menu?.item) {
         const menuItems: string[] = [];
         const workflows: string[] = [];
         const workflowMenuItems: string[] = [];
-        const itemRegex = /<item([^>]*)>(.*?)<\/item>/gi;
-        let itemMatch;
-        while ((itemMatch = itemRegex.exec(menuMatch[1])) !== null) {
-          const attributes = itemMatch[1];
-          const text = itemMatch[2].trim().replace(/\s+/g, ' ');
 
-          if (text) {
-            menuItems.push(text);
+        const items = Array.isArray(agent.menu.item)
+          ? agent.menu.item
+          : [agent.menu.item];
+
+        for (const item of items) {
+          // Get item text
+          const text =
+            typeof item === 'string' ? item : item['#text'] || item || '';
+          const trimmedText = String(text).trim().replace(/\s+/g, ' ');
+
+          if (trimmedText) {
+            menuItems.push(trimmedText);
 
             // Extract workflow attribute if present
-            const workflowMatch = attributes.match(/workflow="([^"]+)"/);
-            if (workflowMatch) {
-              const workflowPath = workflowMatch[1];
+            const workflowPath = item['@_workflow'];
+            if (workflowPath) {
               // Extract workflow name from path like "{project-root}/bmad/bmm/workflows/debug/inspect/workflow.yaml"
               // Pattern: .../workflows/{...path...}/workflow.yaml
               // Capture everything between last '/workflows/' and '/workflow.yaml'
-              const nameMatch = workflowPath.match(
+              const nameMatch = String(workflowPath).match(
                 /\/workflows\/(.+)\/workflow\.yaml$/,
               );
               if (nameMatch) {
@@ -949,11 +975,12 @@ export class ResourceLoaderGit {
                 const fullPath = nameMatch[1];
                 const workflowName = fullPath.split('/').pop() || fullPath;
                 workflows.push(workflowName);
-                workflowMenuItems.push(text); // Track menu items with workflows
+                workflowMenuItems.push(trimmedText); // Track menu items with workflows
               }
             }
           }
         }
+
         if (menuItems.length > 0) {
           metadata.menuItems = menuItems.slice(0, 8);
         }
@@ -962,6 +989,7 @@ export class ResourceLoaderGit {
           metadata.workflowMenuItems = workflowMenuItems; // Store menu items with workflows
         }
       }
+      /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
       return metadata;
     } catch {

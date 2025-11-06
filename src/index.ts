@@ -59,12 +59,19 @@ async function main() {
     .slice(2)
     .filter((arg) => arg.startsWith('git+'));
 
+  // Allow overriding project root via BMAD_ROOT environment variable
+  // This is useful for testing and custom deployments
+  const projectRoot = process.env.BMAD_ROOT;
+
   console.error('BMAD MCP Server (Tool-per-Agent + Git Support)');
   if (gitRemotes.length > 0) {
     console.error(`Git remotes: ${gitRemotes.join(', ')}`);
   }
+  if (projectRoot) {
+    console.error(`Project root: ${projectRoot}`);
+  }
 
-  const server = new BMADServerLiteMultiToolGit(undefined, gitRemotes);
+  const server = new BMADServerLiteMultiToolGit(projectRoot, gitRemotes);
   await server.start();
 }
 

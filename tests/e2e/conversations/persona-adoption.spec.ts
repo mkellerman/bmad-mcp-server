@@ -39,9 +39,14 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
 
   it('should respond in persona after loading architect', async () => {
     // 1) Load the architect agent via MCP tool
-    const load = await mcpClient.callTool('bmad', { command: 'architect' });
+    const load = await mcpClient.callTool('bmm-architect', {
+      message: 'What is your name and what are your duties?',
+    });
+    if (load.isError) {
+      console.log('Tool call error:', load.content);
+    }
     expect(load.isError).toBe(false);
-    expect(load.content).toContain('BMAD Agent');
+    expect(load.content).toContain('instructions');
 
     // 2) Ask the LLM a question with the agent content as system context
     const completion = await llm.chat(
@@ -59,7 +64,7 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
     const answer = llm.getResponseText(completion);
 
     // 3) Validate the reply reflects the persona from sample assets
-    // Architect sample (v6) uses name="Winston" and role includes "System Architect"
+    // Architect sample (v4) uses name="Winston" and role includes "System Architect"
     expect(answer.toLowerCase()).toContain('winston');
     expect(answer.toLowerCase()).toMatch(
       /architect|system architect|technical design/,
@@ -77,8 +82,8 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
       },
       toolCalls: [
         {
-          name: 'mcp_bmad_bmad',
-          arguments: { command: 'architect' },
+          name: 'bmm-architect',
+          arguments: { message: 'What is your name and what are your duties?' },
           timestamp: new Date().toISOString(),
           duration: 0,
           result: load.content,
