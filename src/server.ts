@@ -50,10 +50,17 @@ import {
   getAgentInstructions,
   getWorkflowInstructions,
 } from './config.js';
+import { BMADEngine } from './core/bmad-engine.js';
+import {
+  createBMADTool,
+  handleBMADTool,
+  type BMADToolParams,
+} from './tools/index.js';
 
 export class BMADServerLiteMultiToolGit {
   private server: Server;
   private loader: ResourceLoaderGit;
+  private engine: BMADEngine;
   private agentMetadata: AgentMetadata[] = [];
   private workflows: Workflow[] = [];
   private cachedResources: Array<{
@@ -95,6 +102,7 @@ export class BMADServerLiteMultiToolGit {
    */
   constructor(projectRoot?: string, gitRemotes?: string[]) {
     this.loader = new ResourceLoaderGit(projectRoot, gitRemotes);
+    this.engine = new BMADEngine(projectRoot, gitRemotes);
     this.server = new Server(
       {
         name: SERVER_CONFIG.name,
@@ -272,51 +280,37 @@ export class BMADServerLiteMultiToolGit {
       // tools.push({ name: TOOL_NAMES.resources, ...resourcesToolDefinition... });
 
       // ============================================================================
-      // NEW: Unified BMAD Tool (to be implemented)
+      // NEW: Unified BMAD Tool
       // ============================================================================
-      // TODO: Import and register unified bmad tool here
-      // import { createBMADTool } from './tools/bmad-unified.js';
-      // tools.push(createBMADTool(this.agentMetadata, this.workflows));
+      // Single tool that handles all operations: list, search, read, execute
+      // Replaces individual agent tools, workflow tool, and resources tool
+      tools.push(createBMADTool(this.agentMetadata, this.workflows));
       // ============================================================================
 
       return { tools };
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const toolName = request.params.name;
-      // const args = request.params.arguments ?? {}; // TODO: Re-enable when unified tool is implemented
+      const args = request.params.arguments ?? {};
 
       // ============================================================================
-      // TODO: REFACTOR TOOL CALL HANDLER
+      // Unified BMAD Tool Handler
       // ============================================================================
-      // Old handlers for individual agent tools, workflow tool, and resources tool
-      // are disabled during migration to unified bmad tool.
-      //
-      // New handler will route all calls through single bmad tool implementation.
-      // ============================================================================
+      if (toolName === 'bmad') {
+        // Cast args to BMADToolParams - MCP SDK provides Record<string, unknown>
+        // The tool schema ensures proper structure, but TypeScript needs the cast
+        return await handleBMADTool(
+          args as unknown as BMADToolParams,
+          this.engine,
+        );
+      }
 
-      // Placeholder - will be replaced with unified tool handler
+      // Unknown tool
       throw new Error(
-        `Tool system disabled during refactor. Tool '${toolName}' not available. ` +
-          `See src/tools/bmad-unified.ts for new implementation.`,
+        `Unknown tool: ${toolName}. Only 'bmad' tool is available.`,
       );
-
-      // OLD CODE - Agent tool handler (disabled)
-      // if (toolName !== TOOL_NAMES.workflow && toolName !== TOOL_NAMES.resources) {
-      //   const agent = this.agentMetadata.find(...);
-      //   if (agent) return await this.invokeAgent(agent.name, message);
-      // }
-
-      // OLD CODE - Workflow tool handler (disabled)
-      // if (toolName === TOOL_NAMES.workflow) {
-      //   return await this.executeWorkflow(workflow, context);
-      // }
-
-      // OLD CODE - Resources tool handler (disabled)
-      // if (toolName === TOOL_NAMES.resources) {
-      //   switch (operation) { case 'read': ... case 'list': ... }
-      // }
     });
   }
 
