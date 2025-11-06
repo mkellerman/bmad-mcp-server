@@ -15,6 +15,7 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
+import { ensureLiteLLMRunning } from '../../support/litellm-helper';
 
 interface TestResult {
   userInput: string;
@@ -342,14 +343,8 @@ describe.skipIf(skipE2E)('Workflow Validation with LLM', () => {
     // Initialize LLM client (baseURL, apiKey)
     llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
 
-    // Verify LiteLLM is available
-    const healthy = await llmClient.healthCheck();
-    if (!healthy) {
-      throw new Error(
-        '❌ LiteLLM proxy is not running!\n\n   Start it with:\n   npm run test:litellm-start\n',
-      );
-    }
-    console.log('✅ LiteLLM health check passed\n');
+    // Ensure LiteLLM is running (auto-start if needed)
+    await ensureLiteLLMRunning(() => llmClient.healthCheck());
 
     // Discover all workflows
     discoveredWorkflows = await discoverWorkflows();

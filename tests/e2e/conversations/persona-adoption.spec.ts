@@ -5,6 +5,7 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
+import { ensureLiteLLMRunning } from '../../support/litellm-helper';
 
 /**
  * E2E Test: Persona adoption with LLM
@@ -27,12 +28,9 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
     // Start MCP client
     mcpClient = await createMCPClient();
 
-    // Init LLM client and check health
+    // Init LLM client and ensure it's running
     llm = new LLMClient();
-    const healthy = await llm.healthCheck();
-    if (!healthy) {
-      throw new Error('❌ LiteLLM proxy not running!');
-    }
+    await ensureLiteLLMRunning(() => llm.healthCheck());
   });
 
   afterAll(async () => {

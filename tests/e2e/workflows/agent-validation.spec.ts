@@ -15,6 +15,7 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
+import { ensureLiteLLMRunning } from '../../support/litellm-helper';
 import fs from 'fs';
 import path from 'path';
 
@@ -329,10 +330,8 @@ describe.skipIf(skipE2E)('Agent Validation with LLM', () => {
     mcpClient = await createMCPClient();
     llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
 
-    const isHealthy = await llmClient.healthCheck();
-    if (!isHealthy) {
-      throw new Error('❌ LiteLLM proxy is not running!');
-    }
+    // Ensure LiteLLM is running (auto-start if needed)
+    await ensureLiteLLMRunning(() => llmClient.healthCheck());
   });
 
   afterAll(async () => {

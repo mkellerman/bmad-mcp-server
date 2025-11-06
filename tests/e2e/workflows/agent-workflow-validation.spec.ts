@@ -16,6 +16,7 @@ import {
   createMCPClient,
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
+import { ensureLiteLLMRunning } from '../../support/litellm-helper';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
 
 interface AgentInfo {
@@ -258,19 +259,9 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
     mcpClient = await createMCPClient();
     llmClient = new LLMClient('http://localhost:4000', LLM_API_KEY);
 
-    // Check if LiteLLM is available
-    const isHealthy = await llmClient.healthCheck();
-    if (!isHealthy) {
-      throw new Error(
-        '❌ LiteLLM proxy is not running!\n\n' +
-          '   Start it with:\n' +
-          '   docker-compose up -d\n\n' +
-          '   Or check health:\n' +
-          '   npm run litellm:docker:health',
-      );
-    }
+    // Ensure LiteLLM is running (auto-start if needed)
+    await ensureLiteLLMRunning(() => llmClient.healthCheck());
 
-    console.log('\n✅ LiteLLM proxy is healthy');
     console.log(`🤖 Model: ${LLM_MODEL}`);
   }, 30000);
 
