@@ -8,33 +8,80 @@
  *
  * Design Philosophy:
  * - Single tool with rich description for LLM routing
- * - Three operations: list, read, execute
+ * - Four operations: list, search, read, execute
  * - LLM does intelligence, tool does validation and execution
- * - No search operation (LLM routes from tool description)
+ * - Modular operation handlers in ./operations/
  *
  * @see test-prompts.json for test specification
  */
 
 import { Tool, TextContent } from '@modelcontextprotocol/sdk/types.js';
+import type { BMADEngine } from '../core/bmad-engine.js';
 import type { AgentMetadata } from '../resource-loader.js';
 import type { Workflow } from '../types/index.js';
+
+// Import operation handlers
+import {
+  type ListParams,
+  executeListOperation,
+  validateListParams,
+  getListExamples,
+} from './operations/list.js';
+import {
+  type SearchParams,
+  executeSearchOperation,
+  validateSearchParams,
+  getSearchExamples,
+} from './operations/search.js';
+import {
+  type ReadParams,
+  executeReadOperation,
+  validateReadParams,
+  getReadExamples,
+} from './operations/read.js';
+import {
+  type ExecuteOperationParams,
+  executeExecuteOperation,
+  validateExecuteParams,
+  getExecuteExamples,
+} from './operations/execute.js';
 
 /**
  * Parameters for the unified BMAD tool
  */
 export interface BMADToolParams {
   /** Operation to perform */
-  operation: 'list' | 'read' | 'execute';
+  operation: 'list' | 'search' | 'read' | 'execute';
+
+  // List operation params
+  /** Query for list operation (agents, workflows, modules, resources) */
+  query?: string;
+  /** Pattern for resource filtering */
+  pattern?: string;
+
+  // Search operation params
+  /** Search query string */
+  searchQuery?: string;
+  /** Search type (agents, workflows, all) */
+  searchType?: string;
+
+  // Read operation params
+  /** Type for read operation (agent, workflow, resource) */
+  type?: string;
+  /** Resource URI for read operation */
+  uri?: string;
+
+  // Execute operation params
+  /** User message/context (for execute operation) */
+  message?: string;
+
+  // Common params
   /** Optional module filter (core, bmm, cis) */
   module?: string;
   /** Agent name (for read/execute) */
   agent?: string;
   /** Workflow name (for read/execute) */
   workflow?: string;
-  /** Query for list operation (agents, workflows, modules) */
-  query?: string;
-  /** User message/context (for execute operation) */
-  message?: string;
 }
 
 /**
@@ -64,10 +111,11 @@ export function createBMADTool(
       properties: {
         operation: {
           type: 'string',
-          enum: ['list', 'read', 'execute'],
+          enum: ['list', 'search', 'read', 'execute'],
           description:
             'Operation type:\n' +
-            '- list: Get available agents/workflows/modules\n' +
+            '- list: Get available agents/workflows/modules/resources\n' +
+            '- search: Find agents/workflows by fuzzy search\n' +
             '- read: Inspect agent or workflow details (read-only)\n' +
             '- execute: Run agent or workflow with user context (action)',
         },
@@ -128,7 +176,8 @@ function buildToolDescription(
   );
   parts.push('');
   parts.push('**Operations:**');
-  parts.push('- `list`: Discover available agents/workflows/modules');
+  parts.push('- `list`: Discover available agents/workflows/modules/resources');
+  parts.push('- `search`: Find agents/workflows by fuzzy search');
   parts.push(
     '- `read`: Inspect agent or workflow details (read-only, no execution)',
   );
@@ -236,70 +285,204 @@ function groupWorkflowsByModule(
  * Handles execution of the unified BMAD tool
  *
  * Routes operation to appropriate handler:
- * - list: Returns manifest data
- * - read: Returns agent/workflow definition
+ * - list: Returns manifest data (agents/workflows/modules/resources)
+ * - search: Performs fuzzy search across agents and workflows
+ * - read: Returns agent/workflow/resource definition
  * - execute: Invokes agent or workflow
  *
  * @param params - Tool parameters
- * @param context - Server context with loader, etc.
+ * @param engine - BMAD Engine instance
  * @returns Tool execution result
  */
 export async function handleBMADTool(
   params: BMADToolParams,
-  context: {
-    // TODO: Define context interface with loader, agent executor, etc.
-    agents: AgentMetadata[];
-    workflows: Workflow[];
-  },
+  engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
   const { operation } = params;
 
   switch (operation) {
     case 'list':
-      return handleList(params, context);
+      return await handleList(params, engine);
+    case 'search':
+      return await handleSearch(params, engine);
     case 'read':
-      return handleRead(params, context);
+      return await handleRead(params, engine);
     case 'execute':
-      return handleExecute(params, context);
+      return await handleExecute(params, engine);
+    default:
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Invalid operation: ${String(operation)}`,
+          },
+        ],
+      };
   }
-
-  // TypeScript exhaustiveness check
-  const _exhaustive: never = operation;
-  return _exhaustive; // This line never executes but satisfies TypeScript
 }
 
 /**
  * Handles list operation
- * TODO: Implement
  */
-function handleList(
-  _params: BMADToolParams,
-  _context: { agents: AgentMetadata[]; workflows: Workflow[] },
+async function handleList(
+  params: BMADToolParams,
+  engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
-  // TODO: Implement list logic
-  throw new Error('List operation not yet implemented');
+  // Map BMADToolParams to ListParams
+  const listParams: ListParams = {
+    query:
+      (params.query as 'agents' | 'workflows' | 'modules' | 'resources') ||
+      'agents',
+    module: params.module,
+    pattern: params.pattern,
+  };
+
+  // Validate params
+  const validationError = validateListParams(listParams);
+  if (validationError) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ Validation Error: ${validationError}\n\nExamples:\n${getListExamples().join('\n')}`,
+        },
+      ],
+    };
+  }
+
+  // Execute operation
+  const result = await executeListOperation(engine, listParams);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: result.text,
+      },
+    ],
+  };
+}
+
+/**
+ * Handles search operation
+ */
+async function handleSearch(
+  params: BMADToolParams,
+  engine: BMADEngine,
+): Promise<{ content: TextContent[] }> {
+  // Map BMADToolParams to SearchParams
+  const searchParams: SearchParams = {
+    query: params.searchQuery || '',
+    type: params.searchType as 'agents' | 'workflows' | 'all',
+    module: params.module,
+  };
+
+  // Validate params
+  const validationError = validateSearchParams(searchParams);
+  if (validationError) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ Validation Error: ${validationError}\n\nExamples:\n${getSearchExamples().join('\n')}`,
+        },
+      ],
+    };
+  }
+
+  // Execute operation
+  const result = await executeSearchOperation(engine, searchParams);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: result.text,
+      },
+    ],
+  };
 }
 
 /**
  * Handles read operation
- * TODO: Implement
  */
-function handleRead(
-  _params: BMADToolParams,
-  _context: { agents: AgentMetadata[]; workflows: Workflow[] },
+async function handleRead(
+  params: BMADToolParams,
+  engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
-  // TODO: Implement read logic
-  throw new Error('Read operation not yet implemented');
+  // Map BMADToolParams to ReadParams
+  const readParams: ReadParams = {
+    type: params.type as 'agent' | 'workflow' | 'resource',
+    agent: params.agent,
+    workflow: params.workflow,
+    uri: params.uri,
+    module: params.module,
+  };
+
+  // Validate params
+  const validationError = validateReadParams(readParams);
+  if (validationError) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ Validation Error: ${validationError}\n\nExamples:\n${getReadExamples().join('\n')}`,
+        },
+      ],
+    };
+  }
+
+  // Execute operation
+  const result = await executeReadOperation(engine, readParams);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: result.text,
+      },
+    ],
+  };
 }
 
 /**
  * Handles execute operation
- * TODO: Implement
  */
-function handleExecute(
-  _params: BMADToolParams,
-  _context: { agents: AgentMetadata[]; workflows: Workflow[] },
+async function handleExecute(
+  params: BMADToolParams,
+  engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
-  // TODO: Implement execute logic
-  throw new Error('Execute operation not yet implemented');
+  // Map BMADToolParams to ExecuteOperationParams
+  const execParams: ExecuteOperationParams = {
+    type: params.type as 'agent' | 'workflow',
+    agent: params.agent,
+    workflow: params.workflow,
+    message: params.message || '',
+    module: params.module,
+  };
+
+  // Validate params
+  const validationError = validateExecuteParams(execParams);
+  if (validationError) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ Validation Error: ${validationError}\n\nExamples:\n${getExecuteExamples().join('\n')}`,
+        },
+      ],
+    };
+  }
+
+  // Execute operation
+  const result = await executeExecuteOperation(engine, execParams);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: result.text,
+      },
+    ],
+  };
 }
