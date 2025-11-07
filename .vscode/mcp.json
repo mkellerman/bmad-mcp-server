@@ -4,18 +4,17 @@
       "command": "npx",
       "args": [
         "-y",
-        "git+https://github.com/mkellerman/bmad-mcp-server#refactor-lite",
+        "git+https://github.com/mkellerman/bmad-mcp-server#main",
         "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad",
         "--mode=strict"
       ]
-    },
-    "bmad-test": {
-      "command": "node",
-      "args": [
-        "${workspaceFolder}/build/index.js",
-        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad/core",
-        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad/bmm"
-      ]
     }
+    // "bmad-test": {
+    //   "command": "node",
+    //   "args": [
+    //     "${workspaceFolder}/build/index.js",
+    //     "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad"
+    //   ]
+    // }
   }
 }

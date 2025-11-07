@@ -15,8 +15,10 @@
  * - Graceful error handling
  */
 
-import * as fse from 'fs-extra';
-import { join } from 'node:path';
+import { pathExists } from 'fs-extra';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse as parseCsv } from 'csv-parse/sync';
 import type { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
 
@@ -208,10 +210,20 @@ export class ManifestCache {
    */
   private async generateManifests(bmadRoot: string): Promise<void> {
     // Import ManifestGenerator dynamically to avoid startup cost
-    const { ManifestGenerator } = await import(
-      'bmad-method/tools/cli/installers/lib/core/manifest-generator.js'
-    );
+    // Resolve the package path and construct the correct generator path
+    const pkgPath = import.meta.resolve('bmad-method');
+    const pkgFile = fileURLToPath(pkgPath);
+    const pkgRoot = dirname(dirname(dirname(pkgFile))); // up 3 levels from tools/cli/bmad-cli.js
+    const generatorPath = pathToFileURL(
+      join(pkgRoot, 'tools/cli/installers/lib/core/manifest-generator.js'),
+    ).href;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const module = await import(generatorPath);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
+    const ManifestGenerator = (module as any).ManifestGenerator;
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const generator = new ManifestGenerator();
 
     // Detect modules in this root
@@ -221,6 +233,7 @@ export class ManifestCache {
     const files = await this.walkDirectory(bmadRoot);
 
     // Generate manifests
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await generator.generateManifests(bmadRoot, modules, files, {
       ides: [],
       preservedModules: [],
@@ -261,11 +274,11 @@ export class ManifestCache {
   private async loadAgentManifest(cfgDir: string): Promise<AgentMetadata[]> {
     const csvPath = join(cfgDir, 'agent-manifest.csv');
 
-    if (!(await fse.pathExists(csvPath))) {
+    if (!(await pathExists(csvPath))) {
       return [];
     }
 
-    const content = await fse.readFile(csvPath, 'utf-8');
+    const content = await readFile(csvPath, 'utf-8');
     const records: Array<Record<string, string>> = parseCsv(content, {
       columns: true,
       skip_empty_lines: true,
@@ -295,11 +308,11 @@ export class ManifestCache {
   private async loadWorkflowManifest(cfgDir: string): Promise<Workflow[]> {
     const csvPath = join(cfgDir, 'workflow-manifest.csv');
 
-    if (!(await fse.pathExists(csvPath))) {
+    if (!(await pathExists(csvPath))) {
       return [];
     }
 
-    const content = await fse.readFile(csvPath, 'utf-8');
+    const content = await readFile(csvPath, 'utf-8');
     const records: Array<Record<string, string>> = parseCsv(content, {
       columns: true,
       skip_empty_lines: true,
@@ -326,11 +339,11 @@ export class ManifestCache {
   private async loadFilesManifest(cfgDir: string): Promise<FileEntry[]> {
     const csvPath = join(cfgDir, 'files-manifest.csv');
 
-    if (!(await fse.pathExists(csvPath))) {
+    if (!(await pathExists(csvPath))) {
       return [];
     }
 
-    const content = await fse.readFile(csvPath, 'utf-8');
+    const content = await readFile(csvPath, 'utf-8');
     const records: Array<Record<string, string>> = parseCsv(content, {
       columns: true,
       skip_empty_lines: true,
@@ -392,7 +405,7 @@ export class ManifestCache {
 
     // User bmad
     const userBmad = this.resourceLoader.getPaths().userBmad;
-    if (await fse.pathExists(userBmad)) {
+    if (await pathExists(userBmad)) {
       sources.push({
         root: userBmad,
         priority: 2,
@@ -424,20 +437,20 @@ export class ManifestCache {
   private async detectModules(bmadRoot: string): Promise<string[]> {
     const modules: string[] = [];
 
-    if (!(await fse.pathExists(bmadRoot))) {
+    if (!(await pathExists(bmadRoot))) {
       return modules;
     }
 
-    const entries = await fse.readdir(bmadRoot, { withFileTypes: true });
+    const entries = await readdir(bmadRoot, { withFileTypes: true });
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       if (entry.name === 'core' || entry.name === '_cfg') continue;
 
       const entryPath = join(bmadRoot, entry.name);
-      const hasAgents = await fse.pathExists(join(entryPath, 'agents'));
-      const hasWorkflows = await fse.pathExists(join(entryPath, 'workflows'));
-      const hasTasks = await fse.pathExists(join(entryPath, 'tasks'));
+      const hasAgents = await pathExists(join(entryPath, 'agents'));
+      const hasWorkflows = await pathExists(join(entryPath, 'workflows'));
+      const hasTasks = await pathExists(join(entryPath, 'tasks'));
 
       if (hasAgents || hasWorkflows || hasTasks) {
         modules.push(entry.name);
@@ -457,11 +470,11 @@ export class ManifestCache {
     const files: string[] = [];
 
     const walk = async (dir: string): Promise<void> => {
-      if (!(await fse.pathExists(dir))) {
+      if (!(await pathExists(dir))) {
         return;
       }
 
-      const entries = await fse.readdir(dir, { withFileTypes: true });
+      const entries = await readdir(dir, { withFileTypes: true });
 
       for (const entry of entries) {
         const fullPath = join(dir, entry.name);
@@ -507,11 +520,11 @@ export class ManifestCache {
    */
   private async isManifestFresh(manifestPath: string): Promise<boolean> {
     try {
-      if (!(await fse.pathExists(manifestPath))) {
+      if (!(await pathExists(manifestPath))) {
         return false;
       }
 
-      const stats = await fse.stat(manifestPath);
+      const stats = await stat(manifestPath);
       const age = Date.now() - stats.mtimeMs;
       return age < this.manifestTTL;
     } catch {
