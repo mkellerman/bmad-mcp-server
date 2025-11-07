@@ -1,59 +1,97 @@
 # BMAD MCP Server Documentation
 
-Welcome to the BMAD MCP Server documentation. This server brings the power of the [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) to any AI assistant through the Model Context Protocol (MCP).
+**Version:** 4.0.0  
+**Last Updated:** November 6, 2025
+
+Welcome to the BMAD MCP Server documentation - bringing the power of the [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) to AI assistants through the Model Context Protocol.
 
 ---
 
-## 📖 Quick Navigation
+## Essential Documentation
 
-### 🚀 Getting Started
+### � [README.md](../README.md)
 
-- **[README.md](../README.md)** - Project overview and installation
-- **[Deployment Guide](deployment-guide.md)** - Installation and configuration
+**Start here** - Project overview, installation, quick start, and usage guide.
 
-### 🏗️ Architecture & Design
+### 🏗️ [Architecture](./architecture.md)
 
-- **[Architecture](architecture.md)** - System architecture and components
-- **[API Contracts](api-contracts.md)** - MCP tools and TypeScript APIs
+System architecture, components, design principles, and data flow.
 
-### 🛠️ Development
+### 🔌 [API Contracts](./api-contracts.md)
 
-- **[Development Guide](development-guide.md)** - Development workflow
-- **[Testing Guide](testing-guide.md)** - Test strategy and examples
+MCP tools API, resources, prompts, completions, and TypeScript APIs.
 
-### 📋 Project Information
+### � [Development Guide](./development-guide.md)
 
-- **[Project Overview](project-overview.md)** - Technical foundation and scope
-- **[CHANGELOG.md](../CHANGELOG.md)** - Version history
+Development workflow, testing, building, contributing, and troubleshooting.
 
 ---
 
-## 🎯 Documentation by Role
+## Quick Navigation
 
-### For AI Assistant Users
+### For Users
 
-_Want to use BMAD through your AI client?_
+**Want to use BMAD through your AI assistant?**
 
-1. **Quick Start** → [README.md](../README.md)
-2. **Integration** → [Deployment Guide](deployment-guide.md)
-3. **Available Tools** → [API Contracts](api-contracts.md)
+1. Installation → [README.md](../README.md)
+2. Configuration → [README.md - Setup](../README.md#-installation)
+3. Usage → [API Contracts - MCP Tools](./api-contracts.md#mcp-tools-api)
 
 ### For Developers
 
-_Want to contribute or modify the code?_
+**Want to contribute or modify the code?**
 
-1. **Setup** → [Development Guide](development-guide.md)
-2. **Architecture** → [Architecture](architecture.md)
-3. **API Reference** → [API Contracts](api-contracts.md)
-4. **Testing** → [Testing Guide](testing-guide.md)
+1. Setup → [Development Guide - Quick Start](./development-guide.md#quick-start)
+2. Architecture → [Architecture](./architecture.md)
+3. API Reference → [API Contracts - TypeScript API](./api-contracts.md#typescript-api-internal)
+4. Testing → [Development Guide - Testing](./development-guide.md#testing)
 
-### For System Administrators
+---
 
-_Want to deploy and maintain the server?_
+## Additional Resources
 
-1. **Installation** → [Deployment Guide](deployment-guide.md)
-2. **Configuration** → [Deployment Guide](deployment-guide.md)
-3. **Monitoring** → [Deployment Guide](deployment-guide.md)
+- **BMAD Method:** https://github.com/bmad-code-org/BMAD-METHOD
+- **MCP Specification:** https://modelcontextprotocol.io/
+- **Repository:** https://github.com/mkellerman/bmad-mcp-server
+- **Issues:** https://github.com/mkellerman/bmad-mcp-server/issues
+
+---
+
+## What's New in v4.0
+
+**Major Changes:**
+
+- ✅ **Unified Tool Architecture** - Single `bmad` tool replaces 100+ individual agent tools
+- ✅ **Transport-Agnostic Engine** - Core business logic separated from MCP layer
+- ✅ **Improved Operation Model** - Clear separation: list, read, execute
+- ✅ **Better Documentation** - Consolidated from 12 files to 4 essential docs
+- ✅ **Enhanced Testing** - Comprehensive unit, integration, and e2e test suites
+
+**Migration:** Users upgrading from v3.x should review the [API Contracts](./api-contracts.md#migration-from-v3x) migration guide.
+
+---
+
+## Documentation Philosophy
+
+We maintain **minimal essential documentation** focused on:
+
+1. **README.md** - Quick start and usage
+2. **Architecture** - System design
+3. **API Contracts** - Interface specifications
+4. **Development Guide** - Contributing workflow
+
+Everything else is either consolidated into these 4 docs or archived for reference.
+
+This approach:
+
+- ✅ Reduces maintenance burden
+- ✅ Prevents documentation drift
+- ✅ Makes it easier to find information
+- ✅ Ensures accuracy through focused review
+
+---
+
+## Additional Resources
 
 ---
 

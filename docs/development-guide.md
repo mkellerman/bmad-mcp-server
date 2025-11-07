@@ -1,107 +1,113 @@
 # Development Guide - BMAD MCP Server
 
-**Audience:** Developers, Contributors
+**Version:** 4.0.0  
+**Last Updated:** November 6, 2025
 
 ---
 
 ## Overview
 
-This guide covers the complete development workflow for the BMAD MCP Server, from initial setup through testing, building, and deployment.
+Complete development workflow for the BMAD MCP Server - from setup through testing, building, and contributing.
 
 **Tech Stack:**
 
-- **Language:** TypeScript 5.7.2 (Strict mode, ES2022 target)
-- **Runtime:** Node.js (ES modules)
-- **Protocol:** MCP 1.0.4 (Model Context Protocol)
-- **Testing:** Vitest 4.0.3 with coverage reporting
-- **Linting:** ESLint 9.17.0 with TypeScript support
-- **Formatting:** Prettier 3.4.2
-- **Build:** TypeScript compiler (no bundler)
+- **Language:** TypeScript 5.7.2 (strict mode, ES2022)
+- **Runtime:** Node.js 18+
+- **Protocol:** MCP SDK 1.0.4
+- **Testing:** Vitest 4.0.3
+- **Linting:** ESLint 9.17.0 + Prettier 3.4.2
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 **Required:**
 
-- Node.js 18+ (check with `node --version`)
-- npm 8+ (check with `npm --version`)
-- Git (for cloning and Git remote support)
+- Node.js 18+ (`node --version`)
+- npm 8+ (`npm --version`)
+- Git
 
 **Recommended:**
 
-- VS Code with TypeScript and Node.js extensions
-- GitHub Copilot for AI-assisted development
+- VS Code with TypeScript extension
+- GitHub Copilot (optional)
 
 ### Initial Setup
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/mkellerman/bmad-mcp-server.git
 cd bmad-mcp-server
 
 # Install dependencies
 npm install
 
-# Verify setup
-npm run doctor:show
+# Build project
+npm run build
+
+# Verify installation
+npm run cli:list-tools
 ```
 
 ### First Development Run
 
 ```bash
-# Start development server with auto-restart
+# Start in development mode
 npm run dev
 
-# In another terminal, test basic functionality
-npm run lite:list
+# In another terminal, test functionality
+npm run cli:list-agents
 ```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 bmad-mcp-server/
-├── src/                    # Source code (TypeScript)
+├── src/                    # TypeScript source code
+│   ├── index.ts            # MCP server entry point
+│   ├── cli.ts              # CLI entry point
+│   ├── server.ts           # MCP server implementation
+│   ├── config.ts           # Configuration
+│   ├── core/               # Core business logic
+│   │   ├── bmad-engine.ts  # Transport-agnostic engine
+│   │   └── resource-loader.ts # Multi-source content loading
+│   ├── tools/              # Tool implementations
+│   │   ├── bmad-unified.ts # Unified bmad tool
+│   │   └── operations/     # Operation handlers
+│   ├── types/              # TypeScript types
+│   └── utils/              # Utilities
 ├── build/                  # Compiled JavaScript (generated)
-├── tests/                  # Test suites and fixtures
-├── scripts/                # Development utilities
-├── docs/                   # Documentation (generated)
-├── coverage/               # Test coverage reports (generated)
-├── test-results/           # Test execution results (generated)
-├── node_modules/           # Dependencies
-├── package.json            # Project configuration
-├── tsconfig.json           # TypeScript configuration
-└── vitest.config.ts        # Test framework configuration
+├── tests/                  # Test suites
+│   ├── unit/               # Unit tests
+│   ├── integration/        # Integration tests
+│   ├── e2e/                # End-to-end tests
+│   ├── framework/          # Test infrastructure
+│   ├── fixtures/           # Test data
+│   └── helpers/            # Test utilities
+├── scripts/                # Development scripts
+├── docs/                   # Documentation
+├── coverage/               # Test coverage (generated)
+└── test-results/           # Test results (generated)
 ```
-
-### Key Directories
-
-| Directory  | Purpose                 | Key Files                                           |
-| ---------- | ----------------------- | --------------------------------------------------- |
-| `src/`     | Source code             | `server.ts`, `resource-loader.ts`, `types/index.ts` |
-| `tests/`   | Test infrastructure     | Unit, integration, e2e test suites                  |
-| `scripts/` | Development tools       | Build helpers, diagnostics, utilities               |
-| `docs/`    | Generated documentation | API docs, architecture, guides                      |
-| `build/`   | Distribution artifacts  | Compiled JavaScript for npm publish                 |
 
 ---
 
-## 🛠️ Development Workflow
+## Development Workflow
 
 ### Daily Development Cycle
 
 ```bash
-# 1. Start with a clean state
+# 1. Start clean
 npm run clean
 
 # 2. Install/update dependencies
 npm install
 
-# 3. Run tests to ensure everything works
+# 3. Run tests
 npm run test
 
 # 4. Start development with auto-restart
@@ -110,95 +116,548 @@ npm run dev
 # 5. Make changes, verify with tests
 npm run test:unit
 
-# 6. Format and lint code
+# 6. Format and lint
 npm run format
 npm run lint:fix
 
 # 7. Build for production
 npm run build
-
-# 8. Run integration tests
-npm run test:integration
 ```
 
 ### Code Changes Workflow
 
 ```bash
-# Make your changes to .ts files in src/
+# Make changes to .ts files in src/
 
-# Run unit tests for your changes
+# Run unit tests
 npm run test:unit
 
-# Run all tests to ensure no regressions
+# Run all tests
 npm run test
 
 # Format code
 npm run format
 
-# Fix any linting issues
+# Fix linting issues
 npm run lint:fix
 
-# Build to verify compilation
+# Build
 npm run build
 
-# Run integration tests if needed
+# Run integration tests
 npm run test:integration
 ```
 
-### Pre-Commit Checks
+---
 
-The project uses Husky for Git hooks. These run automatically on commit:
+## npm Scripts Reference
 
-```bash
-# Manual pre-commit validation
-npm run guard:src-js  # Validate source code
-npm run lint:fix      # Auto-fix linting issues
-npm run format        # Format all files
-```
+### Build & Run
 
-**What happens on commit:**
+| Script    | Command                   | Purpose                                |
+| --------- | ------------------------- | -------------------------------------- |
+| `build`   | `tsc && chmod +x...`      | Compile TypeScript to JavaScript       |
+| `start`   | `node build/index.js`     | Run production server                  |
+| `dev`     | `tsx src/index.ts`        | Development mode with auto-restart     |
+| `prepare` | `npm run build \|\| true` | Pre-install hook (runs on npm install) |
 
-1. **Source validation:** Ensures no JavaScript in `src/` (must be TypeScript)
-2. **Linting:** Auto-fixes ESLint issues
-3. **Formatting:** Applies Prettier formatting
-4. **Type checking:** TypeScript compilation verification
+### Testing
+
+| Script             | Command                                  | Purpose                    |
+| ------------------ | ---------------------------------------- | -------------------------- |
+| `test`             | `vitest run`                             | Run all tests once         |
+| `test:watch`       | `vitest`                                 | Run tests in watch mode    |
+| `test:ui`          | `vitest --ui`                            | Open Vitest UI             |
+| `test:coverage`    | `vitest run --coverage`                  | Run with coverage report   |
+| `test:unit`        | `vitest run tests/unit`                  | Run only unit tests        |
+| `test:integration` | `vitest run tests/integration`           | Run only integration tests |
+| `test:e2e`         | `vitest run tests/e2e`                   | Run only e2e tests         |
+| `test:llm`         | Same as `test:e2e`                       | Alias for e2e tests        |
+| `test:all`         | Runs unit, integration, e2e sequentially | Run complete test suite    |
+
+### Code Quality
+
+| Script      | Command                       | Purpose                      |
+| ----------- | ----------------------------- | ---------------------------- |
+| `lint`      | `eslint . --ext .ts,.js,.mjs` | Check linting errors         |
+| `lint:fix`  | `eslint ... --fix`            | Auto-fix linting errors      |
+| `format`    | `prettier --write .`          | Format all files             |
+| `precommit` | `lint:fix` + `format`         | Manual pre-commit validation |
+
+### CLI Tools
+
+| Script               | Command                     | Purpose                  |
+| -------------------- | --------------------------- | ------------------------ |
+| `cli`                | `node scripts/bmad-cli.mjs` | Run BMAD CLI             |
+| `cli:list-tools`     | List all MCP tools          | Enumerate tools          |
+| `cli:list-resources` | List all resources          | Show available resources |
+| `cli:list-agents`    | List all agents             | Show agent directory     |
+| `cli:list-workflows` | List all workflows          | Show workflow directory  |
+
+### Cleanup
+
+| Script       | Command                               | Purpose               |
+| ------------ | ------------------------------------- | --------------------- |
+| `clean`      | Remove build/ coverage/ test-results/ | Clean generated files |
+| `clean:all`  | `clean` + remove node_modules/        | Nuclear cleanup       |
+| `test:clean` | Remove test result files              | Clean test artifacts  |
 
 ---
 
-## 🧪 Testing Strategy
+## Testing
 
-### Test Types
+### Test Structure
 
-| Test Type       | Command                    | Purpose                   | Timeout  |
-| --------------- | -------------------------- | ------------------------- | -------- |
-| **Unit**        | `npm run test:unit`        | Isolated function testing | 5s       |
-| **Integration** | `npm run test:integration` | Component interaction     | 10s      |
-| **E2E**         | `npm run test:e2e`         | Full workflow testing     | 30s      |
-| **All**         | `npm run test:all`         | Complete test suite       | Variable |
+```
+tests/
+├── unit/                   # Isolated function tests
+│   ├── engine.test.ts      # BMADEngine tests
+│   ├── loader.test.ts      # ResourceLoader tests
+│   └── validators.test.ts  # Validation logic tests
+├── integration/            # Component interaction tests
+│   ├── server.test.ts      # Server + Engine integration
+│   └── loader-git.test.ts  # Loader with Git sources
+├── e2e/                    # Full workflow tests
+│   ├── agent-execution.test.ts
+│   └── workflow-flow.test.ts
+├── framework/              # Test infrastructure
+│   ├── reporters/          # Custom reporters
+│   └── setup/              # Global setup/teardown
+├── fixtures/               # Mock BMAD content
+│   ├── mock-agents/
+│   └── mock-workflows/
+└── helpers/                # Test utilities
+    └── test-fixtures.ts
+```
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# All tests
 npm run test
 
-# Run specific test types
-npm run test:unit
-npm run test:integration
-npm run test:e2e
+# Specific test types
+npm run test:unit           # Fast, isolated tests
+npm run test:integration    # Component interaction
+npm run test:e2e            # Full workflows
 
-# Run with coverage
-npm run test:coverage
-
-# Run tests in watch mode
+# Watch mode (auto-rerun on changes)
 npm run test:watch
 
-# Run tests with UI
-npm run test:ui
+# Coverage report
+npm run test:coverage
 
-# Run LLM integration tests
-npm run test:llm
+# UI mode (interactive)
+npm run test:ui
 ```
+
+### Writing Tests
+
+**Unit Test Example:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { BMADEngine } from '@/core/bmad-engine';
+
+describe('BMADEngine', () => {
+  it('should list agents', async () => {
+    const engine = new BMADEngine();
+    await engine.initialize();
+
+    const agents = await engine.listAgents();
+
+    expect(agents).toBeInstanceOf(Array);
+    expect(agents.length).toBeGreaterThan(0);
+  });
+});
+```
+
+**Integration Test Example:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { BMADEngine } from '@/core/bmad-engine';
+
+describe('Engine + Loader Integration', () => {
+  it('should execute agent workflow', async () => {
+    const engine = new BMADEngine();
+    await engine.initialize();
+
+    const result = await engine.executeAgent({
+      agent: 'analyst',
+      message: 'Test message',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.text).toContain('analyst');
+  });
+});
+```
+
+### Test Configuration
+
+**File:** `vitest.config.ts`
+
+```typescript
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['tests/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/build/**'],
+    testTimeout: 30000,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+    },
+  },
+});
+```
+
+---
+
+## Building
+
+### TypeScript Compilation
+
+```bash
+# Standard build
+npm run build
+
+# Watch mode (auto-rebuild)
+tsc --watch
+```
+
+### Build Output
+
+```
+build/
+├── index.js              # MCP server entry (executable)
+├── index.d.ts            # Type declarations
+├── cli.js                # CLI entry (executable)
+├── cli.d.ts
+├── server.js
+├── server.d.ts
+├── core/
+│   ├── bmad-engine.js
+│   ├── bmad-engine.d.ts
+│   └── ...
+├── tools/
+└── types/
+```
+
+### TypeScript Configuration
+
+**File:** `tsconfig.json`
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "strict": true,
+    "outDir": "./build",
+    "rootDir": "./src",
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "build", "tests"]
+}
+```
+
+---
+
+## Code Quality
+
+### Linting
+
+```bash
+# Check for linting errors
+npm run lint
+
+# Auto-fix errors
+npm run lint:fix
+```
+
+**Configuration:** `eslint.config.mjs`
+
+### Formatting
+
+```bash
+# Format all files
+npm run format
+```
+
+**Configuration:** `.prettierrc`
+
+```json
+{
+  "semi": true,
+  "trailingComma": "all",
+  "singleQuote": true,
+  "printWidth": 80,
+  "tabWidth": 2
+}
+```
+
+### Pre-commit Hooks
+
+**Husky + lint-staged automatically:**
+
+1. Validates source (no .js in src/)
+2. Fixes linting errors
+3. Formats code
+4. Type-checks compilation
+
+**Manual pre-commit check:**
+
+```bash
+npm run precommit
+```
+
+---
+
+## Debugging
+
+### VS Code Configuration
+
+Create `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug MCP Server",
+      "program": "${workspaceFolder}/src/index.ts",
+      "runtimeArgs": ["-r", "tsx"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Tests",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "${file}"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
+```
+
+### Debug Logging
+
+```typescript
+// Enable debug logging
+const DEBUG = process.env.DEBUG === 'true';
+
+if (DEBUG) {
+  console.error('[DEBUG] Engine initialized');
+}
+```
+
+---
+
+## Contributing
+
+### Branch Strategy
+
+```bash
+# Create feature branch
+git checkout -b feature/my-feature
+
+# Make changes, commit
+git add .
+git commit -m "feat: add my feature"
+
+# Push and create PR
+git push origin feature/my-feature
+```
+
+### Commit Messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat: add new feature
+fix: fix bug
+docs: update documentation
+test: add tests
+refactor: refactor code
+chore: update dependencies
+```
+
+**Commitlint validates automatically on commit.**
+
+### Pull Request Process
+
+1. Create feature branch
+2. Make changes with tests
+3. Run `npm run test:all`
+4. Run `npm run lint:fix`
+5. Run `npm run format`
+6. Push and create PR
+7. Wait for CI checks
+8. Request review
+
+---
+
+## Troubleshooting
+
+### Build Errors
+
+**Issue:** TypeScript compilation fails
+
+```bash
+# Clean and rebuild
+npm run clean
+npm install
+npm run build
+```
+
+**Issue:** Module not found
+
+```bash
+# Ensure dependencies are installed
+npm install
+
+# Check tsconfig.json paths
+```
+
+### Test Failures
+
+**Issue:** Tests failing after changes
+
+```bash
+# Run specific test file
+npm run test tests/unit/engine.test.ts
+
+# Run with verbose output
+npx vitest run --reporter=verbose
+```
+
+**Issue:** Test timeout
+
+```bash
+# Increase timeout in vitest.config.ts
+testTimeout: 60000  # 60 seconds
+```
+
+### Git Remote Issues
+
+**Issue:** Git clone fails
+
+```bash
+# Check Git URL format
+git+https://github.com/org/repo.git
+
+# For SSH (private repos)
+git+ssh://git@github.com/org/repo.git
+
+# Check Git credentials
+git config --list
+```
+
+---
+
+## Release Process
+
+### Semantic Release
+
+This project uses semantic-release for automated versioning.
+
+**Configuration:** `.releaserc.json`
+
+```json
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    "@semantic-release/npm",
+    "@semantic-release/git"
+  ]
+}
+```
+
+**Versioning:**
+
+- `feat:` commits → minor version bump (0.x.0)
+- `fix:` commits → patch version bump (0.0.x)
+- `BREAKING CHANGE:` → major version bump (x.0.0)
+
+---
+
+## Environment Variables
+
+| Variable    | Purpose               | Default           |
+| ----------- | --------------------- | ----------------- |
+| `BMAD_ROOT` | Override project root | Current directory |
+| `DEBUG`     | Enable debug logging  | `false`           |
+| `NODE_ENV`  | Environment mode      | `development`     |
+
+**Usage:**
+
+```bash
+# Override project root
+BMAD_ROOT=/custom/path npm run dev
+
+# Enable debug logging
+DEBUG=true npm run dev
+```
+
+---
+
+## Performance Profiling
+
+### CPU Profiling
+
+```bash
+# Profile server startup
+node --prof build/index.js
+
+# Process profile
+node --prof-process isolate-*.log > profile.txt
+```
+
+### Memory Profiling
+
+```bash
+# Heap snapshot
+node --inspect build/index.js
+
+# Then in Chrome: chrome://inspect
+```
+
+---
+
+## Additional Resources
+
+### Documentation
+
+- [Architecture](./architecture.md) - System design
+- [API Contracts](./api-contracts.md) - MCP tools and TypeScript APIs
+- [README](../README.md) - Project overview
+
+### External Links
+
+- [MCP Specification](https://modelcontextprotocol.io/)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [Vitest Documentation](https://vitest.dev/)
+- [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD)
+
+### Getting Help
+
+- **Issues:** https://github.com/mkellerman/bmad-mcp-server/issues
+- **Discussions:** GitHub Discussions
+- **BMAD Method:** https://github.com/bmad-code-org/BMAD-METHOD
 
 ### Test Structure
 

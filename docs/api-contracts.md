@@ -1,210 +1,777 @@
 # API Contracts - BMAD MCP Server
 
-**Contract Types:** MCP Tools (External) + Internal APIs
+**Version:** 4.0.0  
+**Protocol:** MCP 1.0.4  
+**Last Updated:** November 6, 2025
 
 ---
 
 ## Overview
 
-The BMAD MCP Server exposes two types of APIs:
+The BMAD MCP Server exposes two API layers:
 
-1. **MCP Tools**: External tools available to AI assistants via the Model Context Protocol
-2. **Internal APIs**: TypeScript classes and methods for internal server operation
+1. **MCP Tools API** - External interface for AI assistants via Model Context Protocol
+2. **TypeScript API** - Internal classes and methods for server operation
 
-**Protocol Version:** MCP 1.0.4  
-**Tool Pattern:** Tool-per-Agent + Specialized Tools  
-**Response Format:** JSON-RPC 2.0
+**Key Change in v4.0:** Unified tool architecture - single `bmad` tool replaces 100+ individual agent tools.
 
 ---
 
-## MCP Tools (External API)
+## MCP Tools API
 
-### Tool Discovery
+### Tool: `bmad`
 
-**Endpoint:** `tools/list`  
-**Purpose:** Enumerate all available tools dynamically generated from BMAD agents
+**Purpose:** Unified access to all BMAD functionality through a single intelligent tool
 
-**Response Schema:**
+**Operations:**
 
-```json
-{
-  "tools": [
-    {
-      "name": "string",
-      "description": "string",
-      "inputSchema": {
-        "type": "object",
-        "properties": {...},
-        "required": ["string"]
-      }
-    }
-  ]
-}
-```
-
-### 1. Agent Tools (Dynamic)
-
-**Pattern:** `{module}-{agent}` or `bmad-{agent}`  
-**Quantity:** Variable (1 tool per BMAD agent)  
-**Purpose:** Execute specific BMAD agents with contextual messages
+- `list` - Discover agents, workflows, modules, resources
+- `read` - Inspect agent/workflow definitions (read-only, no execution)
+- `execute` - Run agents/workflows with user context (performs actions)
+- `search` - Find agents/workflows by name/description (optional)
 
 #### Tool Schema
 
 ```json
 {
-  "name": "core-john",
-  "description": "Product Manager + Investigative Product Strategist + Market-Savvy PM - Product management veteran with 8+ years experience launching B2B and consumer products. Expert in market research, competitive analysis, and user behavior.\n\nAvailable actions:\n• Check workflow status and get recommendations (START HERE!)",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "message": {
-        "type": "string",
-        "description": "Your message or question for Product Manager"
-      }
-    },
-    "required": ["message"]
-  }
-}
-```
-
-#### Invocation Example
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "core-john",
-    "arguments": {
-      "message": "Help me analyze the market opportunity for a new SaaS product targeting small businesses"
-    }
-  }
-}
-```
-
-#### Response Format
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "As a Product Manager with 8+ years of experience, I'll help you analyze this market opportunity...\n\n## Market Analysis Framework\n\n### 1. Target Market Validation\n**TAM (Total Addressable Market):** Small businesses (1-50 employees) represent approximately 5.8 million firms in the US alone, with $1.2T in annual revenue potential.\n\n..."
-      }
-    ]
-  }
-}
-```
-
-### 2. Workflow Execution Tool
-
-**Name:** `bmad-workflow`  
-**Purpose:** Execute BMAD workflows like PRD generation, architecture analysis, debugging
-
-#### Tool Schema
-
-```json
-{
-  "name": "bmad-workflow",
-  "description": "Execute BMAD workflows like prd, architecture, debug-inspect, etc.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "workflow": {
-        "type": "string",
-        "description": "Workflow name (without the * prefix)"
-      },
-      "context": {
-        "type": "string",
-        "description": "Optional context or parameters for the workflow"
-      }
-    },
-    "required": ["workflow"]
-  }
-}
-```
-
-#### Invocation Examples
-
-**Basic Workflow Execution:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "tools/call",
-  "params": {
-    "name": "bmad-workflow",
-    "arguments": {
-      "workflow": "prd",
-      "context": "Create a PRD for a task management app"
-    }
-  }
-}
-```
-
-**Workflow with Parameters:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "method": "tools/call",
-  "params": {
-    "name": "bmad-workflow",
-    "arguments": {
-      "workflow": "architecture",
-      "context": "target_platform: web, team_size: 5, timeline: 3_months"
-    }
-  }
-}
-```
-
-### 3. Resources Tool
-
-**Name:** `bmad-resources`  
-**Purpose:** Access BMAD resources, discover modules/agents/workflows, search capabilities
-
-#### Tool Schema
-
-```json
-{
-  "name": "bmad-resources",
-  "description": "Access BMAD resources: read files, discover modules/agents/workflows, search by name/description. This is the primary tool for exploring and accessing BMAD content.",
+  "name": "bmad",
+  "description": "Execute BMAD agents and workflows. Provides access to all BMAD modules.\n\n**Operations:**\n- `list`: Discover available agents/workflows/modules/resources\n- `read`: Inspect agent or workflow details (read-only, no execution)\n- `execute`: Run agent or workflow with user context (performs actions)\n\n**Available Agents:**\n\nBMM Module:\n  - analyst (Mary): Business Analyst\n  - architect (Winston): Architect\n  - debug (Diana): Debug Specialist\n  - dev (Amelia): Developer Agent\n  - pm (John): Product Manager\n  ...\n\n**Available Workflows:**\n\nBMM Module:\n  - prd: Product Requirements Document workflow\n  - architecture: Architecture design workflow\n  - debug-inspect: Comprehensive debugging workflow\n  ...\n\n**Usage Guide:**\n\n**When to use each operation:**\n- `list` - User asks \"what agents/workflows are available?\"\n- `read` - User asks \"what does the analyst do?\"\n- `execute` - User wants to actually run an agent/workflow\n\n**Examples:**\n\nDiscovery:\n  { operation: \"list\", query: \"agents\" }\n  { operation: \"list\", query: \"workflows\", module: \"bmm\" }\n\nCapability Query:\n  { operation: \"read\", type: \"agent\", agent: \"analyst\" }\n  { operation: \"read\", type: \"workflow\", workflow: \"prd\" }\n\nExecution:\n  { operation: \"execute\", agent: \"analyst\", message: \"Help me brainstorm\" }\n  { operation: \"execute\", workflow: \"prd\", message: \"Create PRD for app\" }\n",
   "inputSchema": {
     "type": "object",
     "properties": {
       "operation": {
         "type": "string",
-        "enum": ["read", "list", "modules", "agents", "workflows", "search"],
-        "description": "Operation type:\n- read: Get file content from bmad:// URI\n- list: List all available resource files (optionally filtered by pattern)\n- modules: Show all loaded BMAD modules\n- agents: List all available agents with metadata\n- workflows: List all available workflows\n- search: Fuzzy search agents/workflows by name/title/description"
-      },
-      "uri": {
-        "type": "string",
-        "description": "The bmad:// URI to read (required for operation=read). Example: \"bmad://core/config.yaml\""
-      },
-      "pattern": {
-        "type": "string",
-        "description": "Glob pattern to filter resources (optional for operation=list). Example: \"core/workflows/**/*.yaml\""
+        "enum": ["list", "read", "execute"],
+        "description": "Operation type:\n- list: Get available agents/workflows/modules\n- read": Inspect agent or workflow details\n- execute: Run agent or workflow"
       },
       "query": {
         "type": "string",
-        "description": "Search query (required for operation=search). Searches in name, title, and description fields."
+        "description": "For list operation: \"agents\", \"workflows\", \"modules\", \"resources\""
       },
       "type": {
         "type": "string",
-        "enum": ["agents", "workflows", "all"],
-        "description": "What to search (for operation=search). Default: all"
+        "enum": ["agent", "workflow", "resource"],
+        "description": "For read operation: type of resource to read"
+      },
+      "agent": {
+        "type": "string",
+        "description": "Agent name (for read/execute with agents)"
+      },
+      "workflow": {
+        "type": "string",
+        "description": "Workflow name (for read/execute with workflows)"
+      },
+      "module": {
+        "type": "string",
+        "enum": ["core", "bmm", "cis"],
+        "description": "Optional module filter"
+      },
+      "message": {
+        "type": "string",
+        "description": "For execute operation: user's message or context"
+      },
+      "uri": {
+        "type": "string",
+        "description": "For read resource: bmad:// URI"
       }
     },
     "required": ["operation"]
   }
 }
 ```
+
+#### Operation 1: List
+
+**Purpose:** Discover available agents, workflows, modules, resources
+
+**Examples:**
+
+```json
+// List all agents
+{
+  "operation": "list",
+  "query": "agents"
+}
+
+// List workflows in BMM module
+{
+  "operation": "list",
+  "query": "workflows",
+  "module": "bmm"
+}
+
+// List all modules
+{
+  "operation": "list",
+  "query": "modules"
+}
+
+// List resources with pattern filter
+{
+  "operation": "list",
+  "query": "resources",
+  "pattern": "core/workflows/**/*.yaml"
+}
+```
+
+**Response Format:**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Available Agents:\n\n**BMM Module:**\n- analyst (Mary) - Business Analyst\n- architect (Winston) - Architect\n- debug (Diana) - Debug Specialist\n..."
+    }
+  ]
+}
+```
+
+#### Operation 2: Read
+
+**Purpose:** Inspect agent or workflow details without executing
+
+**Examples:**
+
+```json
+// Read agent definition
+{
+  "operation": "read",
+  "type": "agent",
+  "agent": "analyst"
+}
+
+// Read workflow definition
+{
+  "operation": "read",
+  "type": "workflow",
+  "workflow": "prd",
+  "module": "bmm"
+}
+
+// Read resource file
+{
+  "operation": "read",
+  "type": "resource",
+  "uri": "bmad://core/config.yaml"
+}
+```
+
+**Response Format (Agent):**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"name\": \"analyst\",\n  \"displayName\": \"Mary\",\n  \"title\": \"Business Analyst\",\n  \"module\": \"bmm\",\n  \"description\": \"Strategic analyst with market research expertise\",\n  \"capabilities\": [...],\n  \"workflows\": [...],\n  \"content\": \"# Full agent markdown...\"\n}"
+    }
+  ]
+}
+```
+
+#### Operation 3: Execute
+
+**Purpose:** Run agent or workflow with user context
+
+**Examples:**
+
+```json
+// Execute agent
+{
+  "operation": "execute",
+  "agent": "analyst",
+  "message": "Help me analyze the market for a SaaS product"
+}
+
+// Execute workflow
+{
+  "operation": "execute",
+  "workflow": "prd",
+  "message": "Create PRD for task management app"
+}
+
+// Execute with module disambiguation
+{
+  "operation": "execute",
+  "agent": "debug",
+  "module": "bmm",
+  "message": "Analyze this bug"
+}
+```
+
+**Response Format:**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "---\n\nagent: analyst\nmenu-item: execute\nuser-prompt: Help me analyze the market\n\n---\n\n[Agent execution prompt with instructions for AI to assume agent role]\n\n**Your role:** You are now Mary, the Business Analyst...\n\n**User request:** Help me analyze the market for a SaaS product\n\n**Instructions:** ...\n"
+    }
+  ]
+}
+```
+
+---
+
+## MCP Resources API
+
+### Resource URI Scheme
+
+**Format:** `bmad://{relative-path}`
+
+**Examples:**
+
+```
+bmad://core/config.yaml
+bmad://bmm/agents/analyst.md
+bmad://bmm/workflows/prd/workflow.yaml
+bmad://bmm/workflows/prd/instructions.md
+bmad://cis/knowledge/brainstorming/scamper.md
+```
+
+### List Resources
+
+**Request:**
+
+```json
+{
+  "method": "resources/list",
+  "params": {}
+}
+```
+
+**Response:**
+
+```json
+{
+  "resources": [
+    {
+      "uri": "bmad://core/config.yaml",
+      "name": "core/config.yaml",
+      "description": "BMAD resource: core/config.yaml",
+      "mimeType": "application/x-yaml"
+    },
+    {
+      "uri": "bmad://bmm/agents/analyst.md",
+      "name": "bmm/agents/analyst.md",
+      "description": "BMAD resource: bmm/agents/analyst.md",
+      "mimeType": "text/markdown"
+    }
+  ]
+}
+```
+
+### Read Resource
+
+**Request:**
+
+```json
+{
+  "method": "resources/read",
+  "params": {
+    "uri": "bmad://core/config.yaml"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "contents": [
+    {
+      "uri": "bmad://core/config.yaml",
+      "mimeType": "application/x-yaml",
+      "text": "# BMAD Core Configuration\nversion: 6.0.0\n..."
+    }
+  ]
+}
+```
+
+### Resource Templates
+
+**Available Templates:**
+
+| Template              | Description          | Example URI                                            |
+| --------------------- | -------------------- | ------------------------------------------------------ |
+| Agent Source          | Agent markdown files | `bmad://{module}/agents/{agent}.md`                    |
+| Workflow Definition   | Workflow YAML config | `bmad://{module}/workflows/{workflow}/workflow.yaml`   |
+| Workflow Instructions | Workflow steps       | `bmad://{module}/workflows/{workflow}/instructions.md` |
+| Workflow Template     | Output template      | `bmad://{module}/workflows/{workflow}/template.md`     |
+| Knowledge Base        | Knowledge articles   | `bmad://{module}/knowledge/{category}/{file}`          |
+| Agent Customization   | Customization config | `bmad://_cfg/agents/{agent}.customize.yaml`            |
+| Core Config           | Core configuration   | `bmad://core/config.yaml`                              |
+
+**Request:**
+
+```json
+{
+  "method": "resources/templates/list",
+  "params": {}
+}
+```
+
+---
+
+## MCP Prompts API
+
+### List Prompts
+
+**Request:**
+
+```json
+{
+  "method": "prompts/list",
+  "params": {}
+}
+```
+
+**Response:**
+
+```json
+{
+  "prompts": [
+    {
+      "name": "agent-execution",
+      "description": "Execute a BMAD agent with context",
+      "arguments": [
+        { "name": "agent", "description": "Agent name", "required": true },
+        { "name": "message", "description": "User message", "required": false }
+      ]
+    },
+    {
+      "name": "workflow-execution",
+      "description": "Execute a BMAD workflow",
+      "arguments": [
+        {
+          "name": "workflow",
+          "description": "Workflow name",
+          "required": true
+        },
+        { "name": "message", "description": "Context", "required": false }
+      ]
+    }
+  ]
+}
+```
+
+### Get Prompt
+
+**Request:**
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "agent-execution",
+    "arguments": {
+      "agent": "analyst",
+      "message": "Help me analyze the market"
+    }
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": {
+        "type": "text",
+        "text": "Execute analyst agent with message: Help me analyze the market"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## MCP Completions API
+
+### Argument Completions
+
+**Request:**
+
+```json
+{
+  "method": "completion/complete",
+  "params": {
+    "ref": {
+      "type": "ref/prompt",
+      "name": "agent-execution"
+    },
+    "argument": {
+      "name": "agent",
+      "value": "ana"
+    }
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "completion": {
+    "values": ["analyst"],
+    "total": 1,
+    "hasMore": false
+  }
+}
+```
+
+---
+
+## TypeScript API (Internal)
+
+### BMADEngine
+
+**Location:** `src/core/bmad-engine.ts`
+
+**Purpose:** Transport-agnostic business logic core
+
+```typescript
+class BMADEngine {
+  constructor(projectRoot?: string, gitRemotes?: string[]);
+
+  // Initialization
+  async initialize(): Promise<void>;
+
+  // List operations
+  async listAgents(filter?: ListFilter): Promise<AgentMetadata[]>;
+  async listWorkflows(filter?: ListFilter): Promise<Workflow[]>;
+  async listModules(): Promise<string[]>;
+  async listResources(pattern?: string): Promise<ResourceFile[]>;
+
+  // Read operations
+  async readAgent(name: string, module?: string): Promise<AgentDefinition>;
+  async readWorkflow(
+    name: string,
+    module?: string,
+  ): Promise<WorkflowDefinition>;
+  async readResource(uri: string): Promise<string>;
+
+  // Execute operations
+  async executeAgent(params: ExecuteParams): Promise<BMADResult>;
+  async executeWorkflow(params: ExecuteParams): Promise<BMADResult>;
+
+  // Search operations
+  async searchAgents(query: string): Promise<AgentMetadata[]>;
+  async searchWorkflows(query: string): Promise<Workflow[]>;
+
+  // Getters
+  getCachedResources(): ResourceFile[];
+  getAgents(): AgentMetadata[];
+  getWorkflows(): Workflow[];
+}
+```
+
+### ResourceLoaderGit
+
+**Location:** `src/core/resource-loader.ts`
+
+**Purpose:** Multi-source BMAD content loading
+
+```typescript
+class ResourceLoaderGit {
+  constructor(projectRoot?: string, gitRemotes?: string[]);
+
+  // Initialization
+  async initialize(): Promise<void>;
+  async loadManifests(): Promise<void>;
+
+  // Discovery
+  getAgent(name: string, module?: string): AgentMetadata | undefined;
+  getWorkflow(name: string, module?: string): Workflow | undefined;
+  getResource(relativePath: string): ResourceFile | undefined;
+
+  // Listing
+  getAllAgents(module?: string): AgentMetadata[];
+  getAllWorkflows(module?: string): Workflow[];
+  getAllResources(pattern?: string): ResourceFile[];
+  getModules(): string[];
+
+  // File operations
+  async readFile(relativePath: string): Promise<string>;
+
+  // Search
+  searchAgents(query: string): AgentMetadata[];
+  searchWorkflows(query: string): Workflow[];
+}
+```
+
+### BMADServerLiteMultiToolGit
+
+**Location:** `src/server.ts`
+
+**Purpose:** MCP server implementation
+
+```typescript
+class BMADServerLiteMultiToolGit {
+  constructor(projectRoot?: string, gitRemotes?: string[]);
+
+  async start(): Promise<void>;
+
+  private setupHandlers(): void;
+  private getMimeType(path: string): string;
+}
+```
+
+---
+
+## Type Definitions
+
+### Core Types
+
+```typescript
+// Agent metadata
+interface AgentMetadata {
+  name: string;
+  displayName: string;
+  title: string;
+  module?: string;
+  description?: string;
+  persona?: string;
+  capabilities?: string[];
+  workflows?: string[];
+}
+
+// Workflow definition
+interface Workflow {
+  name: string;
+  description: string;
+  module: string;
+  standalone?: boolean;
+}
+
+// Resource file
+interface ResourceFile {
+  relativePath: string;
+  fullPath: string;
+  source: 'project' | 'user' | 'git';
+  content?: string;
+}
+
+// Operation result
+interface BMADResult {
+  success: boolean;
+  data?: unknown;
+  error?: string;
+  text: string;
+}
+
+// List filter
+interface ListFilter {
+  module?: string;
+  pattern?: string;
+}
+
+// Execute parameters
+interface ExecuteParams {
+  agent?: string;
+  workflow?: string;
+  message?: string;
+  module?: string;
+}
+```
+
+---
+
+## Error Handling
+
+### Error Response Format
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request",
+    "data": {
+      "details": "Missing required parameter: operation"
+    }
+  }
+}
+```
+
+### Common Error Codes
+
+| Code   | Meaning          | Example                    |
+| ------ | ---------------- | -------------------------- |
+| -32600 | Invalid Request  | Missing required parameter |
+| -32601 | Method not found | Unknown MCP method         |
+| -32602 | Invalid params   | Invalid operation type     |
+| -32603 | Internal error   | File read failure          |
+
+### Validation Errors
+
+**Invalid Operation:**
+
+```json
+{
+  "error": "Invalid operation. Supported: list, read, execute"
+}
+```
+
+**Missing Parameters:**
+
+```json
+{
+  "error": "Missing required parameter: agent name for read operation"
+}
+```
+
+**Not Found:**
+
+```json
+{
+  "error": "Agent 'unknown' not found in any module"
+}
+```
+
+---
+
+## Usage Patterns
+
+### Pattern 1: Discovery → Read → Execute
+
+```typescript
+// 1. Discover available agents
+await bmad({ operation: 'list', query: 'agents' });
+
+// 2. Read agent details
+await bmad({ operation: 'read', type: 'agent', agent: 'analyst' });
+
+// 3. Execute agent
+await bmad({ operation: 'execute', agent: 'analyst', message: 'Help me...' });
+```
+
+### Pattern 2: Direct Execution
+
+```typescript
+// Execute directly if you know the agent
+await bmad({
+  operation: 'execute',
+  agent: 'analyst',
+  message: 'Analyze market for SaaS product',
+});
+```
+
+### Pattern 3: Module Filtering
+
+```typescript
+// List only BMM workflows
+await bmad({ operation: 'list', query: 'workflows', module: 'bmm' });
+
+// Execute with module hint (disambiguation)
+await bmad({ operation: 'execute', agent: 'debug', module: 'bmm' });
+```
+
+---
+
+## Migration from v3.x
+
+### Old Pattern (Tool-per-Agent)
+
+```json
+// v3.x - Multiple tools
+{"name": "bmm-analyst", "arguments": {"message": "Help me"}}
+{"name": "bmm-architect", "arguments": {"message": "Design this"}}
+{"name": "core-john", "arguments": {"message": "Create PRD"}}
+```
+
+### New Pattern (Unified Tool)
+
+```json
+// v4.0 - Single tool with operation
+{"name": "bmad", "arguments": {"operation": "execute", "agent": "analyst", "message": "Help me"}}
+{"name": "bmad", "arguments": {"operation": "execute", "agent": "architect", "message": "Design this"}}
+{"name": "bmad", "arguments": {"operation": "execute", "agent": "pm", "message": "Create PRD"}}
+```
+
+### Benefits of Migration
+
+- ✅ Single tool → easier LLM routing
+- ✅ Consistent parameter structure
+- ✅ Better validation and error messages
+- ✅ Read-only inspection without execution
+- ✅ Discovery without knowing all agent names
+
+---
+
+## Performance
+
+### Latency Expectations
+
+| Operation | First Call | Subsequent Calls            |
+| --------- | ---------- | --------------------------- |
+| List      | ~100-500ms | <10ms (cached)              |
+| Read      | ~50-200ms  | <10ms (cached)              |
+| Execute   | ~100-500ms | Variable (depends on agent) |
+
+### Caching Strategy
+
+- **Manifests:** Loaded once on initialization, cached in memory
+- **Resources:** Lazy-loaded on read, cached in memory
+- **Git clones:** Cached on disk at `~/.bmad/cache/git/`
+
+---
+
+## Testing the API
+
+### Using Scripts
+
+```bash
+# List all tools
+npm run cli:list-tools
+
+# List agents
+npm run cli:list-agents
+
+# List workflows
+npm run cli:list-workflows
+
+# Test tool execution
+node scripts/test-tool-output.mjs
+```
+
+### Using Test Suite
+
+```bash
+# Run all tests
+npm run test
+
+# Run integration tests
+npm run test:integration
+
+# Run e2e tests
+npm run test:e2e
+```
+
+---
+
+## References
+
+- **MCP Specification:** https://modelcontextprotocol.io/specification/
+- **MCP SDK:** https://github.com/modelcontextprotocol/typescript-sdk
+- **BMAD Method:** https://github.com/bmad-code-org/BMAD-METHOD
+
+          "description": "What to search (for operation=search). Default: all"
+        }
+      },
+      "required": ["operation"]
+
+  }
+  }
+
+````
 
 #### Operation Examples
 
@@ -223,7 +790,7 @@ The BMAD MCP Server exposes two types of APIs:
     }
   }
 }
-```
+````
 
 **List workflow files:**
 
