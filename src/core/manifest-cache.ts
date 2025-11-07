@@ -19,6 +19,8 @@ import { pathExists } from 'fs-extra';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { parse as parseCsv } from 'csv-parse/sync';
 import type { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
 
@@ -78,6 +80,7 @@ export class ManifestCache {
   private resourceLoader: ResourceLoaderGit;
   private cache: Map<string, CachedManifests>;
   private manifestTTL: number;
+  private cacheDir: string;
 
   /**
    * Create a new ManifestCache
@@ -88,6 +91,7 @@ export class ManifestCache {
     this.resourceLoader = resourceLoader;
     this.cache = new Map();
     this.manifestTTL = parseInt(process.env.BMAD_MANIFEST_TTL || '300000', 10); // 5 minutes default
+    this.cacheDir = join(homedir(), '.bmad', 'cache', 'manifests');
   }
 
   /**
@@ -108,10 +112,15 @@ export class ManifestCache {
       }
     }
 
-    return this.deduplicateByPriority(
+    const deduplicated = this.deduplicateByPriority(
       allAgents,
       (agent) => `${agent.module || 'core'}:${agent.name}`,
     );
+
+    // Write merged results to cache for visibility
+    await this.writeMergedManifests({ agents: deduplicated });
+
+    return deduplicated;
   }
 
   /**
@@ -132,10 +141,15 @@ export class ManifestCache {
       }
     }
 
-    return this.deduplicateByPriority(
+    const deduplicated = this.deduplicateByPriority(
       allWorkflows,
       (workflow) => `${workflow.module}:${workflow.name}`,
     );
+
+    // Write merged results to cache for visibility
+    await this.writeMergedManifests({ workflows: deduplicated });
+
+    return deduplicated;
   }
 
   /**
@@ -185,7 +199,7 @@ export class ManifestCache {
   /**
    * Ensure manifests exist and are fresh for a bmad_root
    *
-   * @param bmadRoot - Path to check
+   * @param bmadRoot - Source path
    */
   private async ensureManifests(bmadRoot: string): Promise<void> {
     // Check if in-memory cache is fresh
@@ -193,22 +207,25 @@ export class ManifestCache {
       return;
     }
 
-    // Check if disk manifests are fresh
-    const manifestPath = join(bmadRoot, '_cfg', 'manifest.yaml');
+    // Check if cached disk manifests are fresh
+    const cacheDir = this.getCacheDir(bmadRoot);
+    const manifestPath = join(cacheDir, '_cfg', 'manifest.yaml');
     if (await this.isManifestFresh(manifestPath)) {
       return;
     }
 
-    // Generate new manifests
+    // Generate new manifests to cache
     await this.generateManifests(bmadRoot);
   }
 
   /**
    * Generate manifests for a bmad_root using ManifestGenerator
    *
-   * @param bmadRoot - Path to bmad_root
+   * @param bmadRoot - Source path (temporarily writes here, then moves to cache)
    */
   private async generateManifests(bmadRoot: string): Promise<void> {
+    const { mkdir, rename, rm } = await import('node:fs/promises');
+
     // Import ManifestGenerator dynamically to avoid startup cost
     // Resolve the package path and construct the correct generator path
     const pkgPath = import.meta.resolve('bmad-method');
@@ -232,18 +249,52 @@ export class ManifestCache {
     // Build complete file list
     const files = await this.walkDirectory(bmadRoot);
 
-    // Generate manifests
+    // Generate manifests to SOURCE (ManifestGenerator limitation)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await generator.generateManifests(bmadRoot, modules, files, {
       ides: [],
       preservedModules: [],
     });
+
+    // Now MOVE manifests from source/_cfg to cache/_cfg
+    const sourceCfg = join(bmadRoot, '_cfg');
+    const cacheDir = this.getCacheDir(bmadRoot);
+    const cacheCfg = join(cacheDir, '_cfg');
+
+    // Ensure cache directory exists
+    await mkdir(cacheCfg, { recursive: true });
+
+    // Move manifest files to cache
+    const manifestFiles = [
+      'agent-manifest.csv',
+      'workflow-manifest.csv',
+      'task-manifest.csv',
+      'tool-manifest.csv',
+      'files-manifest.csv',
+      'manifest.yaml',
+    ];
+
+    for (const file of manifestFiles) {
+      const sourcePath = join(sourceCfg, file);
+      const cachePath = join(cacheCfg, file);
+
+      if (await pathExists(sourcePath)) {
+        await rename(sourcePath, cachePath);
+      }
+    }
+
+    // Clean up empty _cfg directory from source if it was created
+    try {
+      await rm(sourceCfg, { recursive: true, force: true });
+    } catch {
+      // Ignore if directory doesn't exist or can't be removed
+    }
   }
 
   /**
    * Load manifests from disk and cache them
    *
-   * @param bmadRoot - Path to bmad_root
+   * @param bmadRoot - Source path (we read from cache, not source!)
    * @returns Cached manifests
    */
   private async loadManifests(bmadRoot: string): Promise<CachedManifests> {
@@ -252,7 +303,9 @@ export class ManifestCache {
       return cached;
     }
 
-    const cfgDir = join(bmadRoot, '_cfg');
+    // Read from CACHE directory, not source!
+    const cacheDir = this.getCacheDir(bmadRoot);
+    const cfgDir = join(cacheDir, '_cfg');
 
     const manifests: CachedManifests = {
       agents: await this.loadAgentManifest(cfgDir),
@@ -529,6 +582,85 @@ export class ManifestCache {
       return age < this.manifestTTL;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Get hash for a source path (for cache directory naming)
+   *
+   * @param sourcePath - Path to hash
+   * @returns SHA256 hash (first 12 characters)
+   */
+  private getSourceHash(sourcePath: string): string {
+    return createHash('sha256')
+      .update(sourcePath)
+      .digest('hex')
+      .substring(0, 12);
+  }
+
+  /**
+   * Get cache directory for a specific source
+   *
+   * @param sourcePath - Source bmad_root path
+   * @returns Cache directory path for this source
+   */
+  private getCacheDir(sourcePath: string): string {
+    const hash = this.getSourceHash(sourcePath);
+    return join(this.cacheDir, hash);
+  }
+
+  /**
+   * Get merged manifests cache directory
+   *
+   * @returns Path to merged manifests directory
+   */
+  private getMergedCacheDir(): string {
+    return join(this.cacheDir, 'merged');
+  }
+
+  /**
+   * Write merged/deduplicated manifests to cache for visibility
+   *
+   * @param manifests - Partial manifests to write
+   */
+  private async writeMergedManifests(manifests: {
+    agents?: AgentMetadata[];
+    workflows?: Workflow[];
+  }): Promise<void> {
+    const mergedDir = this.getMergedCacheDir();
+    const { mkdir, writeFile } = await import('node:fs/promises');
+
+    try {
+      await mkdir(mergedDir, { recursive: true });
+
+      if (manifests.agents) {
+        const csvLines = ['name,displayName,title,module,role,description'];
+        for (const agent of manifests.agents) {
+          csvLines.push(
+            `"${agent.name}","${agent.displayName || ''}","${agent.title || ''}","${agent.module || 'core'}","${agent.role || ''}","${agent.description || ''}"`,
+          );
+        }
+        await writeFile(
+          join(mergedDir, 'agent-manifest.csv'),
+          csvLines.join('\n'),
+        );
+      }
+
+      if (manifests.workflows) {
+        const csvLines = ['name,description,module,path,trigger,standalone'];
+        for (const workflow of manifests.workflows) {
+          csvLines.push(
+            `"${workflow.name}","${workflow.description}","${workflow.module}","${workflow.path}","${workflow.trigger || ''}","${workflow.standalone}"`,
+          );
+        }
+        await writeFile(
+          join(mergedDir, 'workflow-manifest.csv'),
+          csvLines.join('\n'),
+        );
+      }
+    } catch (error) {
+      // Don't fail if we can't write merged manifests - they're just for visibility
+      console.warn('Failed to write merged manifests:', error);
     }
   }
 }
