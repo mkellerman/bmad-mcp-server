@@ -568,30 +568,52 @@ git config --list
 
 ## Release Process
 
-### Semantic Release
+This project uses an **automated draft-based release workflow** with conventional commits.
 
-This project uses semantic-release for automated versioning.
+**For Maintainers:** See [Release Process Documentation](../.github/RELEASE_PROCESS.md) for complete release workflow.
 
-**Configuration:** `.releaserc.json`
+### Quick Overview
 
-```json
-{
-  "branches": ["main"],
-  "plugins": [
-    "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
-    "@semantic-release/changelog",
-    "@semantic-release/npm",
-    "@semantic-release/git"
-  ]
-}
+1. **Merge PR to main** → Automatic pre-release created with `@alpha` npm tag
+2. **Test alpha version** → `npm install bmad-mcp-server@alpha`
+3. **Create full release** → Manual release creation publishes to `@latest`
+
+### Commit Message Format
+
+Versions are determined automatically from commit messages using [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Commit Type                   | Version Bump              | Example                 |
+| ----------------------------- | ------------------------- | ----------------------- |
+| `feat!:` or `BREAKING CHANGE` | **Major** (3.0.0 → 4.0.0) | `feat!: redesign API`   |
+| `feat:`                       | **Minor** (3.0.0 → 3.1.0) | `feat: add new command` |
+| `fix:`                        | **Patch** (3.0.0 → 3.0.1) | `fix: resolve bug`      |
+| `docs:`, `chore:`, etc.       | **None**                  | No release created      |
+
+### Developer Workflow
+
+```bash
+# 1. Create PR with conventional commit title
+git checkout -b feat/my-feature
+git commit -m "feat: add amazing feature"
+git push origin feat/my-feature
+
+# 2. Merge PR → Auto-creates pre-release
+# GitHub Actions will:
+# - Run CI tests
+# - Publish to npm @alpha
+# - Create GitHub pre-release
+
+# 3. Test the alpha version (optional)
+npm install bmad-mcp-server@alpha
+
+# 4. Maintainer creates full release
+# (See Release Process docs)
 ```
 
-**Versioning:**
+**Related Documentation:**
 
-- `feat:` commits → minor version bump (0.x.0)
-- `fix:` commits → patch version bump (0.0.x)
-- `BREAKING CHANGE:` → major version bump (x.0.0)
+- [Complete Release Process](../.github/RELEASE_PROCESS.md) - Full release workflow
+- [Release Workflow Diagram](../.github/RELEASE_WORKFLOW_DIAGRAM.md) - Visual workflow
 
 ---
 
@@ -645,6 +667,8 @@ node --inspect build/index.js
 - [Architecture](./architecture.md) - System design
 - [API Contracts](./api-contracts.md) - MCP tools and TypeScript APIs
 - [README](../README.md) - Project overview
+- [Release Process](../.github/RELEASE_PROCESS.md) - Release workflow for maintainers
+- [Release Workflow Diagram](../.github/RELEASE_WORKFLOW_DIAGRAM.md) - Visual workflow diagrams
 
 ### External Links
 

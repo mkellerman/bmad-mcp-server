@@ -149,9 +149,9 @@ jobs:
 
           # Create release notes
           cat > release-notes.md <<EOF
-          ## 🧪 Alpha Release for Testing
+          ## 🧪 Alpha Pre-release for Testing
 
-          This is a **draft release** published to npm with the \`@alpha\` tag for testing.
+          This is a **pre-release** published to npm with the \`@alpha\` tag for testing.
 
           ### Installation
           \`\`\`bash
@@ -164,14 +164,14 @@ jobs:
           ### Next Steps
           1. Test this alpha version in your projects
           2. Report any issues in this repository
-          3. When ready, **publish this draft** to promote to stable release
+          3. When ready, **create a full release** to promote to stable
 
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...v${{ steps.next_version.outputs.alpha_version }}
           EOF
 
           echo "Generated release notes"
 
-      - name: Create draft GitHub release
+      - name: Create pre-release on GitHub
         if: steps.version.outputs.bump != 'none'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -179,7 +179,6 @@ jobs:
           gh release create ${{ steps.next_version.outputs.tag }} \
             --title "v${{ steps.next_version.outputs.version }}" \
             --notes-file release-notes.md \
-            --draft \
             --prerelease
 
       - name: Comment on skipped release
