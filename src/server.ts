@@ -14,6 +14,7 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
+  CompleteRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { SERVER_CONFIG } from './config.js';
@@ -47,6 +48,7 @@ export class BMADServerLiteMultiToolGit {
             listChanged: false,
           },
           prompts: {},
+          completions: {},
         },
       },
     );
@@ -255,6 +257,86 @@ export class BMADServerLiteMultiToolGit {
           role: 'user' as const,
           content: c,
         })),
+      };
+    });
+
+    // Provide completions for prompts and resources
+    this.server.setRequestHandler(CompleteRequestSchema, async (request) => {
+      await this.initialize();
+
+      const { ref, argument } = request.params;
+
+      // Complete prompt names (agents)
+      if (ref.type === 'ref/prompt') {
+        const agents = this.engine.getAgentMetadata();
+        const partialValue = argument.value.toLowerCase();
+
+        const matches = agents
+          .filter((agent) => {
+            const promptName = agent.module
+              ? `${agent.module}.${agent.name}`
+              : `bmad.${agent.name}`;
+            return promptName.toLowerCase().includes(partialValue);
+          })
+          .map((agent) => {
+            const promptName = agent.module
+              ? `${agent.module}.${agent.name}`
+              : `bmad.${agent.name}`;
+            return promptName;
+          })
+          .slice(0, 20); // Limit to 20 results
+
+        return {
+          completion: {
+            values: matches,
+            total: matches.length,
+            hasMore: false,
+          },
+        };
+      }
+
+      // Complete resource URIs
+      if (ref.type === 'ref/resource') {
+        const resources = this.engine.getCachedResources();
+        const partialValue = argument.value.toLowerCase();
+
+        // If completing a template URI, provide template-based suggestions
+        if (partialValue.includes('{') || partialValue.includes('}')) {
+          // Template completion - suggest parameter values
+          return {
+            completion: {
+              values: [],
+              total: 0,
+              hasMore: false,
+            },
+          };
+        }
+
+        // Match against actual resource paths
+        const matches = resources
+          .filter((resource) => {
+            const uri = `bmad://${resource.relativePath}`;
+            return uri.toLowerCase().includes(partialValue);
+          })
+          .map((resource) => `bmad://${resource.relativePath}`)
+          .slice(0, 20);
+
+        return {
+          completion: {
+            values: matches,
+            total: matches.length,
+            hasMore: resources.length > matches.length,
+          },
+        };
+      }
+
+      // No completions available for other types
+      return {
+        completion: {
+          values: [],
+          total: 0,
+          hasMore: false,
+        },
       };
     });
   }

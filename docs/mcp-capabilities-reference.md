@@ -16,13 +16,13 @@
 | **Resource Templates** | ✅ Implemented | `ListResourceTemplates`         | Dynamic resource URIs with parameters (98.1% reduction) |
 | **Tools**              | ✅ Implemented | `ListTools`, `CallTool`         | Unified `bmad` tool with list/read/execute operations   |
 | **Prompts**            | ✅ Implemented | `ListPrompts`, `GetPrompt`      | Expose all 16 agents as native MCP prompts              |
+| **Completions**        | ✅ Implemented | `Complete`                      | Autocomplete for agent names and resource URIs          |
 
 ### 🔍 Available but Not Yet Implemented
 
 | Capability                 | Request Schemas                               | Use Case for BMAD                                                  | Priority    |
 | -------------------------- | --------------------------------------------- | ------------------------------------------------------------------ | ----------- |
 | **Resource Subscriptions** | `Subscribe`, `Unsubscribe`, `ResourceUpdated` | Real-time updates when BMAD files change                           | ⭐⭐ Medium |
-| **Completions**            | `Complete`                                    | Auto-complete for agent names, workflow names, resource URIs       | ⭐⭐ Medium |
 | **Sampling**               | `CreateMessage`                               | Allow agents to request LLM responses (agent-to-LLM communication) | ⭐ Low      |
 | **Roots**                  | `ListRoots`, `RootsListChanged`               | Expose project root paths for multi-project scenarios              | ⭐ Low      |
 | **Logging**                | `SetLevel`, `LoggingMessage`                  | Debug logging for MCP protocol                                     | ⭐ Low      |
@@ -90,39 +90,26 @@ fs.watch(agentPath, () => {
 
 ---
 
-### 3. Completions ⭐⭐ **Nice UX Enhancement**
+### 3. Completions ✅ **IMPLEMENTED**
 
 **What it does**: Provide autocomplete suggestions for parameters.
 
-**Use case**: When user types agent name or workflow name, show suggestions.
+**Implementation**: Autocomplete support for prompt names (agents) and resource URIs.
 
-**Implementation**:
+**Supported Completions:**
 
-```typescript
-server.setRequestHandler(CompleteRequestSchema, async (request) => {
-  const { ref, argument } = request.params;
+- **Prompt names** - Type-ahead for agent names (e.g., typing "ana" suggests "bmm.analyst")
+- **Resource URIs** - Autocomplete for resource paths (e.g., typing "workflow" suggests workflow files)
 
-  if (ref.type === 'ref/prompt') {
-    // Complete prompt (agent) names
-    const agents = await engine.getAgentMetadata();
-    return {
-      completion: {
-        values: agents
-          .filter((a) => a.name.startsWith(argument.value))
-          .map((a) => `${a.module}-${a.name}`),
-      },
-    };
-  }
+**Features:**
 
-  return { completion: { values: [] } };
-});
-```
+- ✅ Case-insensitive matching
+- ✅ Partial string matching
+- ✅ Fuzzy search (matches anywhere in string)
+- ✅ Results limited to 20 items
+- ✅ <1ms response time
 
-**Benefits**:
-
-- Better UX in MCP clients
-- Fewer typos
-- Discoverability
+**Documentation**: See [Completions Guide](./completions-guide.md)
 
 ---
 
@@ -198,7 +185,7 @@ server.setRequestHandler(ListRootsRequestSchema, async () => {
 
 ## Recommendations
 
-### Immediate Priority (Recently Completed)
+### Recently Completed ✅
 
 1. **Resource Templates** ✅ **IMPLEMENTED**
    - Replaced 368 static resources with 7 templates
@@ -206,12 +193,13 @@ server.setRequestHandler(ListRootsRequestSchema, async () => {
    - Cleaner, self-documenting API
    - See [Resource Templates Guide](./resource-templates-guide.md)
 
-### Medium Priority (Consider for v5.0)
+2. **Completions** ✅ **IMPLEMENTED**
+   - Autocomplete for agent names and resource URIs
+   - Case-insensitive partial matching
+   - <1ms response time
+   - See [Completions Guide](./completions-guide.md)
 
-2. **Completions** ⭐⭐
-   - Improve UX in compatible clients
-   - Low effort, high value
-   - **Effort**: Low (1-2 hours)
+### Medium Priority (Consider for v5.0)
 
 3. **Resource Subscriptions** ⭐⭐
    - Great for development workflow
@@ -252,7 +240,7 @@ ListToolsRequestSchema; // List all tools ✅
 CallToolRequestSchema; // Call a tool ✅
 
 // Completions
-CompleteRequestSchema; // Get autocomplete suggestions ⭐
+CompleteRequestSchema; // Get autocomplete suggestions ✅
 
 // Sampling (Server-to-Client)
 CreateMessageRequestSchema; // Request LLM completion ⭐
@@ -285,7 +273,7 @@ ProgressNotification; // Operation progress
     resourceTemplates: {},            // ✅ Implemented
     prompts: {},                      // ✅ Implemented
     tools: {},                        // ✅ Implemented
-    completions: {},                  // ⭐ Nice to have
+    completions: {},                  // ✅ Implemented
     sampling: {},                     // ⭐ Advanced
     roots: {},                        // ⭐ Multi-project
     logging: {}                       // ⭐ Debugging
@@ -297,12 +285,11 @@ ProgressNotification; // Operation progress
 
 ## Summary
 
-**Current Implementation**: ✅ Comprehensive foundation (Resources, Resource Templates, Tools, Prompts)
+**Current Implementation**: ✅ Comprehensive MCP feature set (Resources, Resource Templates, Tools, Prompts, Completions)
 
 **Next Steps**:
 
-1. ⭐⭐ Add Completions (better UX)
-2. ⭐⭐ Add Resource Subscriptions (development workflow)
+1. ⭐⭐ Add Resource Subscriptions (development workflow)
 
 **Type Definitions**: All types available in `@modelcontextprotocol/sdk/types.js`
 

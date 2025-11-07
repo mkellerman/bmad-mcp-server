@@ -133,6 +133,7 @@ bmad *ux-spec         # Create UX specifications
 
 - **🎯 MCP Prompts** - All 16 agents as native prompts ([Guide](./docs/prompts-guide.md))
 - **📦 Resource Templates** - 98% reduction in exposed resources via parameterized URIs ([Guide](./docs/resource-templates-guide.md))
+- **⌨️ Completions** - Smart autocomplete for agent names and resource URIs ([Guide](./docs/completions-guide.md))
 - **🔧 Unified Tool** - Single `bmad` tool with list/read/execute operations
 - **📚 368 Resources** - Direct access to all BMAD files via `bmad://` URIs
 
