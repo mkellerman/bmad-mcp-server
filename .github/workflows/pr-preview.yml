@@ -88,17 +88,8 @@ jobs:
 
           ### Testing this preview
 
-          **Option 1: Using npx (recommended for MCP servers)**
-          ```bash
-          npx -y git+https://github.com/mkellerman/bmad-mcp-server#${{ steps.create_tag.outputs.tag_name }}
-          ```
+          Add this to your MCP configuration file:
 
-          **Option 2: Install as dependency**
-          ```bash
-          npm install mkellerman/bmad-mcp-server#${{ steps.create_tag.outputs.tag_name }}
-          ```
-
-          **For MCP configuration (Claude Desktop, VS Code, etc.):**
           ```json
           {
             "mcpServers": {
@@ -138,17 +129,8 @@ jobs:
 
             ### Test this PR
 
-            **Using npx (recommended for MCP servers):**
-            \`\`\`bash
-            npx -y git+https://github.com/${{ github.repository }}#${tag}
-            \`\`\`
+            Add this to your MCP configuration file:
 
-            **Or install as dependency:**
-            \`\`\`bash
-            npm install mkellerman/bmad-mcp-server#${tag}
-            \`\`\`
-
-            **MCP Configuration:**
             \`\`\`json
             {
               "mcpServers": {
