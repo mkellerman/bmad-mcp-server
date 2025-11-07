@@ -10,6 +10,7 @@
  * - Workflow execution instructions
  * - Resource access guidelines
  * - Default configuration values
+ * - Feature flags (e.g., enable search operation)
  */
 
 /**
@@ -21,66 +22,27 @@ export const SERVER_CONFIG = {
 } as const;
 
 /**
- * Tool name constants
+ * Feature flags
+ *
+ * To enable the search operation in the unified BMAD tool, pass config to createBMADTool:
+ * ```typescript
+ * createBMADTool(agents, workflows, { enableSearch: true })
+ * ```
  */
-export const TOOL_NAMES = {
-  workflow: 'bmad-workflow',
-  resources: 'bmad-resources',
+export const FEATURE_FLAGS = {
+  /** Enable search operation in unified BMAD tool (default: false) */
+  enableSearch: false,
 } as const;
 
 /**
  * Default BMAD configuration values
  * These are used when user hasn't customized their config.yaml
+```
  */
 export const DEFAULT_BMAD_CONFIG = {
   user_name: 'User',
   communication_language: 'English',
   output_folder: './docs',
-} as const;
-
-/**
- * Get comprehensive description for the bmad-resources tool
- *
- * This provides detailed guidance on how to use the bmad-resources tool,
- * including URI format, available operations, and common file paths.
- * Used in MCP tool listings to give LLMs complete context upfront.
- *
- * @returns Formatted tool description with usage examples and guidelines
- */
-export function getBMADResourcesToolDescription(): string {
-  return `Access BMAD resources: read files, discover modules/agents/workflows, search by name/description. This is the primary tool for exploring and accessing BMAD content.
-
-**CRITICAL USAGE RULES:**
-- ✅ USE this tool to access ALL BMAD files
-- ❌ DO NOT use MCP Resources API (not supported in all clients)
-- ❌ DO NOT search user's workspace for BMAD files
-- ❌ DO NOT use filesystem paths like ./bmad/ or {project-root}/bmad/
-
-**URI Format:** All BMAD resources use bmad:// scheme
-- Format: bmad://{module}/{path} or bmad://core/{path}
-- Example: bmad://core/config.yaml
-
-**Available Operations:**
-- read - Load specific file: { operation: "read", uri: "bmad://core/config.yaml" }
-- list - Discover files: { operation: "list", pattern: "core/**/*.yaml" }
-- modules - Show all modules: { operation: "modules" }
-- agents - List agents: { operation: "agents" }
-- workflows - List workflows: { operation: "workflows" }
-- search - Find resources: { operation: "search", query: "debug", type: "agents" }
-
-**Common Files:**
-- bmad://core/config.yaml - User configuration
-- bmad://_cfg/agent-manifest.csv - All agents metadata
-- bmad://_cfg/workflow-manifest.csv - All workflows metadata`;
-}
-
-/**
- * Tool descriptions for MCP tool listings
- */
-export const TOOL_DESCRIPTIONS = {
-  workflow:
-    'Execute BMAD workflows like prd, architecture, debug-inspect, etc.',
-  resources: getBMADResourcesToolDescription(),
 } as const;
 
 /**

@@ -38,21 +38,27 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
   });
 
   it('should respond in persona after loading architect', async () => {
-    // 1) Load the architect agent via MCP tool
-    const load = await mcpClient.callTool('bmm-architect', {
-      message: 'What is your name and what are your duties?',
+    // 1) Read the architect agent definition via MCP unified tool
+    const load = await mcpClient.callTool('bmad', {
+      operation: 'read',
+      type: 'agent',
+      agent: 'architect',
     });
     if (load.isError) {
       console.log('Tool call error:', load.content);
     }
     expect(load.isError).toBe(false);
-    expect(load.content).toContain('instructions');
+
+    // Parse JSON response to get agent definition
+    const agentDef = JSON.parse(load.content);
+    expect(agentDef.content).toBeDefined();
+    expect(agentDef.content).toContain('instructions');
 
     // 2) Ask the LLM a question with the agent content as system context
     const completion = await llm.chat(
       process.env.LLM_MODEL || 'gpt-4.1',
       [
-        { role: 'system', content: load.content },
+        { role: 'system', content: agentDef.content },
         {
           role: 'user',
           content: 'What is your name and what are your duties?',

@@ -129,6 +129,13 @@ bmad *ux-spec         # Create UX specifications
 - **Cursor** - Native compatibility
 - **Any MCP Client** - Standard protocol
 
+### Advanced MCP Features
+
+- **🎯 MCP Prompts** - All 16 agents as native prompts ([Guide](./docs/prompts-guide.md))
+- **📦 Resource Templates** - 98% reduction in exposed resources via parameterized URIs ([Guide](./docs/resource-templates-guide.md))
+- **🔧 Unified Tool** - Single `bmad` tool with list/read/execute operations
+- **📚 368 Resources** - Direct access to all BMAD files via `bmad://` URIs
+
 ### Flexible When You Need It
 
 **Global by default:**
@@ -255,7 +262,7 @@ bmad tea "What test cases am I missing?"
 
 Every command works in every project. No setup, no configuration, just results.
 
-## � Key Features
+## 🎯 Key Features
 
 - **🎭 Role-Based Expertise** - Agents maintain consistent personality and domain knowledge
 - **🔄 Workflow Automation** - Multi-step processes become single commands
@@ -264,11 +271,13 @@ Every command works in every project. No setup, no configuration, just results.
 - **🔒 Privacy-First** - Runs locally, your code stays on your machine
 - **⚡ Zero Overhead** - No API keys, no accounts, install and use immediately
 - **🌐 Universal Access** - One configuration, unlimited projects
+- **💬 MCP Prompts** - Agents exposed as native MCP prompts for easy activation
 
 ## 📚 Documentation
 
 - **[Installation Guide](./docs/installation.md)** - Complete setup instructions for all platforms
 - **[Development Guide](./docs/development.md)** - Contributing and local development
+- **[Prompts Guide](./docs/prompts-guide.md)** - Using agents as MCP prompts
 - **[Troubleshooting](./docs/troubleshooting.md)** - Solutions to common issues
 - **[Release Process](./docs/release-process.md)** - Versioning and publishing guide
 

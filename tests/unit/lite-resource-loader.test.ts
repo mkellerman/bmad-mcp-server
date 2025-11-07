@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ResourceLoaderGit } from '../../src/resource-loader.js';
+import { ResourceLoaderGit } from '../../src/core/resource-loader.js';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

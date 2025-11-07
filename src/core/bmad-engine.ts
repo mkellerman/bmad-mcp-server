@@ -17,7 +17,7 @@
  * 3. **Execute Operations**: Running agents and workflows (performs actions)
  */
 
-import { ResourceLoaderGit, AgentMetadata } from '../resource-loader.js';
+import { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
 import type { Workflow } from '../types/index.js';
 import { getAgentInstructions, getWorkflowInstructions } from '../config.js';
 
@@ -667,6 +667,11 @@ ${resource.content}
       agent.workflows.forEach((w) => lines.push(`- ${w}`));
     }
 
+    // Include full agent content (instructions/template)
+    if (agent.content) {
+      lines.push('', '---', '', agent.content);
+    }
+
     return lines.join('\n');
   }
 
@@ -734,5 +739,37 @@ ${resource.content}
     }
 
     return lines.join('\n');
+  }
+
+  // ============================================================================
+  // PUBLIC GETTERS (For MCP Server and other consumers)
+  // ============================================================================
+
+  /**
+   * Get agent metadata (requires initialization)
+   */
+  getAgentMetadata(): AgentMetadata[] {
+    return this.agentMetadata;
+  }
+
+  /**
+   * Get workflow metadata (requires initialization)
+   */
+  getWorkflowMetadata(): Workflow[] {
+    return this.workflows;
+  }
+
+  /**
+   * Get cached resources (requires initialization)
+   */
+  getCachedResources(): Array<{ uri: string; relativePath: string }> {
+    return this.cachedResources;
+  }
+
+  /**
+   * Get the underlying ResourceLoaderGit instance
+   */
+  getLoader(): ResourceLoaderGit {
+    return this.loader;
   }
 }

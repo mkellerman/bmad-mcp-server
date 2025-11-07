@@ -39,8 +39,8 @@ import { homedir } from 'node:os';
 import { load as parseYaml } from 'js-yaml';
 import { XMLParser } from 'fast-xml-parser';
 import { parse as parseCsv } from 'csv-parse/sync';
-import { GitSourceResolver } from './utils/git-source-resolver.js';
-import type { Workflow } from './types/index.js';
+import { GitSourceResolver } from '../utils/git-source-resolver.js';
+import type { Workflow } from '../types/index.js';
 
 /**
  * Constants for resource loading

@@ -136,57 +136,49 @@ function analyzeLLMResponse(response: string): {
 /**
  * Parse agent list from bmad-resources response (v4 format)
  */
+/**
+ * Parse agent list from bmad tool response (JSON format)
+ */
 function parseAgentList(content: string): AgentInfo[] {
-  const agents: AgentInfo[] = [];
+  try {
+    // New unified tool returns JSON array
+    const data = JSON.parse(content);
 
-  // New v4 format from bmad-resources:
-  // **bmm-analyst** - Mary (Business Analyst)
-  // **bmm-architect** - Winston (Architect)
-  const v4Pattern = /\*\*([a-z]+-[a-z-]+)\*\*\s*-\s*([^(]+)\(([^)]+)\)/gm;
+    if (Array.isArray(data)) {
+      return data.map((a: any) => ({
+        name: a.toolName || a.name, // toolName for backward compat
+        module: a.module,
+        title: `${a.displayName} (${a.title})`,
+      }));
+    }
 
-  let match;
-  while ((match = v4Pattern.exec(content)) !== null) {
-    const toolName = match[1]; // e.g., "bmm-analyst"
-    const displayName = match[2].trim(); // e.g., "Mary"
-    const title = match[3].trim(); // e.g., "Business Analyst"
-
-    // Extract module from tool name (e.g., "bmm" from "bmm-analyst")
-    const moduleParts = toolName.split('-');
-    const module = moduleParts[0]; // First part is the module
-
-    agents.push({
-      name: toolName,
-      module,
-      title: `${displayName} (${title})`,
-    });
+    return [];
+  } catch (error) {
+    console.error('Failed to parse agent list:', error);
+    return [];
   }
-
-  return agents;
 }
 
 /**
- * Parse workflow list from bmad-resources response (v4 format)
+ * Parse workflow list from bmad tool response (JSON format)
  */
 function parseWorkflowList(content: string): WorkflowInfo[] {
-  const workflows: WorkflowInfo[] = [];
+  try {
+    // New unified tool returns JSON array
+    const data = JSON.parse(content);
 
-  // New v4 format from bmad-resources:
-  // - **party-mode**: Group chat with all agents
-  // - **audit-workflow**: Audit existing workflows...
-  const v4Pattern = /^-\s+\*\*([a-z0-9-]+)\*\*:\s*(.+)$/gm;
+    if (Array.isArray(data)) {
+      return data.map((w: any) => ({
+        name: w.name,
+        path: w.name, // In v4, workflow name is the identifier
+      }));
+    }
 
-  let match;
-  while ((match = v4Pattern.exec(content)) !== null) {
-    const name = match[1]; // e.g., "party-mode"
-    // match[2] contains the description, not currently used
-
-    workflows.push({
-      name,
-      path: name, // In v4, workflow name is the identifier
-    });
+    return [];
+  } catch (error) {
+    console.error('Failed to parse workflow list:', error);
+    return [];
   }
-
-  return workflows;
 }
 
 /**
@@ -268,8 +260,9 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
 
   describe('Discovery Commands', () => {
     it('should list all agents via *list-agents', async () => {
-      const result = await mcpClient.callTool('bmad-resources', {
-        operation: 'agents',
+      const result = await mcpClient.callTool('bmad', {
+        operation: 'list',
+        query: 'agents',
       });
 
       expect(result.isError).toBe(false);
@@ -283,8 +276,9 @@ describe.skipIf(skipE2E)('Agent and Workflow Validation', () => {
     });
 
     it('should list all workflows via *list-workflows', async () => {
-      const result = await mcpClient.callTool('bmad-resources', {
-        operation: 'workflows',
+      const result = await mcpClient.callTool('bmad', {
+        operation: 'list',
+        query: 'workflows',
       });
 
       expect(result.isError).toBe(false);

@@ -87,6 +87,7 @@ export {
   createBMADTool,
   handleBMADTool,
   type BMADToolParams,
+  type BMADToolConfig,
 } from './bmad-unified.js';
 
 // Re-export operations for testing and advanced usage
