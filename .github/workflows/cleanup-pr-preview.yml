@@ -1,0 +1,41 @@
+name: Cleanup PR Preview
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete PR Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Delete preview release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          TAG_NAME="pr-${PR_NUMBER}"
+
+          echo "Cleaning up preview for PR #${PR_NUMBER}"
+
+          # Delete the GitHub Release if it exists
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Deleting GitHub release: $TAG_NAME"
+            gh release delete "$TAG_NAME" --yes 2>/dev/null || true
+          fi
+
+          # Delete the tag
+          echo "Deleting tag: $TAG_NAME"
+          git push origin ":refs/tags/$TAG_NAME" 2>/dev/null || true
+
+          echo "✅ Cleanup complete for PR #${PR_NUMBER}"

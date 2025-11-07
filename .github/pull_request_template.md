@@ -1,15 +1,33 @@
 ## Summary
 
--
+<!-- Brief description of what this PR does -->
 
-## Testing
+## What type of change is this?
 
-- [ ] npm run lint
-- [ ] npm test
-- [ ] npm run build
-- [ ] Other:
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+- [ ] Refactor/cleanup
 
-## Risk & Rollback Plan
+## PR Title Format
 
-- Risk level: Low / Medium / High
-- Rollback plan:
+Use conventional commits (version auto-detected from title):
+
+- `fix: description` → patch (v4.0.x)
+- `feat: description` → minor (v4.x.0)
+- `feat!: description` → major (vx.0.0)
+- `docs:` / `chore:` → no release
+
+## Does this introduce breaking changes?
+
+- [ ] No
+- [ ] Yes (describe migration path below)
+
+## How has this been tested?
+
+<!-- Describe how you tested this change -->
+
+## Additional context
+
+<!-- Any other information that reviewers should know -->

@@ -1,0 +1,110 @@
+name: Publish Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    # Only run if this is NOT a prerelease
+    if: |
+      github.event.release.draft == false &&
+      github.event.release.prerelease == false
+    steps:
+      - name: Checkout at release tag
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        env:
+          HUSKY: 0
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          # Remove 'v' prefix and '-alpha.X' suffix if present
+          VERSION=${TAG#v}
+          VERSION=${VERSION%-alpha.*}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Stable version: $VERSION"
+
+      - name: Update package.json to stable version
+        run: |
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+      - name: Run tests
+        run: |
+          npm run test
+
+      - name: Publish to npm (latest tag)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        run: |
+          npm publish --tag latest --access public
+
+      - name: Create stable tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Update package.json and lock
+          git add package.json package-lock.json
+          git commit -m "chore(release): ${{ steps.version.outputs.version }} [skip ci]" || true
+
+          # Create stable tag
+          git tag -f v${{ steps.version.outputs.version }}
+          git push origin v${{ steps.version.outputs.version }} --force
+
+      - name: Update release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get current release notes
+          CURRENT_NOTES=$(gh release view ${{ github.event.release.tag_name }} --json body -q .body)
+
+          # Add published notice
+          cat > updated-notes.md <<EOF
+          ## ✅ Published to npm
+
+          \`\`\`bash
+          npm install bmad-mcp-server@latest
+          # or
+          npm install bmad-mcp-server@${{ steps.version.outputs.version }}
+          \`\`\`
+
+          ---
+
+          $CURRENT_NOTES
+          EOF
+
+          # Update release
+          gh release edit ${{ github.event.release.tag_name }} \
+            --notes-file updated-notes.md
+
+      - name: Notify success
+        run: |
+          echo "✅ Successfully published v${{ steps.version.outputs.version }} to npm"
+          echo "📦 Package: https://www.npmjs.com/package/bmad-mcp-server/v/${{ steps.version.outputs.version }}"
+          echo "🎉 Release: ${{ github.event.release.html_url }}"

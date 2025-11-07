@@ -1,0 +1,159 @@
+name: PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Run CI workflow first
+  ci:
+    name: Run CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  pr-preview:
+    name: Create PR Preview
+    runs-on: ubuntu-latest
+    needs: ci
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: build-${{ github.sha }}
+          path: .
+
+      - name: Get PR info
+        id: pr_info
+        run: |
+          set -euo pipefail
+          echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})" >> $GITHUB_OUTPUT
+          echo "branch_name=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+
+      - name: Create preview tag
+        id: create_tag
+        run: |
+          set -euo pipefail
+          # Use pr-{number} as the tag format
+          TAG_NAME="pr-${{ steps.pr_info.outputs.pr_number }}"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+          # Delete existing tag if it exists
+          git tag -d $TAG_NAME 2>/dev/null || true
+          git push origin :refs/tags/$TAG_NAME 2>/dev/null || true
+
+          # Create new tag
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+
+      - name: Delete existing preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Delete old release for this PR if it exists
+          if gh release view "${{ steps.create_tag.outputs.tag_name }}" >/dev/null 2>&1; then
+            gh release delete "${{ steps.create_tag.outputs.tag_name }}" --yes || true
+          fi
+
+      - name: Create preview release notes
+        run: |
+          cat > preview-notes.md <<'EOF'
+          ## 🔍 PR Preview Build
+
+          This is an automated preview build for testing.
+
+          **Branch:** `${{ steps.pr_info.outputs.branch_name }}`  
+          **Commit:** ${{ github.event.pull_request.head.sha }}  
+          **PR:** ${{ github.event.pull_request.html_url }}
+
+          ### Testing this preview
+
+          ```bash
+          # Install from this release tag
+          npm install mkellerman/bmad-mcp-server#${{ steps.create_tag.outputs.tag_name }}
+          ```
+
+          > ⚠️ **Note:** This is a preview build, not published to npm. Install directly from GitHub.
+
+          ---
+
+          **This preview will be automatically updated** when you push new commits.
+          EOF
+
+      - name: Create GitHub Preview Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create ${{ steps.create_tag.outputs.tag_name }} \
+            --title "PR #${{ steps.pr_info.outputs.pr_number }}: Preview" \
+            --notes-file preview-notes.md \
+            --prerelease
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ steps.create_tag.outputs.tag_name }}';
+            const body = `## 🔍 Preview Build Ready
+
+            A preview build has been created for this PR.
+
+            ### Test this PR
+            \`\`\`bash
+            npm install mkellerman/bmad-mcp-server#${tag}
+            \`\`\`
+
+            📦 [View Release](https://github.com/${{ github.repository }}/releases/tag/${tag})
+
+            > This preview will be automatically updated when you push new commits.`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Preview Build Ready')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
