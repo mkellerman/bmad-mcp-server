@@ -43,8 +43,10 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "bmad-method": "file:../BMAD-METHOD",
     "csv-parse": "^6.1.0",
     "fast-xml-parser": "^5.3.1",
+    "fs-extra": "^11.2.0",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
