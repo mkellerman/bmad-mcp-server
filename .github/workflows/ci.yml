@@ -86,6 +86,9 @@ jobs:
           HUSKY: 0
         run: npm ci
 
+      - name: Build package
+        run: npm run build
+
       - name: Run unit tests with coverage
         env:
           CI: true
@@ -116,6 +119,9 @@ jobs:
         env:
           HUSKY: 0
         run: npm ci
+
+      - name: Build package
+        run: npm run build
 
       - name: Run integration tests
         env:
