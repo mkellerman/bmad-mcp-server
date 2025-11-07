@@ -88,9 +88,26 @@ jobs:
 
           ### Testing this preview
 
+          **Option 1: Using npx (recommended for MCP servers)**
           ```bash
-          # Install from this release tag
+          npx -y git+https://github.com/mkellerman/bmad-mcp-server#${{ steps.create_tag.outputs.tag_name }}
+          ```
+
+          **Option 2: Install as dependency**
+          ```bash
           npm install mkellerman/bmad-mcp-server#${{ steps.create_tag.outputs.tag_name }}
+          ```
+
+          **For MCP configuration (Claude Desktop, VS Code, etc.):**
+          ```json
+          {
+            "mcpServers": {
+              "bmad": {
+                "command": "npx",
+                "args": ["-y", "git+https://github.com/mkellerman/bmad-mcp-server#${{ steps.create_tag.outputs.tag_name }}"]
+              }
+            }
+          }
           ```
 
           > ⚠️ **Note:** This is a preview build, not published to npm. Install directly from GitHub.
@@ -120,8 +137,27 @@ jobs:
             A preview build has been created for this PR.
 
             ### Test this PR
+
+            **Using npx (recommended for MCP servers):**
+            \`\`\`bash
+            npx -y git+https://github.com/${{ github.repository }}#${tag}
+            \`\`\`
+
+            **Or install as dependency:**
             \`\`\`bash
             npm install mkellerman/bmad-mcp-server#${tag}
+            \`\`\`
+
+            **MCP Configuration:**
+            \`\`\`json
+            {
+              "mcpServers": {
+                "bmad": {
+                  "command": "npx",
+                  "args": ["-y", "git+https://github.com/${{ github.repository }}#${tag}"]
+                }
+              }
+            }
             \`\`\`
 
             📦 [View Release](https://github.com/${{ github.repository }}/releases/tag/${tag})
