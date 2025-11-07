@@ -19,7 +19,10 @@
 
 import { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
 import type { Workflow } from '../types/index.js';
-import { getAgentInstructions, getWorkflowInstructions } from '../config.js';
+import {
+  getAgentExecutionPrompt,
+  getWorkflowExecutionPrompt,
+} from '../config.js';
 
 // ============================================================================
 // Core Types (Transport-Agnostic)
@@ -163,9 +166,10 @@ export class BMADEngine {
 
     const agentList = agents.map((a) => ({
       name: a.name,
+      module: a.module,
       displayName: a.displayName,
       title: a.title,
-      module: a.module,
+      role: a.role,
       description: a.description,
       toolName: a.module ? `${a.module}-${a.name}` : `bmad-${a.name}`,
     }));
@@ -180,24 +184,54 @@ export class BMADEngine {
   }
 
   /**
-   * List all available workflows
+   * List all available workflows by extracting them from agent menu items.
+   *
+   * Only workflows linked to agents appear in this list.
+   * Workflows not linked to agents can still be executed via direct bmad:// URI.
    */
   async listWorkflows(filter?: ListFilter): Promise<BMADResult> {
     await this.initialize();
 
-    let workflows = this.workflows;
+    // Build workflow list from agent metadata
+    const workflowMap = new Map<
+      string,
+      {
+        name: string;
+        description: string;
+        module?: string;
+        agents: string[];
+        standalone: boolean;
+      }
+    >();
 
-    // Apply module filter if specified
-    if (filter?.module) {
-      workflows = workflows.filter((w) => w.module === filter.module);
+    // Scan all agents for their workflow menu items
+    for (const agent of this.agentMetadata) {
+      if (!agent.workflows || agent.workflows.length === 0) continue;
+
+      // Apply module filter if specified
+      if (filter?.module && agent.module !== filter.module) continue;
+
+      // Process each workflow this agent offers
+      for (let i = 0; i < agent.workflows.length; i++) {
+        const workflowName = agent.workflows[i];
+        const menuItemDesc = agent.workflowMenuItems?.[i] || workflowName;
+
+        if (!workflowMap.has(workflowName)) {
+          workflowMap.set(workflowName, {
+            name: workflowName,
+            description: menuItemDesc,
+            module: agent.module,
+            agents: [agent.name],
+            standalone: true, // Can be executed directly via bmad tool
+          });
+        } else {
+          // Workflow offered by multiple agents
+          workflowMap.get(workflowName)!.agents.push(agent.name);
+        }
+      }
     }
 
-    const workflowList = workflows.map((w) => ({
-      name: w.name,
-      description: w.description,
-      module: w.module,
-      standalone: w.standalone,
-    }));
+    const workflowList = Array.from(workflowMap.values());
 
     const text = this.formatWorkflowList(workflowList);
 
@@ -387,7 +421,25 @@ export class BMADEngine {
         relativePath = uriOrPath.replace('bmad://', '');
       }
 
-      const content = await this.loader.loadFile(relativePath);
+      // Handle virtual manifest generation for _cfg/*.csv files
+      let content: string;
+
+      if (relativePath === '_cfg/agent-manifest.csv') {
+        content = this.generateAgentManifest();
+      } else if (relativePath === '_cfg/workflow-manifest.csv') {
+        content = this.generateWorkflowManifest();
+      } else if (relativePath === '_cfg/tool-manifest.csv') {
+        throw new Error(
+          'Tool manifest generation not yet implemented - coming soon! This will provide virtual tool metadata from loaded BMAD modules.',
+        );
+      } else if (relativePath === '_cfg/task-manifest.csv') {
+        throw new Error(
+          'Task manifest generation not yet implemented - coming soon! This will provide virtual task metadata from loaded BMAD modules.',
+        );
+      } else {
+        // Default: Load file from filesystem
+        content = await this.loader.loadFile(relativePath);
+      }
 
       // Determine file extension for formatting
       const ext = relativePath.split('.').pop()?.toLowerCase() || 'txt';
@@ -438,29 +490,14 @@ export class BMADEngine {
     await this.initialize();
 
     try {
-      const resource = await this.loader.loadAgent(params.agent);
-
-      // Translate filesystem paths to MCP resource URIs
-      let agentContent = resource.content;
-      agentContent = agentContent.replace(
-        /\{project-root\}\/bmad\//g,
-        'bmad://',
-      );
-
+      // Build minimal execution context (NO agent content loading!)
       const executionContext = {
         agent: params.agent,
-        message: params.message,
-        instructions: getAgentInstructions(),
-        agentContent,
+        userContext: params.message,
       };
 
-      const text = `${executionContext.instructions}
-
----
-
-<instructions>
-${agentContent}
-</instructions>`;
+      // Build the prompt with just agent name and instructions
+      const text = getAgentExecutionPrompt(executionContext);
 
       return {
         success: true,
@@ -477,7 +514,14 @@ ${agentContent}
   }
 
   /**
-   * Execute a workflow with user context
+   * Execute a workflow using agent-specific workflow handler instructions.
+   *
+   * Injects ONLY:
+   * 1. Agent's workflow handler instructions (tells LLM what to do)
+   * 2. workflow.yaml (raw configuration)
+   *
+   * The agent's workflow handler will instruct the LLM to load workflow.xml
+   * and any other files needed.
    */
   async executeWorkflow(params: ExecuteParams): Promise<BMADResult> {
     if (!params.workflow) {
@@ -491,26 +535,37 @@ ${agentContent}
     await this.initialize();
 
     try {
-      const resource = await this.loader.loadWorkflow(params.workflow);
+      // Find which agent(s) offer this workflow
+      let agentForWorkflow: AgentMetadata | undefined;
 
+      if (params.agent) {
+        // User specified which agent to use
+        agentForWorkflow = this.agentMetadata.find(
+          (a) => a.name === params.agent,
+        );
+      } else {
+        // Find first agent that offers this workflow
+        agentForWorkflow = this.agentMetadata.find((a) =>
+          a.workflows?.includes(params.workflow!),
+        );
+      }
+
+      // Get workflow path from agent metadata
+      const workflowPath =
+        agentForWorkflow?.workflowPaths?.[params.workflow] ||
+        `{project-root}/bmad/workflows/${params.workflow}/workflow.yaml`;
+
+      // Build minimal execution context (NO workflow.yaml loading!)
       const executionContext = {
         workflow: params.workflow,
-        context: params.message,
-        instructions: getWorkflowInstructions(params.workflow, params.message),
-        workflowConfig: resource.content,
+        workflowPath,
+        userContext: params.message,
+        agent: agentForWorkflow?.name,
+        agentWorkflowHandler: agentForWorkflow?.workflowHandlerInstructions,
       };
 
-      const text = `${executionContext.instructions}
-
----
-
-<instructions>
-You are executing the BMAD workflow: ${params.workflow}
-</instructions>
-
-<workflow-config>
-${resource.content}
-</workflow-config>`;
+      // Build the prompt with just agent metadata and handler
+      const text = getWorkflowExecutionPrompt(executionContext);
 
       return {
         success: true,
@@ -634,13 +689,17 @@ ${resource.content}
     workflows: Array<{
       name: string;
       description: string;
-      module: string;
+      module?: string;
+      agents?: string[];
+      standalone?: boolean;
     }>,
   ): string {
     const lines = [`⚙️  Available BMAD Workflows (${workflows.length})\n`];
 
     workflows.forEach((w) => {
-      lines.push(`**${w.name}**: ${w.description}`);
+      const agentInfo =
+        w.agents && w.agents.length > 0 ? ` (via ${w.agents.join(', ')})` : '';
+      lines.push(`**${w.name}**${agentInfo}: ${w.description}`);
     });
 
     return lines.join('\n');
@@ -771,5 +830,114 @@ ${resource.content}
    */
   getLoader(): ResourceLoaderGit {
     return this.loader;
+  }
+
+  // ============================================================================
+  // VIRTUAL MANIFEST GENERATION
+  // ============================================================================
+
+  /**
+   * Generate virtual agent-manifest.csv from loaded agent metadata
+   *
+   * @returns CSV-formatted string matching BMAD agent-manifest.csv schema
+   *
+   * @remarks
+   * Maps AgentMetadata fields to CSV columns:
+   * - name, displayName, title, role, module: direct mapping
+   * - identity: mapped from persona field
+   * - icon, communicationStyle, principles: extracted from agent XML
+   * - path: constructed from module/agents/{name}.md
+   */
+  generateAgentManifest(): string {
+    const rows: string[] = [];
+
+    // CSV header matching BMAD schema
+    rows.push(
+      'name,displayName,title,icon,role,identity,communicationStyle,principles,module,path',
+    );
+
+    // Generate row for each agent
+    for (const agent of this.agentMetadata) {
+      // Get raw values first
+      const nameRaw = agent.name || '';
+      const moduleRaw = agent.module || 'core';
+
+      // Escape for CSV
+      const name = this.escapeCsvField(nameRaw);
+      const displayName = this.escapeCsvField(agent.displayName || '');
+      const title = this.escapeCsvField(agent.title || '');
+      const icon = this.escapeCsvField(agent.icon || '');
+      const role = this.escapeCsvField(agent.role || '');
+      const identity = this.escapeCsvField(agent.persona || ''); // persona maps to identity
+      const communicationStyle = this.escapeCsvField(
+        agent.communicationStyle || '',
+      );
+      const principles = this.escapeCsvField(agent.principles || '');
+      const module = this.escapeCsvField(moduleRaw);
+      const path = this.escapeCsvField(
+        `bmad/${moduleRaw}/agents/${nameRaw}.md`,
+      );
+
+      rows.push(
+        `${name},${displayName},${title},${icon},${role},${identity},${communicationStyle},${principles},${module},${path}`,
+      );
+    }
+
+    return rows.join('\n');
+  }
+
+  /**
+   * Generate virtual workflow-manifest.csv from loaded workflow metadata
+   *
+   * @returns CSV-formatted string matching BMAD workflow-manifest.csv schema
+   *
+   * @remarks
+   * Maps Workflow fields to CSV columns:
+   * - name, description, module, path, standalone: direct mapping
+   */
+  generateWorkflowManifest(): string {
+    const rows: string[] = [];
+
+    // CSV header matching BMAD schema
+    rows.push('name,description,module,path,standalone');
+
+    // Generate row for each workflow
+    for (const workflow of this.workflows) {
+      const name = this.escapeCsvField(workflow.name || '');
+      const description = this.escapeCsvField(workflow.description || '');
+      const module = this.escapeCsvField(workflow.module || 'core');
+      const path = this.escapeCsvField(workflow.path || '');
+      const standalone = this.escapeCsvField(
+        workflow.standalone ? 'true' : 'false',
+      );
+
+      rows.push(`${name},${description},${module},${path},${standalone}`);
+    }
+
+    return rows.join('\n');
+  }
+
+  /**
+   * Escape a field for CSV output
+   * Wraps in quotes if contains comma, quote, or newline
+   */
+  private escapeCsvField(value: string): string {
+    if (!value) return '""';
+
+    // Check if needs quoting (contains special characters)
+    const needsQuoting =
+      value.includes(',') ||
+      value.includes('"') ||
+      value.includes('\n') ||
+      value.includes('\r');
+
+    if (needsQuoting) {
+      // Escape quotes by doubling them
+      const escaped = value.replace(/"/g, '""');
+      return `"${escaped}"`;
+    }
+
+    // Wrap in quotes for consistency with BMAD manifests (all fields quoted)
+    return `"${value}"`;
   }
 }

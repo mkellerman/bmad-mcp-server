@@ -62,148 +62,130 @@ export interface InstructionsConfig {
  *
  * @returns Complete instructions including resource access and agent activation
  */
-export function getAgentInstructions(): string {
-  return `
+export function getAgentExecutionPrompt(context: {
+  agent: string;
+  userContext?: string;
+}): string {
+  // Build the YAML frontmatter
+  const frontmatter = `---
+
+agent: ${context.agent}
+user-prompt: ${context.userContext || '(no prompt provided)'}
+
+---`;
+
+  // Add resource access instructions
+  const resourceInstructions = `
 ${getResourceAccessInstructions()}
 
----
+---`;
 
-${getAgentActivationInstructions()}`;
+  // Simple activation message
+  const activationMessage = `
+This agent has been requested.
+
+**CRITICAL:** Use the \`bmad\` tool to read the full agent definition:
+  bmad({ operation: "read", agent: "${context.agent}" })
+
+The agent definition contains your persona, role, capabilities, menu items, and all instructions.
+Embody that agent completely and respond to the user's prompt.`;
+
+  return `${frontmatter}${resourceInstructions}${activationMessage}
+`;
 }
 
 /**
  * Get the complete instruction set for workflow execution
  *
- * @param workflowName - Name of the workflow being executed
- * @param context - Optional user-provided context
- * @returns Complete instructions including resource access and workflow execution
+ * @param _workflowName - Name of the workflow being executed (unused but kept for API compatibility)
+ * @param _context - Optional user-provided context (unused but kept for API compatibility)
+ * @returns Complete instructions including resource access
  */
 export function getWorkflowInstructions(
-  workflowName: string,
-  context?: string,
+  _workflowName: string,
+  _context?: string,
 ): string {
   return `
-${getWorkflowResourceAccessInstructions(workflowName)}
-
----
-
-${getWorkflowExecutionInstructions(context)}`;
+${getResourceAccessInstructions()}`;
 }
 
 /**
- * Resource access instructions for agents
- * These tell the LLM how to properly access BMAD files using the bmad-resources tool
+ * Build the workflow execution prompt with minimal injection.
+ *
+ * Injects only:
+ * 1. Agent's workflow handler instructions (tells LLM what to do)
+ * 2. workflow.yaml (raw YAML - configuration)
+ *
+ * The agent's workflow handler will instruct the LLM to load workflow.xml
+ * and any other files via bmad-resources tool.
  */
-function getResourceAccessInstructions(): string {
+export function getWorkflowExecutionPrompt(context: {
+  workflow: string;
+  workflowPath: string;
+  userContext?: string;
+  agent?: string;
+  agentWorkflowHandler?: string;
+}): string {
+  // Build the YAML frontmatter
+  const frontmatter = `---
+
+agent: ${context.agent || 'unknown'}
+menu-item: ${context.workflow}
+workflow: ${context.workflowPath}
+user-prompt: ${context.userContext || '(no prompt provided)'}
+
+---`;
+
+  // Add resource access instructions FIRST
+  const resourceInstructions = `
+${getResourceAccessInstructions()}
+
+---`;
+
+  // Build handler section
+  const handlerSection = context.agentWorkflowHandler
+    ? `
+This workflow has been requested to be executed.
+
+${context.agentWorkflowHandler}`
+    : '\nThis workflow has been requested to be executed.';
+
+  return `${frontmatter}${resourceInstructions}${handlerSection}
+`;
+}
+
+/**
+ * Resource access instructions for agents and workflows
+ * These tell the LLM how to properly access BMAD files using the bmad tool
+ */
+export function getResourceAccessInstructions(): string {
   return `## HOW TO ACCESS BMAD RESOURCES
 
-**CRITICAL:** ALL BMAD files MUST be accessed through the bmad-resources tool:
-- ✅ USE: bmad-resources tool with operation="read" 
+**CRITICAL:** ALL BMAD files MUST be accessed through the \`bmad\` tool:
+- ✅ USE: \`bmad\` tool with appropriate operation
 - ❌ DO NOT: Use MCP Resources API (not supported in all clients)
 - ❌ DO NOT: Search the user's workspace for BMAD files
 - ❌ DO NOT: Use filesystem paths like ./bmad/ or {project-root}/bmad/
 
-**URI Format:** All BMAD resources use the \`bmad://\` URI scheme
-- Format: \`bmad://{module}/{path}\` or \`bmad://core/{path}\`
-- Example: \`bmad://core/config.yaml\` NOT \`{project-root}/bmad/core/config.yaml\`
+**WORKFLOW HANDLING BEHAVIOR:**
+- ⚡ **BE SILENT**: When loading workflow instructions, configurations, or internal BMAD files
+- ⚡ **NO COMMENTARY**: Don't explain what you're doing when accessing bmad:// resources
+- ⚡ **DIRECT EXECUTION**: Load required files quietly and proceed directly to workflow execution
+- ⚡ **USER FOCUS**: Only communicate with user for workflow outputs, questions, or results
 
-**Available Operations:**
-  - **read** - Load specific file content
-    Example: bmad-resources({ operation: "read", uri: "bmad://core/config.yaml" })
-  
-  - **list** - Discover files by pattern
-    Example: bmad-resources({ operation: "list", pattern: "core/**/*.yaml" })
-  
-  - **modules** - Show all loaded BMAD modules
-    Example: bmad-resources({ operation: "modules" })
-  
-  - **agents** - List all available agents with metadata
-    Example: bmad-resources({ operation: "agents" })
-  
-  - **workflows** - List all available workflows
-    Example: bmad-resources({ operation: "workflows" })
-  
-  - **search** - Find agents/workflows by name or description
-    Example: bmad-resources({ operation: "search", query: "debug", type: "agents" })
+**COMMON BMAD OPERATIONS:**
+  - **List agents**: bmad({ operation: "list", query: "agents" })
+  - **List workflows**: bmad({ operation: "list", query: "workflows" })
+  - **Read agent definition**: bmad({ operation: "read", agent: "analyst" })
+  - **Read workflow definition**: bmad({ operation: "read", workflow: "prd" })
+  - **Execute agent**: bmad({ operation: "execute", agent: "analyst", message: "your request" })
+  - **Execute workflow**: bmad({ operation: "execute", workflow: "prd", message: "context" })
 
-**Common Files You May Need:**
-  - bmad://core/config.yaml - User configuration (user_name, language, output_folder)
-  - bmad://_cfg/agent-manifest.csv - All agents metadata
-  - bmad://_cfg/workflow-manifest.csv - All workflows metadata`;
-}
+**FILE LOCATIONS (for reference only):**
+  - Configuration: {project-root}/bmad/core/config.yaml
+  - Core tasks: {project-root}/bmad/core/tasks/workflow.xml
+  - Agent definitions: {project-root}/bmad/{module}/agents/{agent-name}.md
+  - Workflow definitions: {project-root}/bmad/{module}/workflows/{workflow-name}/workflow.yaml
 
-/**
- * Agent activation instructions
- * These tell the LLM how to properly embody the agent persona and follow instructions
- */
-function getAgentActivationInstructions(): string {
-  return `## INSTRUCTIONS FOR AGENT ACTIVATION
-
-**You must fully embody this agent and follow all instructions precisely:**
-
-1. **Read the agent definition** below to understand your role, identity, principles, and capabilities
-2. **Apply the communication style** specified - this defines how you speak and interact  
-3. **Follow all activation rules** and command handling as defined in the agent XML/markdown
-4. **Stay in character** - you ARE this agent, not an assistant describing what the agent would do
-5. **Respect the agent's principles** - let them guide your decision-making and responses
-6. **Use the agent's expertise** - draw from the identity and background specified
-
-**DEFAULT CONFIGURATION (if not overridden in bmad://core/config.yaml):**
-- user_name: ${DEFAULT_BMAD_CONFIG.user_name}
-- communication_language: ${DEFAULT_BMAD_CONFIG.communication_language}
-- output_folder: ${DEFAULT_BMAD_CONFIG.output_folder}
-
-**CRITICAL:** Do not break character. Respond as the agent would respond, using their voice, style, and perspective.`;
-}
-
-/**
- * Resource access instructions for workflows
- * Similar to agent instructions but tailored for workflow context
- */
-function getWorkflowResourceAccessInstructions(workflowName: string): string {
-  return `## HOW TO ACCESS BMAD RESOURCES DURING WORKFLOW EXECUTION
-
-**CRITICAL:** ALL BMAD files MUST be accessed through the bmad-resources tool:
-- ✅ USE: bmad-resources tool with operation="read"
-- ❌ DO NOT: Use MCP Resources API (not supported in all clients)
-- ❌ DO NOT: Search the user's workspace for BMAD files
-- ❌ DO NOT: Use filesystem paths or {project-root}/bmad/ references
-
-**Common workflow files you may need:**
-  - bmad://core/config.yaml - User configuration (user_name, language, output_folder)
-  - bmad://core/tasks/workflow.xml - Workflow execution engine (MUST load for all workflows)
-  - bmad://_cfg/agent-manifest.csv - All available agents
-  - bmad://_cfg/workflow-manifest.csv - All available workflows  
-  - bmad://{module}/workflows/{workflow}/instructions.md - Step-by-step workflow instructions
-
-**Example: Load workflow execution engine**
-  bmad-resources({ operation: "read", uri: "bmad://core/tasks/workflow.xml" })
-
-**Example: Load workflow instructions**
-  bmad-resources({ operation: "read", uri: "bmad://core/workflows/${workflowName}/instructions.md" })`;
-}
-
-/**
- * Workflow execution instructions
- * These tell the LLM how to properly execute a BMAD workflow
- */
-function getWorkflowExecutionInstructions(context?: string): string {
-  const contextSection = context ? `**User Context:** ${context}\n\n` : '';
-
-  return `## WORKFLOW EXECUTION INSTRUCTIONS
-
-Process this workflow according to BMAD workflow execution methodology:
-
-1. **Read the complete workflow configuration** below to understand the workflow structure
-2. **IMPORTANT - Resource Resolution:**
-   - All workflow data has been pre-loaded by the MCP server
-   - DO NOT search the user's workspace for manifest files or agent data
-   - USE the bmad-resources tool to load any additional files needed
-   - All paths use the bmad:// URI scheme (no filesystem paths)
-3. **Resolve variables:** Replace any \`{{variables}}\` with user input or defaults from config
-4. **Follow instructions:** Execute workflow steps in exact order as defined
-5. **Generate content:** Process \`<template-output>\` sections as needed
-6. **Request input:** Use \`<elicit-required>\` sections to gather additional user input when needed
-
-${contextSection}**CRITICAL:** Follow all steps in the workflow precisely. Begin workflow execution now.`;
+**Note:** The agent workflow handler instructions will tell you which files to load and how.`;
 }

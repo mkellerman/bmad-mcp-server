@@ -85,13 +85,19 @@ export interface AgentMetadata {
   name: string;
   title: string;
   displayName: string;
+  role?: string;
   description?: string;
   persona?: string;
   capabilities?: string[];
   menuItems?: string[];
   module?: string; // The module this agent belongs to (e.g., "core", "bmm", "cis")
-  workflows?: string[]; // Workflow paths extracted from menu items
+  workflows?: string[]; // Workflow names extracted from menu items
+  workflowPaths?: Record<string, string>; // Map of workflow name to full path
   workflowMenuItems?: string[]; // Menu items that have associated workflows
+  workflowHandlerInstructions?: string; // Agent-specific workflow handler instructions
+  icon?: string; // Agent icon emoji (e.g., "📊")
+  communicationStyle?: string; // How the agent communicates
+  principles?: string; // Agent's decision-making philosophy
 }
 
 /**
@@ -577,6 +583,31 @@ export class ResourceLoaderGit {
   }
 
   /**
+   * Load the minimal files needed to bootstrap workflow execution.
+   *
+   * @param workflowName - Name of the workflow to bootstrap
+   * @returns Promise resolving to workflow configuration (raw YAML)
+   *
+   * @remarks
+   * Returns ONLY the workflow.yaml as a raw blob.
+   * Does NOT load workflow.xml - the agent's workflow handler will instruct the LLM to load it.
+   *
+   * This minimal approach lets the agent's workflow handler instructions control
+   * exactly what gets loaded and when.
+   *
+   * @example
+   * ```typescript
+   * const config = await loader.loadWorkflowBootstrap('prd');
+   * console.log(config); // Raw YAML from workflows/prd/workflow.yaml
+   * ```
+   */
+  async loadWorkflowBootstrap(workflowName: string): Promise<string> {
+    // Load workflow.yaml (raw YAML blob)
+    const workflowResource = await this.loadWorkflow(workflowName);
+    return workflowResource.content;
+  }
+
+  /**
    * List all available agents from all BMAD sources
    *
    * @returns Promise resolving to array of agent names (without .md extension)
@@ -972,35 +1003,63 @@ export class ResourceLoaderGit {
         return metadata;
       }
 
-      // Extract agent attributes (name, title)
+      // Extract agent attributes (name, title, icon)
       if (agent['@_name']) {
         metadata.displayName = agent['@_name'];
       }
       if (agent['@_title']) {
         metadata.title = agent['@_title'];
       }
+      if (agent['@_icon']) {
+        metadata.icon = agent['@_icon'];
+      }
 
-      // Extract persona (combine role and identity)
+      // Extract persona (combine role and identity, plus communication_style and principles)
       if (agent.persona) {
         const parts: string[] = [];
 
-        // Extract role
+        // Extract role as separate field
         if (agent.persona.role) {
           const roleText =
             typeof agent.persona.role === 'string'
               ? agent.persona.role
               : agent.persona.role['#text'] || '';
-          parts.push(String(roleText).trim().replace(/\s+/g, ' '));
+          const role = String(roleText).trim().replace(/\s+/g, ' ');
+          metadata.role = role;
+          parts.push(role);
         }
 
-        // Extract identity
+        // Extract identity as description
         if (agent.persona.identity) {
           const identityText =
             typeof agent.persona.identity === 'string'
               ? agent.persona.identity
               : agent.persona.identity['#text'] || '';
           const identity = String(identityText).trim().replace(/\s+/g, ' ');
+          metadata.description = identity; // Use full identity as description
           parts.push(identity.substring(0, AGENT_IDENTITY_MAX_LENGTH));
+        }
+
+        // Extract communication_style
+        if (agent.persona.communication_style) {
+          const styleText =
+            typeof agent.persona.communication_style === 'string'
+              ? agent.persona.communication_style
+              : agent.persona.communication_style['#text'] || '';
+          metadata.communicationStyle = String(styleText)
+            .trim()
+            .replace(/\s+/g, ' ');
+        }
+
+        // Extract principles
+        if (agent.persona.principles) {
+          const principlesText =
+            typeof agent.persona.principles === 'string'
+              ? agent.persona.principles
+              : agent.persona.principles['#text'] || '';
+          metadata.principles = String(principlesText)
+            .trim()
+            .replace(/\s+/g, ' ');
         }
 
         if (parts.length > 0) {
@@ -1033,6 +1092,7 @@ export class ResourceLoaderGit {
       if (agent.menu?.item) {
         const menuItems: string[] = [];
         const workflows: string[] = [];
+        const workflowPaths: Record<string, string> = {};
         const workflowMenuItems: string[] = [];
 
         const items = Array.isArray(agent.menu.item)
@@ -1062,6 +1122,7 @@ export class ResourceLoaderGit {
                 const fullPath = nameMatch[1];
                 const workflowName = fullPath.split('/').pop() || fullPath;
                 workflows.push(workflowName);
+                workflowPaths[workflowName] = String(workflowPath); // Store full path
                 workflowMenuItems.push(trimmedText); // Track menu items with workflows
               }
             }
@@ -1073,10 +1134,38 @@ export class ResourceLoaderGit {
         }
         if (workflows.length > 0) {
           metadata.workflows = Array.from(new Set(workflows)); // Deduplicate
+          metadata.workflowPaths = workflowPaths; // Store workflow paths map
           metadata.workflowMenuItems = workflowMenuItems; // Store menu items with workflows
         }
       }
-      /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+
+      // Extract workflow handler instructions from menu-handlers section (inside activation)
+      /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+      if (agent.activation?.['menu-handlers']?.handlers?.handler) {
+        const handlers = Array.isArray(
+          agent.activation['menu-handlers'].handlers.handler,
+        )
+          ? agent.activation['menu-handlers'].handlers.handler
+          : [agent.activation['menu-handlers'].handlers.handler];
+
+        // Find the workflow handler
+        const workflowHandler = handlers.find(
+          (h: any) => h['@_type'] === 'workflow',
+        );
+
+        if (workflowHandler) {
+          // Extract the handler instructions as raw text
+          // Preserve formatting - don't collapse whitespace
+          const handlerText =
+            typeof workflowHandler === 'string'
+              ? workflowHandler
+              : workflowHandler['#text'] || '';
+          if (handlerText) {
+            metadata.workflowHandlerInstructions = String(handlerText).trim();
+          }
+        }
+      }
+      /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 
       return metadata;
     } catch {

@@ -138,6 +138,8 @@ export class BMADServerLiteMultiToolGit {
     this.server.setRequestHandler(
       ReadResourceRequestSchema,
       async (request) => {
+        await this.initialize();
+
         const uri = request.params.uri;
         const pathMatch = uri.match(/^bmad:\/\/(.+)$/);
 
@@ -147,6 +149,47 @@ export class BMADServerLiteMultiToolGit {
 
         const relativePath = pathMatch[1];
 
+        // Handle virtual manifest generation for _cfg/*.csv files
+        if (relativePath === '_cfg/agent-manifest.csv') {
+          const content = this.engine.generateAgentManifest();
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/csv',
+                text: content,
+              },
+            ],
+          };
+        }
+
+        if (relativePath === '_cfg/workflow-manifest.csv') {
+          const content = this.engine.generateWorkflowManifest();
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/csv',
+                text: content,
+              },
+            ],
+          };
+        }
+
+        // TODO: Tool and Task manifests not yet implemented
+        if (relativePath === '_cfg/tool-manifest.csv') {
+          throw new Error(
+            'Tool manifest generation not yet implemented - coming soon! This will provide virtual tool metadata from loaded BMAD modules.',
+          );
+        }
+
+        if (relativePath === '_cfg/task-manifest.csv') {
+          throw new Error(
+            'Task manifest generation not yet implemented - coming soon! This will provide virtual task metadata from loaded BMAD modules.',
+          );
+        }
+
+        // Default: Load file from filesystem
         try {
           const content = await this.engine.getLoader().loadFile(relativePath);
           const mimeType = this.getMimeType(relativePath);

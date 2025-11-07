@@ -496,6 +496,44 @@ export interface WorkflowContext {
 }
 
 /**
+ * Minimal bootstrap data for workflow execution.
+ *
+ * @remarks
+ * Returns only the workflow.yaml configuration.
+ * The agent's workflow handler will instruct the LLM to load workflow.xml
+ * and other files via bmad-resources tool.
+ */
+export type WorkflowBootstrap = string;
+
+/**
+ * Context provided to LLM for workflow execution.
+ *
+ * @remarks
+ * Minimal injection approach:
+ * 1. Agent's workflow handler instructions (tells LLM what to do)
+ * 2. workflow.yaml configuration (raw YAML)
+ *
+ * The agent's workflow handler will guide the LLM to load additional
+ * files (workflow.xml, instructions.md, etc.) as needed.
+ */
+export interface WorkflowExecutionContext {
+  /** Workflow name */
+  workflow: string;
+
+  /** User's message/request (optional) */
+  userContext?: string;
+
+  /** Raw workflow.yaml content (the configuration) */
+  workflowConfig: string;
+
+  /** Agent executing this workflow (optional) */
+  agent?: string;
+
+  /** Agent-specific workflow handler instructions (optional) */
+  agentWorkflowHandler?: string;
+}
+
+/**
  * BMAD v6 Master Manifest Types
  *
  * @remarks
