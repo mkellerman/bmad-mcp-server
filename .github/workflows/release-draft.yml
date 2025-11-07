@@ -1,0 +1,188 @@
+name: Create Draft Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-draft
+  cancel-in-progress: false
+
+jobs:
+  # Run CI workflow first
+  ci:
+    name: Run CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  create-draft:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+    needs: ci
+    # Skip if commit message contains [skip ci] or [skip release]
+    if: |
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[skip release]')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: build-${{ github.sha }}
+          path: .
+
+      - name: Install dependencies
+        env:
+          HUSKY: 0
+        run: npm ci
+
+      - name: Determine version bump from commit
+        id: version
+        run: |
+          set -euo pipefail
+
+          # Get the commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          # Determine bump type from conventional commit
+          if [[ "$COMMIT_MSG" =~ ^feat!: ]] || [[ "$COMMIT_MSG" =~ BREAKING[[:space:]]CHANGE ]]; then
+            BUMP="major"
+          elif [[ "$COMMIT_MSG" =~ ^feat(\(.*\))?!?: ]]; then
+            BUMP="minor"
+          elif [[ "$COMMIT_MSG" =~ ^fix(\(.*\))?: ]]; then
+            BUMP="patch"
+          elif [[ "$COMMIT_MSG" =~ ^(docs|chore|refactor|test|ci|perf|build|revert)(\(.*\))?: ]]; then
+            BUMP="none"
+          else
+            # Default to patch for unknown types
+            BUMP="patch"
+          fi
+
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+          echo "Version bump type: $BUMP"
+
+      - name: Calculate next version
+        if: steps.version.outputs.bump != 'none'
+        id: next_version
+        run: |
+          set -euo pipefail
+
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+
+          # Parse version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          # Bump based on type
+          case "${{ steps.version.outputs.bump }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEXT_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          ALPHA_VERSION="${NEXT_VERSION}-alpha.1"
+
+          echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          echo "alpha_version=$ALPHA_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$ALPHA_VERSION" >> $GITHUB_OUTPUT
+
+          echo "Next version: $NEXT_VERSION"
+          echo "Alpha version: $ALPHA_VERSION"
+
+      - name: Update package.json version
+        if: steps.version.outputs.bump != 'none'
+        run: |
+          npm version ${{ steps.next_version.outputs.alpha_version }} --no-git-tag-version
+
+      - name: Publish to npm (alpha tag)
+        if: steps.version.outputs.bump != 'none'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        run: |
+          npm publish --tag alpha --access public
+
+      - name: Generate release notes
+        if: steps.version.outputs.bump != 'none'
+        id: release_notes
+        run: |
+          set -euo pipefail
+
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Create release notes
+          cat > release-notes.md <<EOF
+          ## 🧪 Alpha Release for Testing
+
+          This is a **draft release** published to npm with the \`@alpha\` tag for testing.
+
+          ### Installation
+          \`\`\`bash
+          npm install bmad-mcp-server@alpha
+          \`\`\`
+
+          ### What's Changed
+          $COMMITS
+
+          ### Next Steps
+          1. Test this alpha version in your projects
+          2. Report any issues in this repository
+          3. When ready, **publish this draft** to promote to stable release
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...v${{ steps.next_version.outputs.alpha_version }}
+          EOF
+
+          echo "Generated release notes"
+
+      - name: Create draft GitHub release
+        if: steps.version.outputs.bump != 'none'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ steps.next_version.outputs.tag }} \
+            --title "v${{ steps.next_version.outputs.version }}" \
+            --notes-file release-notes.md \
+            --draft \
+            --prerelease
+
+      - name: Comment on skipped release
+        if: steps.version.outputs.bump == 'none'
+        run: |
+          echo "::notice::No release created - commit type doesn't trigger versioning (docs, chore, etc.)"

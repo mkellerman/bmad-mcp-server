@@ -739,3 +739,67 @@ npm run test:litellm-logs
 ```
 
 ```
+
+---
+
+## 🔧 Troubleshooting
+
+### E2E Tests: Port 4000 Already in Use
+
+**Problem:** LiteLLM proxy fails to start with error:
+
+```
+Error: Bind for 0.0.0.0:4000 failed: port is already allocated
+```
+
+**Cause:** Another process (often OrbStack or another service) is using port 4000.
+
+**Diagnosis:**
+
+```bash
+# Check what's using port 4000
+lsof -i :4000
+```
+
+**Solutions:**
+
+1. **Skip E2E tests** (quickest):
+
+   ```bash
+   SKIP_LLM_TESTS=true npm test
+   ```
+
+2. **Stop the conflicting process** (if safe):
+
+   ```bash
+   # Find the process ID (PID) from lsof output
+   kill <PID>
+
+   # Then run tests
+   npm run test:e2e
+   ```
+
+3. **Clean up stale containers:**
+   ```bash
+   docker rm -f litellm-proxy
+   npm run test:litellm-start
+   ```
+
+### E2E Tests: Container Exists But Not Running
+
+**Problem:** Docker says container exists but health checks fail
+
+**Diagnosis:**
+
+```bash
+docker ps -a | grep litellm
+docker logs litellm-proxy
+```
+
+**Solution:**
+
+```bash
+# Remove stale container and restart
+docker rm -f litellm-proxy
+npm run test:litellm-start
+```

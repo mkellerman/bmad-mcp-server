@@ -1,68 +1,106 @@
-# 🚀 BMAD MCP Server
+# BMAD MCP Server
 
-> **💡 Built on the BMAD Method**  
-> This MCP server brings the power of the [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) to any AI assistant. All methodology, workflows, and best practices are credited to the original BMAD Method project. This server makes it instantly accessible through the Model Context Protocol.
+<div align="center">
 
-**Transform how you work with AI assistants across all your projects**
+[![npm version](https://badge.fury.io/js/bmad-mcp-server.svg)](https://www.npmjs.com/package/bmad-mcp-server)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
-The traditional BMAD approach requires copying files to every project and manually loading agents. The MCP Server changes everything: configure once, access instantly everywhere, stay always updated. It's the difference between managing BMAD in every project versus having it just work.
+A Model Context Protocol server that brings the [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) to AI assistants.
 
-## Why Choose the MCP Server Over Traditional BMAD?
+[Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation)
 
-### The Traditional Way (Single Project Installation)
+</div>
 
-You install BMAD files directly in your project:
+---
 
-- ❌ **Copy files to every project** - Manual setup for each workspace
-- ❌ **Keep 5, 10, 20+ copies in sync** - When BMAD updates, update everywhere
-- ❌ **Project clutter** - BMAD files mixed with your code
-- ❌ **Version drift** - Different projects using different BMAD versions
-- ❌ **Repetitive configuration** - Same setup over and over
-- ❌ **Maintenance burden** - Multiply effort by number of projects
+## Overview
 
-### The MCP Server Way (Universal Access)
+The BMAD MCP Server provides AI assistants with access to 11 specialized agents and 36+ automated workflows from the BMAD (Building Modern Apps Decisively) methodology. Configure once, use everywhere across all your projects.
 
-One server installation serves all your projects:
+**What is BMAD?**
 
-- ✅ **Configure once, use everywhere** - Single setup for unlimited projects
-- ✅ **Always up to date** - Update once, all projects benefit instantly
-- ✅ **Zero project clutter** - No BMAD files in your repositories
-- ✅ **Consistent experience** - Same agents and workflows everywhere
-- ✅ **Instant access** - Available in every workspace immediately
-- ✅ **Effortless maintenance** - Update one location, done
-- ✅ **Smart overrides** - Customize per-project when needed, global by default
+BMAD is a comprehensive software development methodology with specialized AI agents for different roles (Business Analyst, Architect, Developer, UX Designer, etc.) and workflows for common tasks (PRD generation, architecture design, debugging, testing).
 
-### Real Impact
+**Why MCP?**
 
-**Scenario: You maintain 10 projects**
+Instead of copying BMAD files to every project, the MCP server provides universal access:
 
-Traditional BMAD:
+- ✅ Single installation serves all projects
+- ✅ Consistent methodology everywhere
+- ✅ No project clutter
+- ✅ Easy updates
 
-- 10 separate installations
-- 10 places to update when BMAD improves
-- 10 sets of files to manage
-- Hours of maintenance time
+---
 
-MCP Server:
+## Features
 
-- 1 installation
-- 1 update location
-- 0 files in your projects
-- Minutes to upgrade everything
+### Unified Tool Architecture
 
-**The MCP Server doesn't just make BMAD easier—it makes it scalable.**
+Single `bmad` tool with intelligent operations:
 
-## ⚡ Quick Start
+```typescript
+// List available agents and workflows
+{ operation: "list", query: "agents" }
 
-Get BMAD working across all your projects in 2 minutes:
+// Read agent details (no execution)
+{ operation: "read", type: "agent", agent: "analyst" }
 
-**Step 1: Add to your AI client configuration**
+// Execute agent with context
+{ operation: "execute", agent: "analyst", message: "Help me..." }
+```
 
-Add this to your VS Code settings, Claude Desktop, or Cursor config:
+### 11 Specialized Agents
+
+| Agent      | Role             | Load with     |
+| ---------- | ---------------- | ------------- |
+| 📊 Mary    | Business Analyst | `analyst`     |
+| 🏗️ Winston | System Architect | `architect`   |
+| 💻 Amelia  | Developer        | `dev`         |
+| 🎨 Sally   | UX Designer      | `ux-designer` |
+| 🧪 Murat   | Test Architect   | `tea`         |
+| 📋 John    | Product Manager  | `pm`          |
+| 🔄 Bob     | Scrum Master     | `sm`          |
+| 🐛 Diana   | Debug Specialist | `debug`       |
+| ...        | [+3 more agents] |               |
+
+### 36+ Automated Workflows
+
+```bash
+prd              # Product Requirements Document
+architecture     # System architecture design
+debug-inspect    # Comprehensive debugging
+atdd             # Acceptance test generation
+ux-design        # UX specifications
+party-mode       # Multi-agent brainstorming
+... and 30+ more
+```
+
+### MCP Capabilities
+
+- **Tools** - Unified `bmad` tool for all operations
+- **Resources** - Access BMAD files via `bmad://` URIs
+- **Prompts** - Agents as native MCP prompts
+- **Completions** - Smart autocomplete for arguments
+- **Multi-source** - Project, user, and Git remote support
+
+---
+
+## Installation
+
+### Prerequisites
+
+- Node.js 18 or later
+- An MCP-compatible client (Claude Desktop, VS Code with Copilot, Cline, etc.)
+
+### Quick Start
+
+**Option 1: npx (Recommended)**
+
+Add to your MCP client configuration:
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "bmad": {
       "command": "npx",
       "args": ["-y", "bmad-mcp-server"]
@@ -71,299 +109,384 @@ Add this to your VS Code settings, Claude Desktop, or Cursor config:
 }
 ```
 
-**Step 2: Restart your AI client**
-
-**Step 3: Start using BMAD anywhere**
-
-Open any project and say:
-
-```
-bmad analyst
-```
-
-That's it! Mary (the Business Analyst) is ready to help. Works in this project, every project, instantly.
-
-**Advanced: Discovery Modes**
-
-The server supports two modes for finding BMAD installations:
-
-- **`auto` (default)** - Automatically discovers from project, user defaults, or package
-- **`strict`** - Uses only exact paths provided via CLI arguments (production use)
-
-See [Installation Guide](./docs/installation.md) for detailed configuration options.
-
-📖 **Detailed setup for your specific AI client:** [Installation Guide](./docs/installation.md)
-
-## 🎯 What Makes BMAD Powerful?
-
-### 11 Specialist AI Agents, Always Available
-
-Every agent brings unique expertise, personality, and specialized workflows:
+**Option 2: Global Installation**
 
 ```bash
-bmad analyst      # Mary - Strategic Business Analyst
-bmad architect    # Winston - Solution Architect
-bmad dev          # Amelia - Senior Implementation Engineer
-bmad ux-expert    # Sally - UX/UI Specialist
-bmad tea          # Murat - Master Test Architect
-bmad pm           # John - Product Manager
-bmad sm           # Bob - Scrum Master
-# ... plus 4 game development specialists
+npm install -g bmad-mcp-server
 ```
-
-### 36+ Automated Workflows
-
-Complex multi-step processes become single commands:
-
-```bash
-bmad *party-mode       # Multi-agent brainstorming
-bmad *workflow-status  # Project health check
-bmad *atdd            # Generate acceptance tests
-bmad *ux-spec         # Create UX specifications
-```
-
-### Works With Your Workflow
-
-- **VS Code** - Integrated with GitHub Copilot
-- **Claude Desktop** - Full MCP support
-- **Cursor** - Native compatibility
-- **Any MCP Client** - Standard protocol
-
-### Flexible When You Need It
-
-**Global by default:**
-
-- Server provides BMAD to all projects
-- Consistent methodology everywhere
-- Zero setup per project
-
-**Customizable when needed:**
-
-- Place `./bmad` in any project for custom agents
-- Project customizations override global defaults
-- Keep global access for other projects
-
-## 💡 How It Works
-
-### Priority-Based Resource Discovery
-
-The MCP Server intelligently finds BMAD resources:
-
-| Priority | Location         | Use Case                          |
-| -------- | ---------------- | --------------------------------- |
-| 1        | `./bmad`         | Project-specific customizations   |
-| 2        | CLI argument     | Development/testing               |
-| 3        | `BMAD_ROOT` env  | Point to specific location        |
-| 4        | `~/.bmad`        | Your personal defaults            |
-| 5        | Package defaults | Built-in files (always available) |
-
-**Project overrides work seamlessly:**
-
-- Most projects: Use global BMAD (no local files needed)
-- Special projects: Add `./bmad` folder with customizations
-- MCP Server uses project version when present, global otherwise
-
-**Git repository sources (NEW):**
-
-Load BMAD modules directly from GitHub repositories:
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
+    "bmad": {
+      "command": "bmad-mcp-server"
+    }
+  }
+}
+```
+
+**Option 3: Local Development**
+
+```bash
+git clone https://github.com/mkellerman/bmad-mcp-server.git
+cd bmad-mcp-server
+npm install
+npm run build
+```
+
+```json
+{
+  "mcpServers": {
     "bmad": {
       "command": "node",
+      "args": ["/absolute/path/to/bmad-mcp-server/build/index.js"]
+    }
+  }
+}
+```
+
+### Client-Specific Setup
+
+<details>
+<summary><b>Claude Desktop</b></summary>
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "bmad": {
+      "command": "npx",
+      "args": ["-y", "bmad-mcp-server"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop.
+
+</details>
+
+<details>
+<summary><b>VS Code with GitHub Copilot</b></summary>
+
+1. Install the latest GitHub Copilot extension
+2. Open Settings (JSON)
+3. Add to `github.copilot.chat.mcp.servers`:
+
+```json
+{
+  "github.copilot.chat.mcp.servers": {
+    "bmad": {
+      "command": "npx",
+      "args": ["-y", "bmad-mcp-server"]
+    }
+  }
+}
+```
+
+4. Restart VS Code
+
+</details>
+
+<details>
+<summary><b>Cline (VS Code Extension)</b></summary>
+
+1. Open Cline settings
+2. Add MCP server:
+
+```json
+{
+  "mcpServers": {
+    "bmad": {
+      "command": "npx",
+      "args": ["-y", "bmad-mcp-server"]
+    }
+  }
+}
+```
+
+</details>
+
+---
+
+## Usage
+
+### Natural Language Examples
+
+Just ask your AI assistant naturally - it handles the MCP tool calls automatically:
+
+**Agent Execution:**
+
+```
+You: "Ask Mary to analyze the market opportunity for a SaaS product"
+→ AI executes: { operation: "execute", agent: "analyst", message: "..." }
+→ Mary (Business Analyst) provides market analysis
+```
+
+**Workflow Execution:**
+
+```
+You: "Start a PRD workflow for a task management app"
+→ AI executes: { operation: "execute", workflow: "prd", message: "..." }
+→ John (Product Manager) guides you through PRD creation
+```
+
+**Debug Assistance:**
+
+```
+You: "Ask Diana to debug this script" (with code attached)
+→ AI executes: { operation: "execute", agent: "debug", message: "..." }
+→ Diana starts comprehensive debugging workflow
+```
+
+**Collaborative Problem Solving:**
+
+```
+You: "Start party-mode with the planning team to brainstorm features"
+→ AI executes: { operation: "execute", workflow: "party-mode", message: "..." }
+→ Multiple agents collaborate on brainstorming session
+```
+
+**Architecture Review:**
+
+```
+You: "Have Winston review this system design"
+→ AI executes: { operation: "execute", agent: "architect", message: "..." }
+→ Winston provides architectural guidance
+```
+
+### Direct MCP Tool Usage
+
+You can also work with the tool directly (useful for development/testing):
+
+**List available agents:**
+
+```typescript
+{
+  "operation": "list",
+  "query": "agents"
+}
+```
+
+**Execute an agent:**
+
+```typescript
+{
+  "operation": "execute",
+  "agent": "analyst",
+  "message": "Help me analyze the market for a SaaS product"
+}
+```
+
+**Run a workflow:**
+
+```typescript
+{
+  "operation": "execute",
+  "workflow": "prd",
+  "message": "Create PRD for task management app"
+}
+```
+
+**Read agent details:**
+
+```typescript
+{
+  "operation": "read",
+  "type": "agent",
+  "agent": "architect"
+}
+```
+
+### Advanced Configuration
+
+**Multi-source loading with Git remotes:**
+
+```json
+{
+  "mcpServers": {
+    "bmad": {
+      "command": "npx",
       "args": [
         "-y",
         "bmad-mcp-server",
-        "git+https://github.com/mkellerman/bmad-mcp-server.git#main:/.bmad/6.0.0-alpha.0/bmad",
-        "/path/to/your/bmad/folder"
+        "git+https://github.com/org/custom-bmad.git#main"
       ]
     }
   }
 }
 ```
 
-**Supported Git URL formats:**
+**Custom project root:**
 
-- `git+https://github.com/org/repo.git#branch` - HTTPS with branch
-- `git+https://github.com/org/repo.git#v2.0.0` - Pinned to tag
-- `git+https://github.com/org/repo.git#main:/bmad/core` - Subpath within repo
-- `git+ssh://git@github.com/org/repo.git#main` - SSH authentication
-
-The server automatically:
-
-- Clones repositories to `~/.bmad/cache/git/`
-- Pulls latest changes on each startup
-- Validates cache integrity with URL/branch/subpath matching
-- Supports mixing local paths and Git URLs
-
-📖 **Advanced configuration:** See [Installation Guide](./docs/installation.md)
-
-## 🌟 Real-World Scenarios
-
-### Building a New Feature
-
-Work through the full development lifecycle with specialist agents:
-
-```bash
-# Requirements & Analysis
-bmad analyst
-# → Mary helps gather and structure requirements
-
-# Architecture & Design
-bmad architect
-# → Winston designs the technical approach
-
-# User Experience
-bmad ux-expert
-# → Sally crafts the interface and flow
-
-# Implementation
-bmad dev
-# → Amelia builds following best practices
-
-# Quality Assurance
-bmad tea
-# → Murat creates comprehensive tests
+```json
+{
+  "mcpServers": {
+    "bmad": {
+      "command": "npx",
+      "args": ["-y", "bmad-mcp-server"],
+      "env": {
+        "BMAD_ROOT": "/custom/bmad/location"
+      }
+    }
+  }
+}
 ```
 
-**One server, complete methodology, every project.**
+### Resource Discovery Priority
 
-### Stuck on a Complex Problem?
+The server searches for BMAD content in this order:
 
-```bash
-bmad *party-mode
-```
-
-Brings all agents together for collaborative problem-solving. Each specialist contributes their unique perspective. Get solutions you wouldn't have thought of alone.
-
-### Everyday Development
-
-```bash
-# Quick requirements check
-bmad analyst "Review this user story"
-
-# Architecture review
-bmad architect "Is this design pattern appropriate?"
-
-# Code review
-bmad dev "Improve this implementation"
-
-# Test strategy
-bmad tea "What test cases am I missing?"
-```
-
-Every command works in every project. No setup, no configuration, just results.
-
-## � Key Features
-
-- **🎭 Role-Based Expertise** - Agents maintain consistent personality and domain knowledge
-- **🔄 Workflow Automation** - Multi-step processes become single commands
-- **📚 Battle-Tested Methodology** - Software best practices built into every interaction
-- **🎨 Fully Customizable** - Override globally or per-project as needed
-- **🔒 Privacy-First** - Runs locally, your code stays on your machine
-- **⚡ Zero Overhead** - No API keys, no accounts, install and use immediately
-- **🌐 Universal Access** - One configuration, unlimited projects
-
-## 📚 Documentation
-
-- **[Installation Guide](./docs/installation.md)** - Complete setup instructions for all platforms
-- **[Development Guide](./docs/development.md)** - Contributing and local development
-- **[Troubleshooting](./docs/troubleshooting.md)** - Solutions to common issues
-- **[Release Process](./docs/release-process.md)** - Versioning and publishing guide
-
-## 🛠️ Complete Agent Roster
-
-| Agent | Name             | Role                              | Load with                    |
-| ----- | ---------------- | --------------------------------- | ---------------------------- |
-| 🧙    | BMad Master      | Orchestrator & Methodology Expert | `bmad` or `bmad bmad-master` |
-| 📊    | Mary             | Strategic Business Analyst        | `bmad analyst`               |
-| 🏗️    | Winston          | System Architect                  | `bmad architect`             |
-| 💻    | Amelia           | Senior Implementation Engineer    | `bmad dev`                   |
-| 🎨    | Sally            | UX/UI Specialist                  | `bmad ux-expert`             |
-| 🧪    | Murat            | Master Test Architect             | `bmad tea`                   |
-| 📋    | John             | Product Manager                   | `bmad pm`                    |
-| 🔄    | Bob              | Scrum Master                      | `bmad sm`                    |
-| 🎮    | Cloud Dragonborn | Game Systems Architect            | `bmad game-architect`        |
-| 🎲    | Samus Shepard    | Lead Game Designer                | `bmad game-designer`         |
-| 🕹️    | Link Freeman     | Senior Game Developer             | `bmad game-dev`              |
-
-**Every agent, every project, instantly available.**
-
-## 🔧 Commands Reference
-
-| Command            | Purpose                   | Example            |
-| ------------------ | ------------------------- | ------------------ |
-| `bmad`             | Load default orchestrator | `bmad`             |
-| `bmad <agent>`     | Load specialist agent     | `bmad analyst`     |
-| `bmad *<workflow>` | Execute workflow          | `bmad *party-mode` |
-
-## 🚦 Contributing
-
-Want to improve BMAD for everyone?
-
-```bash
-git clone https://github.com/mkellerman/bmad-mcp-server.git
-cd bmad-mcp-server
-npm install
-npm test          # Run comprehensive test suite
-npm run dev       # Start in development mode
-```
-
-📖 **Complete contributor guide:** [Development Documentation](./docs/development.md)
-
-- Architecture overview and design principles
-- Coding standards and best practices
-- Testing guidelines (unit, integration, E2E)
-- Pull request requirements
-
-## 📖 Documentation
-
-- **[Installation Guide](./docs/installation.md)** - Setup for VS Code, Claude Desktop, Cursor
-- **[Architecture Guide](./docs/architecture.md)** - How the MCP server works internally
-- **[Development Guide](./docs/development.md)** - Contributing and extending BMAD
-- **[Troubleshooting](./docs/troubleshooting.md)** - Common issues and solutions
-- **[Release Process](./docs/release-process.md)** - For maintainers
-
-## 🎓 Understanding MCP & BMAD
-
-**What is the Model Context Protocol (MCP)?**
-
-MCP is an open standard that lets AI assistants connect to external tools and data sources. Think of it as a universal adapter: your AI assistant speaks MCP, the BMAD server speaks MCP, and they work together seamlessly.
-
-**What makes BMAD MCP Server different from other tools?**
-
-- **Methodology-driven**: Not just tools, but a complete development approach
-- **Role consistency**: Agents maintain expertise and personality across sessions
-- **Proven workflows**: Battle-tested processes become single commands
-- **Universal access**: Works everywhere you work, not project-by-project
-- **Framework agnostic**: Works with any AI client that supports MCP
-
-**BMAD scales with you**: Whether you're working on 1 project or 100, the MCP server provides consistent access to the complete BMAD methodology.
-
-## 📦 Project Structure
-
-```
-bmad-mcp-server/
-├── src/
-│   ├── server.ts              # MCP server implementation
-│   ├── tools/unified-tool.ts  # Command routing and execution
-│   └── bmad/                  # Methodology files
-│       ├── _cfg/              # Agent/workflow manifests
-│       ├── core/              # Core agents & workflows
-│       └── bmm/               # Extended methodology module
-├── docs/                      # Documentation
-└── tests/                     # Comprehensive test suite
-```
-
-## 📄 License
-
-ISC
-
-## 🌟 Star Us!
-
-If BMAD is helping you build better software, give us a star! It helps others discover the project.
+1. **Project-local**: `./bmad/` (highest priority - project customizations)
+2. **User-global**: `~/.bmad/` (personal defaults)
+3. **Git remotes**: Cloned to `~/.bmad/cache/git/` (shared/team content)
+4. **Package defaults**: Built-in BMAD files (always available)
 
 ---
 
-**Ready to transform your AI assistant?** [Get started now →](./docs/installation.md)
+## Documentation
+
+- **[Architecture](./docs/architecture.md)** - System design and components
+- **[API Contracts](./docs/api-contracts.md)** - MCP tools and TypeScript APIs
+- **[Development Guide](./docs/development-guide.md)** - Contributing and testing
+
+---
+
+## Development
+
+### Setup
+
+```bash
+# Clone repository
+git clone https://github.com/mkellerman/bmad-mcp-server.git
+cd bmad-mcp-server
+
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Run tests
+npm test
+```
+
+### Project Structure
+
+```
+src/
+├── index.ts              # MCP server entry point
+├── cli.ts                # CLI entry point
+├── server.ts             # MCP server implementation
+├── core/
+│   ├── bmad-engine.ts    # Core business logic
+│   └── resource-loader.ts # Multi-source content loading
+├── tools/
+│   ├── bmad-unified.ts   # Unified tool implementation
+│   └── operations/       # Operation handlers
+├── types/                # TypeScript types
+└── utils/                # Utilities
+```
+
+### npm Scripts
+
+```bash
+npm run build          # Compile TypeScript
+npm run dev            # Development mode with auto-restart
+npm test               # Run all tests
+npm run test:unit      # Unit tests only
+npm run test:coverage  # Coverage report
+npm run lint           # Check linting
+npm run format         # Format code
+```
+
+### Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run specific test suite
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+
+# Watch mode
+npm run test:watch
+```
+
+---
+
+## Architecture
+
+### High-Level Overview
+
+```
+AI Assistant (Claude, Copilot, etc.)
+         ↓ MCP Protocol
+    MCP Server Layer
+         ↓
+    BMAD Engine (transport-agnostic)
+         ↓
+  Resource Loader (multi-source)
+         ↓
+   BMAD Content (agents, workflows)
+```
+
+### Key Components
+
+- **Server**: MCP protocol implementation (tools, resources, prompts)
+- **Engine**: Transport-agnostic business logic
+- **Loader**: Multi-source content discovery and loading
+- **Tools**: Unified `bmad` tool with modular operations
+
+See [Architecture Documentation](./docs/architecture.md) for details.
+
+---
+
+## Contributing
+
+We welcome contributions! Please see our [Development Guide](./docs/development-guide.md) for:
+
+- Development setup
+- Code style guidelines
+- Testing requirements
+- Pull request process
+
+### Quick Contribution Guide
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Make your changes with tests
+4. Run tests: `npm test`
+5. Commit: `git commit -m "feat: add my feature"`
+6. Push: `git push origin feature/my-feature`
+7. Create a Pull Request
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
+
+---
+
+## License
+
+ISC © [mkellerman](https://github.com/mkellerman)
+
+---
+
+## Credits
+
+This MCP server is built on the [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD). All methodology, agents, workflows, and best practices are credited to the original BMAD Method project.
+
+---
+
+## Links
+
+- **Repository**: https://github.com/mkellerman/bmad-mcp-server
+- **Issues**: https://github.com/mkellerman/bmad-mcp-server/issues
+- **npm Package**: https://www.npmjs.com/package/bmad-mcp-server
+- **BMAD Method**: https://github.com/bmad-code-org/BMAD-METHOD
+- **MCP Specification**: https://modelcontextprotocol.io/

@@ -17,7 +17,9 @@ export default tseslint.config(
       'test-results/**',
       '**/*.d.ts',
       'tests/support/fixtures/**',
+      'tests/fixtures/**',
       '.bmad/**',
+      '_deprecated/**',
     ],
   },
   {
@@ -47,16 +49,15 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       'no-console': ['warn', { allow: ['error', 'warn'] }],
     },
   },
   {
-    files: [
-      'tests/**/*.ts',
-      'playwright.config.ts',
-      'vitest.config.ts',
-      'vitest.config.llm.ts',
-    ],
+    files: ['tests/**/*.ts', 'playwright.config.ts', 'vitest.config.ts'],
     extends: [js.configs.recommended],
     languageOptions: {
       parser: tseslint.parser,

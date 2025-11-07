@@ -5,6 +5,7 @@ import {
 } from '../../support/mcp-client-fixture';
 import { LLMClient } from '../../support/llm-client';
 import { addLLMInteraction } from '../../framework/core/test-context.js';
+import { verifyLiteLLMRunning } from '../../support/litellm-helper.mjs';
 
 /**
  * E2E Test: Persona adoption with LLM
@@ -27,12 +28,9 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
     // Start MCP client
     mcpClient = await createMCPClient();
 
-    // Init LLM client and check health
-    llm = new LLMClient();
-    const healthy = await llm.healthCheck();
-    if (!healthy) {
-      throw new Error('❌ LiteLLM proxy not running!');
-    }
+    // Init LLM client with dynamic port and verify it's running
+    llm = await LLMClient.create();
+    await verifyLiteLLMRunning(() => llm.healthCheck());
   });
 
   afterAll(async () => {
@@ -40,16 +38,27 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
   });
 
   it('should respond in persona after loading architect', async () => {
-    // 1) Load the architect agent via MCP tool
-    const load = await mcpClient.callTool('bmad', { command: 'architect' });
+    // 1) Read the architect agent definition via MCP unified tool
+    const load = await mcpClient.callTool('bmad', {
+      operation: 'read',
+      type: 'agent',
+      agent: 'architect',
+    });
+    if (load.isError) {
+      console.log('Tool call error:', load.content);
+    }
     expect(load.isError).toBe(false);
-    expect(load.content).toContain('BMAD Agent');
+
+    // Parse JSON response to get agent definition
+    const agentDef = JSON.parse(load.content);
+    expect(agentDef.content).toBeDefined();
+    expect(agentDef.content).toContain('instructions');
 
     // 2) Ask the LLM a question with the agent content as system context
     const completion = await llm.chat(
       process.env.LLM_MODEL || 'gpt-4.1',
       [
-        { role: 'system', content: load.content },
+        { role: 'system', content: agentDef.content },
         {
           role: 'user',
           content: 'What is your name and what are your duties?',
@@ -61,7 +70,7 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
     const answer = llm.getResponseText(completion);
 
     // 3) Validate the reply reflects the persona from sample assets
-    // Architect sample (v6) uses name="Winston" and role includes "System Architect"
+    // Architect sample (v4) uses name="Winston" and role includes "System Architect"
     expect(answer.toLowerCase()).toContain('winston');
     expect(answer.toLowerCase()).toMatch(
       /architect|system architect|technical design/,
@@ -79,8 +88,8 @@ describe.skipIf(skipE2E)('Persona adoption', () => {
       },
       toolCalls: [
         {
-          name: 'mcp_bmad_bmad',
-          arguments: { command: 'architect' },
+          name: 'bmm-architect',
+          arguments: { message: 'What is your name and what are your duties?' },
           timestamp: new Date().toISOString(),
           duration: 0,
           result: load.content,

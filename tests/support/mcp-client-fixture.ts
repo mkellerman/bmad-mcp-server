@@ -34,17 +34,17 @@ export class MCPClientFixture {
     const serverPath = path.join(__dirname, '../../build/index.js');
 
     // Create transport
-    // Use v6 sample data for E2E tests
-    const bmadSamplePath = path.join(
-      __dirname,
-      '../../.bmad/6.0.0-alpha.0/bmad',
-    );
+    // The server looks for {projectRoot}/bmad/, so we point to the fixtures directory
+    // which contains bmad/
+    const bmadSamplePath = path.join(__dirname, '../fixtures');
 
     this.transport = new StdioClientTransport({
       command: 'node',
       args: [serverPath],
       env: {
         ...process.env,
+        // Server will look for {BMAD_ROOT}/bmad/
+        // We're setting it to tests/fixtures so it finds tests/fixtures/bmad/
         BMAD_ROOT: bmadSamplePath,
         ...this.customEnv, // Apply custom env vars
       },

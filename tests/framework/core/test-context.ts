@@ -47,7 +47,30 @@ interface TestContext {
   [key: string]: unknown;
 }
 
-const CONTEXT_DIR = 'test-results/.contexts';
+/**
+ * Infer test type from file path or current test execution context
+ */
+function inferTestType(): string {
+  const envTestType = process.env.TEST_TYPE;
+
+  // If TEST_TYPE is explicitly set (not 'all'), use it
+  if (envTestType && envTestType !== 'all') {
+    return envTestType;
+  }
+
+  // Try to infer from current test file if available
+  // This is a fallback - ideally we'd pass the test file path
+  // For now, default to 'default' when we can't determine
+  return 'default';
+}
+
+/**
+ * Get context directory based on test type
+ */
+function getContextDir(): string {
+  const testType = inferTestType();
+  return path.join('test-results', '.results', testType, '.contexts');
+}
 
 /**
  * Current test tracking
@@ -63,7 +86,7 @@ export function setCurrentTest(testName: string): void {
  */
 function getContextPath(testName: string): string {
   const safeName = testName.replace(/[^a-z0-9-]/gi, '_');
-  return path.join(CONTEXT_DIR, `${safeName}.json`);
+  return path.join(getContextDir(), `${safeName}.json`);
 }
 
 /**
@@ -86,7 +109,7 @@ async function saveContext(
   testName: string,
   context: TestContext,
 ): Promise<void> {
-  await fs.mkdir(CONTEXT_DIR, { recursive: true });
+  await fs.mkdir(getContextDir(), { recursive: true });
   const contextPath = getContextPath(testName);
   await fs.writeFile(contextPath, JSON.stringify(context, null, 2), 'utf-8');
 }
@@ -108,8 +131,8 @@ export async function getAllTestContexts(): Promise<Map<string, TestContext>> {
   const contexts = new Map<string, TestContext>();
 
   try {
-    await fs.mkdir(CONTEXT_DIR, { recursive: true });
-    const files = await fs.readdir(CONTEXT_DIR);
+    await fs.mkdir(getContextDir(), { recursive: true });
+    const files = await fs.readdir(getContextDir());
 
     for (const file of files) {
       if (file.endsWith('.json')) {
@@ -143,7 +166,7 @@ export async function getAllTestContexts(): Promise<Map<string, TestContext>> {
  */
 export async function clearTestContexts(): Promise<void> {
   try {
-    await fs.rm(CONTEXT_DIR, { recursive: true, force: true });
+    await fs.rm(getContextDir(), { recursive: true, force: true });
   } catch {
     // Ignore errors
   }

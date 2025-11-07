@@ -14,6 +14,7 @@ import {
   addChatMessage,
   finalizeChatConversation,
 } from '../../framework/core/test-context.js';
+import { verifyLiteLLMRunning } from '../../support/litellm-helper.mjs';
 
 const LLM_MODEL = 'gpt-4.1';
 const LLM_TEMPERATURE = 0.1;
@@ -28,12 +29,10 @@ describe.skipIf(skipE2E)('Single Agent LLM Integration Test', () => {
 
   beforeAll(async () => {
     mcpClient = await createMCPClient();
-    llmClient = new LLMClient();
+    llmClient = await LLMClient.create();
 
-    const isHealthy = await llmClient.healthCheck();
-    if (!isHealthy) {
-      throw new Error('❌ LiteLLM proxy not running!');
-    }
+    // Verify LiteLLM is running (global setup should have started it)
+    await verifyLiteLLMRunning(() => llmClient.healthCheck());
   });
 
   afterAll(async () => {

@@ -1,81 +1,32 @@
 #!/usr/bin/env node
 /**
- * Show BMAD *list-agents output using the built build/ artifacts.
+ * Display raw list-agents output for troubleshooting
+ * This is a convenience wrapper around bmad-cli.mjs
  *
- * Usage:
- *   node show-list-agents.mjs [--root /path/to/bmad]
+ * Usage: node scripts/show-list-agents.mjs
  */
 
-import { resolveBmadPaths } from '../build/utils/bmad-path-resolver.js';
-import { MasterManifestService } from '../build/services/master-manifest-service.js';
-import { handleListCommand } from '../build/tools/internal/list.js';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const cliPath = path.join(__dirname, 'bmad-cli.mjs');
 
-// Parse args
-function parseArgs(argv) {
-  const args = { root: undefined };
-  for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--root') {
-      args.root = argv[i + 1];
-      i++;
-    } else if (!a.startsWith('--')) {
-      args.root = a;
-    }
-  }
-  return args;
-}
+console.log('Fetching agent list via bmad-cli...\n');
 
-const args = parseArgs(process.argv);
-const projectRoot = path.resolve(__dirname, '..');
-const userBmadPath = path.join(process.env.HOME || '~', '.bmad');
+const child = spawn(
+  'node',
+  [
+    cliPath,
+    'tools/call',
+    '{"name":"bmad-resources","arguments":{"operation":"agents"}}',
+  ],
+  {
+    stdio: 'inherit',
+  },
+);
 
-// Resolve BMAD paths
-const discovery = resolveBmadPaths({
-  cwd: projectRoot,
-  cliArgs: args.root ? [args.root] : [],
-  envVar: process.env.BMAD_ROOT,
-  userBmadPath,
+child.on('exit', (code) => {
+  process.exit(code || 0);
 });
-
-const active = discovery.activeLocation;
-const bmadRoot = active.resolvedRoot ?? active.originalPath ?? projectRoot;
-
-console.log(`Using BMAD root: ${bmadRoot}\n`);
-
-// Build master manifest
-const masterService = new MasterManifestService(discovery, projectRoot);
-const master = masterService.get();
-
-console.log(`Loaded ${master.agents.length} agents\n`);
-
-// Execute list command
-const resolved = {
-  agents: master.agents,
-  workflows: master.workflows,
-  tasks: master.tasks,
-};
-
-const result = await handleListCommand('*list-agents', {
-  resolved,
-  master,
-  discovery,
-});
-
-if (result.success) {
-  console.log('=== MARKDOWN OUTPUT ===\n');
-  console.log(result.content);
-  console.log('\n');
-
-  if (result.structuredData) {
-    console.log('=== STRUCTURED DATA ===\n');
-    console.log(JSON.stringify(result.structuredData, null, 2));
-  }
-} else {
-  console.error('Error:', result.error);
-  process.exit(1);
-}

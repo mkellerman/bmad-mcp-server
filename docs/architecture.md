@@ -1,653 +1,498 @@
-# BMAD MCP Server Architecture
+# Architecture - BMAD MCP Server
 
-Technical deep-dive into the BMAD MCP Server's design and implementation (v0.2.x+).
-
-> **For users:** See [Installation Guide](./installation.md) for setup instructions.  
-> **For contributors:** Read this to understand how the system works internally.
-
-## Overview
-
-The BMAD MCP Server uses a **Master Manifest** architecture that inventories all BMAD resources from multiple locations and provides priority-based resolution for loading agents, workflows, and supporting files.
-
-### Core Design Principles
-
-1. **Single Source of Truth** - Master Manifest inventories all resources
-2. **Priority-Based Resolution** - Multiple locations with clear precedence rules
-3. **Separation of Concerns** - Discovery (manifest) vs. Loading (FileReader)
-4. **Module-Qualified Names** - Support for `module/name` syntax
-5. **Override-Friendly** - Project files override user files override package files
+**Version:** 4.0.0  
+**Architecture Pattern:** Unified Tool with Transport-Agnostic Engine  
+**Last Updated:** November 6, 2025
 
 ---
 
-## Architecture Layers
+## Executive Summary
+
+The BMAD MCP Server is a **Node.js TypeScript library** that implements the Model Context Protocol (MCP) to expose BMAD methodology (agents, workflows, resources) to AI assistants. The v4.0 architecture introduces a **unified tool design** replacing the previous tool-per-agent approach, with a **transport-agnostic core engine** enabling reuse across MCP, CLI, and future interfaces.
+
+**Key Characteristics:**
+
+- **Type:** Backend library/MCP server
+- **Language:** TypeScript 5.7.2 (strict mode, ES2022 target)
+- **Protocol:** MCP SDK 1.0.4
+- **Architecture:** Layered (Transport → Server → Engine → Loader)
+- **Distribution:** npm package with CLI binaries
+
+---
+
+## System Architecture
+
+### High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     MCP Protocol Layer                       │
-│  (ListPrompts, GetPrompt, CallTool handlers)                │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│                   UnifiedBMADTool                            │
-│  - Parse commands (agent/workflow, module-qualified)         │
-│  - Query master manifest for metadata                        │
-│  - Load files via FileReader                                 │
-│  - Format results                                            │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-         ┌───────────┴───────────┐
-         ↓                       ↓
-┌────────────────────┐  ┌────────────────────┐
-│  Master Manifest   │  │    FileReader      │
-│  - What exists     │  │  - How to load     │
-│  - Metadata        │  │  - Priority chain  │
-│  - Priority info   │  │  - File I/O        │
-└────────┬───────────┘  └────────────────────┘
-         ↓
-┌─────────────────────────────────────────────────────────────┐
-│              V4/V6 Inventory Modules                         │
-│  - Scan filesystem for agents/workflows/tasks                │
-│  - Read CSV manifests (v6) or YAML (v4)                     │
-│  - Create MasterRecord entries                               │
+│                    AI Assistant (Client)                     │
+│              (Claude Desktop, Cline, etc.)                   │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ MCP Protocol (stdio/JSON-RPC)
+┌──────────────────────▼──────────────────────────────────────┐
+│                   Transport Layer (MCP)                      │
+│  - StdioServerTransport (stdio communication)                │
+│  - MCP SDK Request/Response handling                         │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────┐
+│               Server Layer (server.ts)                       │
+│  - BMADServerLiteMultiToolGit class                         │
+│  - MCP request handlers (tools, resources, prompts, etc.)   │
+│  - Unified tool registration and validation                 │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────┐
+│            Engine Layer (bmad-engine.ts)                     │
+│  - BMADEngine (transport-agnostic business logic)           │
+│  - Operations: list, read, execute                          │
+│  - Agent/workflow execution orchestration                   │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────┐
+│          Resource Layer (resource-loader.ts)                 │
+│  - ResourceLoaderGit class                                  │
+│  - Multi-source loading (project, user, git remotes)        │
+│  - Manifest generation and caching                          │
+│  - File system and Git operations                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
----
+### Component Responsibilities
 
-## Master Manifest Architecture
-
-### What is the Master Manifest?
-
-The Master Manifest is a **unified inventory** of all BMAD resources (agents, workflows, tasks, modules) discovered from all configured locations, with metadata about each resource's origin, priority, and existence.
-
-### Key Characteristics
-
-- **Not flattened** - Contains all records from all locations
-- **Metadata-rich** - Each record knows its origin, priority, status
-- **Built at startup** - Generated once during server initialization
-- **Cached** - Stored in `MasterManifestService` for fast queries
-
-### Master Record Structure
-
-```typescript
-interface MasterRecord {
-  kind: 'agent' | 'workflow' | 'task';
-  source: 'manifest' | 'filesystem'; // From CSV or discovered?
-  origin: BmadOrigin; // Where it came from
-  moduleName: string; // e.g., 'bmm', 'core'
-  moduleVersion?: string;
-  bmadVersion?: string;
-  name?: string;
-  displayName?: string;
-  description?: string;
-  bmadRelativePath: string; // e.g., 'bmad/bmm/agents/analyst.md'
-  moduleRelativePath: string; // e.g., 'bmm/agents/analyst.md'
-  absolutePath: string; // Full filesystem path
-  exists: boolean; // File actually exists?
-  status: 'verified' | 'not-in-manifest' | 'no-file-found';
-}
-
-interface BmadOrigin {
-  kind: 'project' | 'cli' | 'env' | 'user' | 'package';
-  displayName: string; // e.g., 'Project', 'User Defaults'
-  root: string; // Absolute path to bmad root
-  manifestDir: string; // Absolute path to _cfg
-  priority: number; // Lower = higher priority
-}
-```
-
-### Example Master Manifest
-
-```json
-{
-  "agents": [
-    {
-      "kind": "agent",
-      "name": "architect",
-      "moduleName": "bmm",
-      "absolutePath": "/project/bmad/bmm/agents/architect.md",
-      "exists": true,
-      "status": "verified",
-      "origin": {
-        "kind": "project",
-        "displayName": "Project",
-        "priority": 1
-      }
-    },
-    {
-      "kind": "agent",
-      "name": "architect",
-      "moduleName": "bmm",
-      "absolutePath": "/home/user/.bmad/bmm/agents/architect.md",
-      "exists": true,
-      "status": "verified",
-      "origin": {
-        "kind": "user",
-        "displayName": "User Defaults",
-        "priority": 3
-      }
-    },
-    {
-      "kind": "agent",
-      "name": "analyst",
-      "moduleName": "bmm",
-      "absolutePath": "/package/bmad/bmm/agents/analyst.md",
-      "exists": true,
-      "status": "verified",
-      "origin": {
-        "kind": "package",
-        "displayName": "Package",
-        "priority": 5
-      }
-    }
-  ],
-  "workflows": [...],
-  "tasks": [...],
-  "modules": [...]
-}
-```
+| Layer         | Component                  | Responsibility                                               |
+| ------------- | -------------------------- | ------------------------------------------------------------ |
+| **Transport** | MCP SDK                    | JSON-RPC protocol, stdio communication                       |
+| **Server**    | BMADServerLiteMultiToolGit | MCP request routing, tool/resource handlers                  |
+| **Tool**      | bmad-unified               | Unified tool with 4 operations (list, read, execute, search) |
+| **Engine**    | BMADEngine                 | Business logic, operation execution, validation              |
+| **Loader**    | ResourceLoaderGit          | Multi-source content loading, caching, Git support           |
 
 ---
 
-## Priority-Based Resolution
+## Core Components
 
-### Priority Rules
+### 1. Server (server.ts)
 
-**Lower priority number = Higher priority**
+**Class:** `BMADServerLiteMultiToolGit`
 
-| Source      | Priority | Description             | Example               |
-| ----------- | -------- | ----------------------- | --------------------- |
-| Project     | 1        | Local `./bmad` folder   | `/project/bmad`       |
-| CLI Args    | 2+       | Command-line paths      | `--path /custom/bmad` |
-| Environment | 3+       | `BMAD_ROOT` variable    | `BMAD_ROOT=/path`     |
-| User        | 4+       | `~/.bmad` folder        | `/home/user/.bmad`    |
-| Package     | 5        | Embedded in npm package | `/package/bmad`       |
+**Purpose:** MCP server implementation with request handlers
 
-### Selection Algorithm
+**Capabilities:**
 
-When loading a resource (e.g., agent "architect"):
+- Tools (unified bmad tool)
+- Resources (bmad:// URI scheme)
+- Resource Templates (URI templates for discovery)
+- Prompts (agent/workflow prompts)
+- Completions (argument suggestions)
+
+**Key Methods:**
 
 ```typescript
-function findAgentByName(
-  manifest: MasterManifests,
-  name: string,
-  module?: string,
-): MasterRecord | undefined {
-  // 1. Filter by name and exists=true
-  let candidates = manifest.agents.filter(
-    (a) => a.name === name && a.exists === true,
-  );
-
-  // 2. If module specified, filter by module
-  if (module) {
-    candidates = candidates.filter((a) => a.moduleName === module);
-  }
-
-  // 3. Sort by priority (ascending - lowest wins)
-  candidates.sort((a, b) => a.origin.priority - b.origin.priority);
-
-  // 4. Return first match (highest priority)
-  return candidates[0];
-}
+constructor(projectRoot?: string, gitRemotes?: string[])
+async start(): Promise<void>
+private setupHandlers(): void
+private getMimeType(path: string): string
 ```
 
-### Resolution Examples
+### 2. Engine (bmad-engine.ts)
 
-#### Example 1: No Module Qualifier
+**Class:** `BMADEngine`
+
+**Purpose:** Transport-agnostic business logic core
+
+**Operations:**
+
+1. **List**: Discover agents, workflows, modules, resources
+2. **Read**: Inspect agent/workflow definitions (read-only)
+3. **Execute**: Run agents/workflows with user context (actions)
+4. **Search**: Find agents/workflows by name/description (optional)
+
+**Key Methods:**
+
+```typescript
+async initialize(): Promise<void>
+async listAgents(filter?: ListFilter): Promise<AgentMetadata[]>
+async listWorkflows(filter?: ListFilter): Promise<Workflow[]>
+async readAgent(name: string, module?: string): Promise<AgentDefinition>
+async readWorkflow(name: string, module?: string): Promise<WorkflowDefinition>
+async executeAgent(params: ExecuteParams): Promise<BMADResult>
+async executeWorkflow(params: ExecuteParams): Promise<BMADResult>
+```
+
+### 3. Resource Loader (resource-loader.ts)
+
+**Class:** `ResourceLoaderGit`
+
+**Purpose:** Multi-source BMAD content loading with Git support
+
+**Source Priority:**
+
+1. Project-local: `./bmad/` (highest priority)
+2. User-global: `~/.bmad/`
+3. Git remotes: Cloned to `~/.bmad/cache/git/` (lowest priority)
+
+**Key Features:**
+
+- Automatic manifest generation from YAML/MD sources
+- Git remote cloning and caching
+- Conflict resolution (higher priority wins)
+- Virtual manifests for agent/workflow discovery
+
+**Key Methods:**
+
+```typescript
+async initialize(): Promise<void>
+async loadManifests(): Promise<void>
+getAgent(name: string, module?: string): AgentMetadata | undefined
+getWorkflow(name: string, module?: string): Workflow | undefined
+getResource(relativePath: string): ResourceFile | undefined
+```
+
+### 4. Unified Tool (tools/bmad-unified.ts)
+
+**Tool Name:** `bmad`
+
+**Purpose:** Single tool exposing all BMAD functionality
+
+**Operations:**
+
+- `list` - Discover agents/workflows/modules/resources
+- `read` - Inspect definitions (read-only, no execution)
+- `execute` - Run agents/workflows with context (performs actions)
+- `search` - Find by name/description (optional, config-toggleable)
+
+**Operation Handlers:**
+
+```typescript
+// Modular operation handlers in tools/operations/
+executeListOperation(engine, params); // list.ts
+executeReadOperation(engine, params); // read.ts
+executeExecuteOperation(engine, params); // execute.ts
+executeSearchOperation(engine, params); // search.ts
+```
+
+---
+
+## Data Flow
+
+### List Operation Example
+
+```
+1. AI Client → MCP Request
+   {"method": "tools/call", "params": {"name": "bmad",
+    "arguments": {"operation": "list", "query": "agents"}}}
+
+2. Server → validate → route to bmad-unified handler
+
+3. bmad-unified → validateListParams() → executeListOperation()
+
+4. Engine → listAgents(filter)
+
+5. ResourceLoader → return cached agent metadata
+
+6. Engine → format results as text
+
+7. Server → MCP Response
+   {"content": [{"type": "text", "text": "...agent list..."}]}
+
+8. AI Client ← parses response
+```
+
+### Execute Operation Example
+
+```
+1. AI Client → MCP Request
+   {"method": "tools/call", "params": {"name": "bmad",
+    "arguments": {"operation": "execute", "agent": "analyst",
+                 "message": "Help me..."}}}
+
+2. Server → validate → route to bmad-unified handler
+
+3. bmad-unified → validateExecuteParams() → executeExecuteOperation()
+
+4. Engine → executeAgent(params)
+   - Load agent definition
+   - Generate execution prompt
+   - Return context for AI to act as agent
+
+5. Server → MCP Response (agent prompt + instructions)
+
+6. AI Client ← receives context, continues conversation as agent
+```
+
+---
+
+## Multi-Source Loading
+
+### Source Discovery Order
+
+```
+Priority 1: ./bmad/          (Project-local - user customizations)
+Priority 2: ~/.bmad/         (User-global - personal library)
+Priority 3: git+https://...  (Git remotes - shared/team content)
+```
+
+### Conflict Resolution
+
+**When same agent/workflow exists in multiple sources:**
+
+- Higher priority source wins
+- Example: `./bmad/bmm/agents/analyst.md` overrides `~/.bmad/bmm/agents/analyst.md`
+
+### Git Remote Support
+
+**URL Formats:**
 
 ```bash
-# Command: bmad architect
-
-Master Manifest:
-  - architect (bmm, project, priority=1)   ✅ SELECTED
-  - architect (bmm, user, priority=3)
-  - architect (core, package, priority=5)
-
-Result: /project/bmad/bmm/agents/architect.md
+git+https://github.com/org/repo.git              # HTTPS
+git+https://github.com/org/repo.git#main         # Branch
+git+https://github.com/org/repo.git#v2.0.0       # Tag
+git+https://github.com/org/repo.git#main:/path   # Subpath (monorepo)
+git+ssh://git@github.com/org/repo.git            # SSH (private repos)
 ```
 
-#### Example 2: Module Qualifier
+**Cache Location:** `~/.bmad/cache/git/{hash}/`
 
-```bash
-# Command: bmad core/architect
+**Update Strategy:** Clone on first use, manual update required
 
-Master Manifest:
-  - architect (bmm, project, priority=1)   ❌ Wrong module
-  - architect (bmm, user, priority=3)      ❌ Wrong module
-  - architect (core, package, priority=5)  ✅ SELECTED
+---
 
-Result: /package/bmad/core/agents/architect.md
+## Technology Stack
+
+| Category       | Technology      | Version | Purpose                    |
+| -------------- | --------------- | ------- | -------------------------- |
+| **Language**   | TypeScript      | 5.7.2   | Type-safe development      |
+| **Runtime**    | Node.js         | 18+     | Server execution           |
+| **Protocol**   | MCP SDK         | 1.0.4   | AI assistant communication |
+| **Build**      | tsc             | 5.7.2   | TypeScript compilation     |
+| **Testing**    | Vitest          | 4.0.3   | Unit/integration/e2e tests |
+| **Linting**    | ESLint          | 9.17.0  | Code quality               |
+| **Formatting** | Prettier        | 3.4.2   | Code style                 |
+| **Parsing**    | fast-xml-parser | 5.3.1   | XML parsing                |
+| **Parsing**    | js-yaml         | 4.1.0   | YAML parsing               |
+| **Parsing**    | csv-parse       | 6.1.0   | CSV parsing                |
+
+---
+
+## File Structure
+
 ```
+src/
+├── index.ts              # Entry point (MCP server startup)
+├── cli.ts                # CLI entry point (bmad command)
+├── server.ts             # BMADServerLiteMultiToolGit (MCP layer)
+├── config.ts             # Configuration constants
+├── core/
+│   ├── bmad-engine.ts    # BMADEngine (business logic)
+│   └── resource-loader.ts # ResourceLoaderGit (content loading)
+├── tools/
+│   ├── index.ts          # Tool exports
+│   ├── bmad-unified.ts   # Unified bmad tool
+│   └── operations/
+│       ├── list.ts       # List operation handler
+│       ├── read.ts       # Read operation handler
+│       ├── execute.ts    # Execute operation handler
+│       └── search.ts     # Search operation handler
+├── types/
+│   └── index.ts          # TypeScript type definitions
+└── utils/
+    ├── logger.ts         # Logging utilities
+    └── git-source-resolver.ts # Git URL parsing
 
-#### Example 3: Override Scenario
-
-User wants to customize `bmm/architect` for this project:
-
-```bash
-# 1. User creates: /project/bmad/bmm/agents/architect.md
-
-# 2. Command: bmad bmm/architect
-
-Master Manifest:
-  - architect (bmm, project, priority=1)   ✅ SELECTED (override!)
-  - architect (bmm, user, priority=3)      ⚪ Available but not used
-  - architect (bmm, package, priority=5)   ⚪ Available but not used
-
-Result: /project/bmad/bmm/agents/architect.md (custom version)
+build/                    # Compiled JavaScript (generated)
+tests/
+├── unit/                 # Unit tests (isolated functions)
+├── integration/          # Integration tests (component interaction)
+├── e2e/                  # End-to-end tests (full workflows)
+├── framework/            # Test infrastructure
+├── fixtures/             # Test data
+└── helpers/              # Test utilities
 ```
 
 ---
 
-## FileReader: Supporting File Resolution
+## Design Principles
 
-### Purpose
+### 1. Transport Agnostic Core
 
-While the Master Manifest handles **primary resources** (agents, workflows, tasks), **FileReader** handles **supporting files** (templates, customizations, configs) with priority-based fallback.
+**Principle:** Business logic (BMADEngine) has no MCP dependencies
 
-### How It Works
+**Benefits:**
 
-FileReader maintains a priority-ordered list of BMAD roots and tries each location in order:
+- Reusable across interfaces (MCP, CLI, HTTP API, etc.)
+- Easier testing (no transport mocking)
+- Clear separation of concerns
 
-```typescript
-class FileReader {
-  private roots: string[]; // ['/project/bmad', '~/.bmad', '/package/bmad']
-
-  readFile(relativePath: string): string {
-    for (const root of this.roots) {
-      const fullPath = path.join(root, relativePath);
-      if (fs.existsSync(fullPath)) {
-        return fs.readFileSync(fullPath, 'utf-8');
-      }
-    }
-    throw new Error(`File not found: ${relativePath}`);
-  }
-}
-```
-
-### Example Usage
+**Implementation:**
 
 ```typescript
-// Loading an agent
-const agentRecord = findAgentByName(manifest, 'architect');
-
-// Primary file: Use absolute path from master record
-const agentMd = fs.readFileSync(agentRecord.absolutePath, 'utf-8');
-
-// Supporting files: Use FileReader with fallback
-try {
-  const customization = fileReader.readFile(
-    '_cfg/agents/bmm-architect.customize.yaml',
-  );
-  // Tries: project → user → package
-} catch (e) {
-  // Not found in any location - that's ok
+// ✅ Engine returns plain objects
+interface BMADResult {
+  success: boolean;
+  data?: unknown;
+  error?: string;
+  text: string;
 }
 
-try {
-  const template = fileReader.readFile('templates/story.md');
-  // Tries: project → user → package
-} catch (e) {
-  // Not found in any location - that's ok
-}
+// ❌ Engine does NOT return MCP types
+// No: CallToolResult, TextContent, etc.
 ```
 
-### FileReader vs Master Manifest
+### 2. Unified Tool Pattern
 
-| Aspect          | Master Manifest          | FileReader                          |
-| --------------- | ------------------------ | ----------------------------------- |
-| **Purpose**     | What resources exist     | How to load any file                |
-| **Scope**       | Agents, workflows, tasks | Templates, configs, arbitrary files |
-| **Discovery**   | Pre-built inventory      | On-demand lookup                    |
-| **Fallback**    | Priority-based selection | Sequential try-each-location        |
-| **Performance** | Fast (cached)            | Slower (filesystem checks)          |
+**Previous (v3.x):** Tool-per-agent (bmm-analyst, bmm-architect, core-john, etc.)
+
+- 🔴 100+ tools → LLM confusion
+- 🔴 Duplicate logic across tools
+- 🔴 Hard to add new agents
+
+**Current (v4.0):** Single unified tool with operation parameter
+
+- ✅ 1 tool → clear LLM routing
+- ✅ Shared validation and logic
+- ✅ Easy to add agents (just content, no code)
+
+### 3. Layered Architecture
+
+**Transport → Server → Engine → Loader**
+
+Each layer has single responsibility:
+
+- **Transport**: Protocol communication
+- **Server**: Request routing
+- **Engine**: Business logic
+- **Loader**: Content management
+
+### 4. Multi-Source with Priority
+
+**Source discovery order enables:**
+
+- Global defaults (git remotes, user-global)
+- Project customization (project-local overrides)
+- Zero project clutter (no files in repo if not needed)
 
 ---
 
-## Module-Qualified Loading
+## Extension Points
 
-### Syntax
+### Adding New Operations
 
-```bash
-# Without module qualifier (searches all modules)
-bmad architect
+1. Create handler in `src/tools/operations/new-operation.ts`
+2. Export from `src/tools/operations/index.ts`
+3. Add to `BMADToolParams` interface
+4. Update `bmad-unified.ts` operation enum
+5. Add validation and execution logic
 
-# With module qualifier (searches specific module)
-bmad bmm/architect
-bmad core/bmad-master
+### Adding New MCP Capabilities
 
-# Workflows work the same way
-bmad *party-mode
-bmad *core/brainstorming
-```
+1. Update server capabilities in `server.ts` constructor
+2. Add request handler via `server.setRequestHandler()`
+3. Implement handler logic using `BMADEngine` methods
+4. Update API contracts documentation
 
-### Name Parser
+### Supporting New Transport
 
-```typescript
-interface ParsedName {
-  module?: string; // Optional module qualifier
-  name: string; // The actual resource name
-  original: string; // Original input
-}
-
-function parseQualifiedName(input: string): ParsedName {
-  if (input.includes('/')) {
-    const [module, name] = input.split('/');
-    return { module, name, original: input };
-  }
-  return { name: input, original: input };
-}
-```
-
-### Query Flow
-
-```
-User Input: "bmm/architect"
-        ↓
-Parse: { module: "bmm", name: "architect" }
-        ↓
-Query Master Manifest:
-  1. Filter by name="architect" → 3 matches
-  2. Filter by module="bmm" → 2 matches
-  3. Filter by exists=true → 2 matches
-  4. Sort by priority → [project(1), user(3)]
-  5. Return first → project
-        ↓
-Selected: /project/bmad/bmm/agents/architect.md
-```
+1. Create new entry point (e.g., `http-server.ts`)
+2. Import and use `BMADEngine` directly
+3. Map transport requests to engine operations
+4. Return results in transport-specific format
 
 ---
 
-## Data Flow: Loading an Agent
+## Performance Considerations
 
-### Complete Flow Diagram
+### Initialization
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│ 1. User Command: "bmad bmm/architect"                         │
-└────────────────────────┬──────────────────────────────────────┘
-                         ↓
-┌───────────────────────────────────────────────────────────────┐
-│ 2. UnifiedBMADTool.execute()                                  │
-│    - Parse command → { module: "bmm", name: "architect" }     │
-└────────────────────────┬──────────────────────────────────────┘
-                         ↓
-┌───────────────────────────────────────────────────────────────┐
-│ 3. Query Master Manifest                                      │
-│    findAgentByName(manifest, "architect", "bmm")              │
-│    - Filter by name + module + exists                         │
-│    - Sort by priority                                         │
-│    - Return highest priority match                            │
-└────────────────────────┬──────────────────────────────────────┘
-                         ↓
-┌───────────────────────────────────────────────────────────────┐
-│ 4. Selected MasterRecord                                      │
-│    {                                                           │
-│      name: "architect",                                        │
-│      module: "bmm",                                            │
-│      absolutePath: "/project/bmad/bmm/agents/architect.md",   │
-│      origin: { kind: "project", priority: 1 }                 │
-│    }                                                           │
-└────────────────────────┬──────────────────────────────────────┘
-                         ↓
-┌───────────────────────────────────────────────────────────────┐
-│ 5. Load Primary File                                          │
-│    fs.readFileSync(record.absolutePath)                       │
-│    → Agent markdown content                                   │
-└────────────────────────┬──────────────────────────────────────┘
-                         ↓
-┌───────────────────────────────────────────────────────────────┐
-│ 6. Load Supporting Files (FileReader with fallback)           │
-│    fileReader.readFile("_cfg/agents/bmm-architect.yaml")      │
-│    → Tries: project → user → package                          │
-│    → Returns first match or throws                            │
-└────────────────────────┬──────────────────────────────────────┘
-                         ↓
-┌───────────────────────────────────────────────────────────────┐
-│ 7. Format Response                                            │
-│    - Combine agent markdown + customizations                  │
-│    - Add metadata                                             │
-│    - Return BMADToolResult                                    │
-└───────────────────────────────────────────────────────────────┘
-```
+**Lazy Loading:** Engine initializes on first request, not on startup
 
-### Console Logging
+- First request: ~100-500ms (manifest loading)
+- Subsequent requests: <10ms (cached)
 
-Throughout the process, detailed logging shows what's happening:
+### Caching Strategy
 
-```
-🔍 Found 3 candidates for agent 'architect'
-🔍 After module filter 'bmm': 2 candidates
-✅ Selected: architect from module 'bmm' at Project (project, priority=1)
-📄 Reading file: bmm/agents/architect.md from /project/bmad
-📄 Reading file: _cfg/agents/bmm-architect.customize.yaml from /home/user/.bmad
-```
+**Manifest Caching:**
+
+- Generated once during initialization
+- Cached in memory for server lifetime
+- No disk caching (future enhancement)
+
+**Git Caching:**
+
+- Cloned once to `~/.bmad/cache/git/`
+- Subsequent starts reuse cached clone
+- Manual update required
+
+### Scalability
+
+**Current:** Single-process, in-memory caching
+**Future:** Multi-process, Redis caching, hot reload
 
 ---
 
-## Key Components
+## Security
 
-### MasterManifestService
+### Git Remote Security
 
-**File:** `src/services/master-manifest-service.ts`
+**SSH Support:** Private repositories via git+ssh://
+**Cache Isolation:** Each remote in separate directory
+**Path Traversal:** Prevented by path validation
 
-Manages the master manifest lifecycle:
+### Resource Access
 
-```typescript
-class MasterManifestService {
-  private cache: MasterManifests | null = null;
-
-  generate(): MasterManifests {
-    // Build master manifest from all origins
-    const origins = originsFromResolution(this.discovery);
-    this.cache = buildMasterManifests(origins);
-    return this.cache;
-  }
-
-  get(): MasterManifests {
-    // Return cached manifest (build if needed)
-    if (!this.cache) return this.generate();
-    return this.cache;
-  }
-
-  reload(): MasterManifests {
-    // Force rebuild
-    return this.generate();
-  }
-}
-```
-
-### V6 Module Inventory
-
-**File:** `src/utils/v6-module-inventory.ts`
-
-Scans v6 BMAD installations:
-
-1. Reads CSV manifests (if available)
-2. Scans filesystem for actual files
-3. Creates MasterRecords with:
-   - `source: 'manifest'` for CSV entries
-   - `source: 'filesystem'` for discovered files
-   - `status: 'verified' | 'not-in-manifest' | 'no-file-found'`
-
-### V4 Module Inventory
-
-**File:** `src/utils/v4-module-inventory.ts`
-
-Scans v4 BMAD installations:
-
-1. Reads `install-manifest.yaml`
-2. Scans filesystem for orphaned files
-3. Creates MasterRecords similar to v6
-
-### Master Manifest Adapters
-
-**File:** `src/utils/master-manifest-adapter.ts`
-
-Converts MasterRecords to legacy interfaces:
-
-```typescript
-function filterExisting(records: MasterRecord[]): MasterRecord[] {
-  return records.filter((r) => r.exists === true);
-}
-
-function masterRecordToAgent(record: MasterRecord): Agent {
-  return {
-    name: record.name || '',
-    displayName: record.displayName || record.name || '',
-    title: record.description || '',
-    module: record.moduleName,
-    path: record.absolutePath,
-    sourceRoot: record.origin.root,
-    sourceLocation: record.origin.displayName,
-  };
-}
-```
-
-### Master Manifest Query
-
-**File:** `src/utils/master-manifest-query.ts`
-
-Query functions with priority logic:
-
-```typescript
-function findAgentByName(
-  manifest: MasterManifests,
-  name: string,
-  module?: string,
-): MasterRecord | undefined;
-
-function findWorkflowByName(
-  manifest: MasterManifests,
-  name: string,
-  module?: string,
-): MasterRecord | undefined;
-```
+**URI Validation:** Only bmad:// URIs allowed
+**Path Sanitization:** Prevents access outside bmad directories
+**No Arbitrary Execution:** Agents return prompts, not code execution
 
 ---
 
-## Filtering Strategy
+## Testing Architecture
 
-### Simple Rule: Only Serve Existing Files
+### Test Layers
 
-```typescript
-// Filter records to only include files that exist
-const existingAgents = masterManifest.agents.filter((a) => a.exists === true);
-const existingWorkflows = masterManifest.workflows.filter(
-  (w) => w.exists === true,
-);
-```
+| Layer           | Location             | Purpose                 | Examples                        |
+| --------------- | -------------------- | ----------------------- | ------------------------------- |
+| **Unit**        | `tests/unit/`        | Isolated function tests | Engine operations, validators   |
+| **Integration** | `tests/integration/` | Component interaction   | Server + Engine, Loader + Git   |
+| **E2E**         | `tests/e2e/`         | Full workflow tests     | Agent execution, workflow flows |
 
-**Why this works:**
+### Test Infrastructure
 
-1. **Cannot serve non-existent files** - Obvious constraint
-2. **Master manifest tracks existence** - `exists: boolean` field
-3. **No complex status logic** - Just check `exists === true`
-4. **Clean and simple** - Easy to understand and maintain
+**Framework:** Vitest 4.0.3
 
----
+- Parallel execution
+- Coverage reporting (v8)
+- Custom BMAD reporter
+- Global setup/teardown
 
-## Design Decisions
-
-### Why Not Flatten Master Manifest?
-
-**Decision:** Master manifest contains all records from all origins (not flattened by priority)
-
-**Rationale:**
-
-- Transparency - Can see all available options
-- Flexibility - Query can apply different filters
-- Debugging - Easy to see what's available where
-- Future - May want to show users all options
-
-### Why Keep FileReader?
-
-**Decision:** Use FileReader for supporting files instead of inventorying everything
-
-**Rationale:**
-
-- **Primary resources** (agents/workflows/tasks) - Use master manifest (predictable, discoverable)
-- **Supporting files** (templates/configs) - Use FileReader (arbitrary paths, on-demand)
-- Master manifest would be huge if it included every file
-- FileReader is simpler for unpredictable file access patterns
-
-### Why Module-Qualified Names?
-
-**Decision:** Support both `architect` and `bmm/architect` syntax
-
-**Rationale:**
-
-- Convenience - Short names for common cases
-- Precision - Module qualifier when needed (e.g., same name in different modules)
-- Overrides - User can customize specific module's agent without affecting others
-
----
-
-## Migration from CSV-Based System
-
-### What Changed
-
-| Old (main branch) | New (v0.2.x+)                      |
-| ----------------- | ---------------------------------- |
-| CSV files only    | Master manifest (CSV + filesystem) |
-| Single location   | Multiple locations with priority   |
-| ManifestLoader    | MasterManifestService + Query      |
-| Direct CSV reads  | Master records with metadata       |
-| No module support | Module-qualified names             |
-
-### What Stayed the Same
-
-- UnifiedBMADTool as main orchestrator
-- FileReader for file I/O
-- MCP protocol handlers
-- Tool command syntax (`bmad`, `bmad *workflow`)
-
-### Backward Compatibility
-
-The adapter layer ensures existing code works:
-
-```typescript
-// Old code expects Agent[]
-const agents: Agent[] = this.manifestLoader.loadAgentManifest();
-
-// New code provides Agent[] from master manifest
-const agents: Agent[] = filterExisting(masterManifest.agents).map(
-  masterRecordToAgent,
-);
-```
+**Fixtures:** `tests/fixtures/` - Mock BMAD content
+**Helpers:** `tests/helpers/` - Test utilities
+**Support:** `tests/support/` - Mock implementations
 
 ---
 
 ## Future Enhancements
 
-### Possible Extensions
+### Planned Features
 
-1. **Resource Caching** - Cache loaded file contents
-2. **Hot Reload** - Watch filesystem for changes
-3. **Preference UI** - Let users choose which origin to use
-4. **Resource Browser** - Show all available resources with origins
-5. **Validation** - Check for conflicts/duplicates across origins
-6. **Metrics** - Track which resources are used most
+1. **Hot Reload:** Watch for content changes, reload without restart
+2. **Disk Cache:** Persist manifests to disk for faster startups
+3. **HTTP API:** REST/GraphQL interface for web clients
+4. **Multi-process:** Worker threads for parallel execution
+5. **Metrics:** Performance monitoring and usage analytics
+6. **Auto-update:** Automatic git remote updates with versioning
 
-### Design Allows
+### Architectural Evolution
 
-- Adding new origin types (e.g., `remote`, `plugin`)
-- Custom priority schemes
-- Resource filtering (by module, version, etc.)
-- Dynamic resource loading
-- Multi-workspace support
+**Current:** Monolith (all layers in one process)
+**Future:** Microservices (engine as separate service)
 
 ---
 
-## Summary
+## References
 
-The BMAD MCP Server architecture provides:
-
-1. ✅ **Single source of truth** - Master manifest knows all resources
-2. ✅ **Priority-based resolution** - Clear precedence rules
-3. ✅ **Module-qualified names** - Precise resource selection
-4. ✅ **Override-friendly** - Project files override defaults
-5. ✅ **Separation of concerns** - Discovery vs. loading
-6. ✅ **Clean and simple** - Only serve existing files
-7. ✅ **Extensible** - Easy to add new features
-
-This design makes BMAD flexible for users while maintaining clarity and predictability for developers.
+- **MCP Specification:** https://modelcontextprotocol.io/
+- **BMAD Method:** https://github.com/bmad-code-org/BMAD-METHOD
+- **TypeScript:** https://www.typescriptlang.org/
+- **Vitest:** https://vitest.dev/

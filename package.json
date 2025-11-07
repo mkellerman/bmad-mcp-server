@@ -1,28 +1,29 @@
 {
   "name": "bmad-mcp-server",
-  "version": "3.1.0",
+  "version": "2.1.0",
   "description": "Model Context Protocol server for BMAD methodology",
   "type": "module",
   "bin": {
-    "bmad-mcp-server": "./build/index.js"
+    "bmad-mcp-server": "./build/index.js",
+    "bmad": "./build/cli.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x build/index.js",
-    "clean": "rm -rf build/ coverage/ test-results/ playwright-report/ master-manifest.json bin/graph .bmad/cache/",
+    "build": "tsc && chmod +x build/index.js && chmod +x build/cli.js",
+    "clean": "rm -rf build/ coverage/ test-results/ .bmad/cache/",
     "clean:all": "npm run clean && rm -rf node_modules/ package-lock.json",
     "prepare": "npm run build || true",
     "start": "node build/index.js",
     "dev": "tsx src/index.ts",
-    "test": "vitest run",
+    "test": "vitest run tests/unit tests/integration",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage",
-    "test:unit": "TEST_TYPE=unit vitest run",
-    "test:integration": "TEST_TYPE=integration vitest run",
-    "test:e2e": "TEST_TYPE=e2e vitest run",
+    "test:coverage": "vitest run --coverage tests/unit tests/integration",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e",
     "test:llm": "npm run test:e2e",
     "test:all": "npm run test:unit; npm run test:integration; npm run test:e2e",
-    "test:report": "node scripts/generate-html-report.mjs test-results/test-results.json",
+    "test:clean": "rm -rf test-results/.results/default* test-results/.results/unit* test-results/.results/integration* test-results/.results/e2e* test-results/test-results.* coverage/",
     "test:litellm-start": "docker-compose -f tests/e2e/framework/docker-compose.yml up -d",
     "test:litellm-stop": "docker-compose -f tests/e2e/framework/docker-compose.yml down",
     "test:litellm-logs": "docker-compose -f tests/e2e/framework/docker-compose.yml logs -f",
@@ -30,11 +31,12 @@
     "lint": "eslint . --ext .ts,.js,.mjs",
     "lint:fix": "eslint . --ext .ts,.js,.mjs --fix",
     "format": "prettier --write .",
-    "guard:src-js": "node scripts/guard-src-js.mjs",
-    "precommit": "npm run guard:src-js && npm run lint:fix && npm run format",
-    "doctor:show": "node scripts/show-doctor.mjs",
-    "bmad": "node scripts/run-bmad.mjs",
-    "cli": "node scripts/bmad-cli.mjs"
+    "precommit": "npm run lint:fix && npm run format",
+    "cli": "node scripts/bmad-cli.mjs",
+    "cli:list-tools": "node scripts/bmad-cli.mjs tools/list",
+    "cli:list-resources": "node scripts/bmad-cli.mjs resources/list",
+    "cli:list-agents": "node scripts/show-list-agents.mjs",
+    "cli:list-workflows": "node scripts/show-list-workflows.mjs"
   },
   "files": [
     "build/"
@@ -42,9 +44,11 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "csv-parse": "^6.1.0",
+    "fast-xml-parser": "^5.3.1",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
+    "@clack/prompts": "^0.11.0",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
     "@eslint/js": "^9.38.0",
@@ -54,11 +58,13 @@
     "@types/node": "^24.9.1",
     "@vitest/coverage-v8": "^4.0.3",
     "@vitest/ui": "^4.0.3",
+    "dotenv": "^17.2.3",
     "eslint": "^9.17.0",
     "globals": "^16.4.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
     "openai": "^6.7.0",
+    "picocolors": "^1.1.1",
     "prettier": "^3.4.2",
     "semantic-release": "^25.0.1",
     "tsx": "^4.19.2",

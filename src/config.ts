@@ -1,206 +1,191 @@
-import os from 'node:os';
-import path from 'node:path';
-import type { DiscoveryMode } from './types/index.js';
+/**
+ * Centralized configuration for BMAD MCP Server
+ *
+ * This module contains all configuration constants, server metadata,
+ * and instruction templates used throughout the application.
+ *
+ * Modify this file to adjust:
+ * - Server name and version
+ * - Agent activation instructions
+ * - Workflow execution instructions
+ * - Resource access guidelines
+ * - Default configuration values
+ * - Feature flags (e.g., enable search operation)
+ */
 
-export interface DiscoveryConfig {
-  mode: DiscoveryMode;
-  envRoot?: string;
-  userBmadPath: string;
-  includeUserBmad: boolean;
-  rootSearchMaxDepth: number;
-  excludeDirs: string[];
-}
+/**
+ * Server metadata configuration
+ */
+export const SERVER_CONFIG = {
+  name: 'bmad-mcp-server',
+  version: '3.1.0',
+} as const;
 
-export interface GitConfig {
-  cacheDir: string;
-  autoUpdate: boolean;
-  cacheTTL: number; // Time-to-live in seconds
-}
+/**
+ * Feature flags
+ *
+ * To enable the search operation in the unified BMAD tool, pass config to createBMADTool:
+ * ```typescript
+ * createBMADTool(agents, workflows, { enableSearch: true })
+ * ```
+ */
+export const FEATURE_FLAGS = {
+  /** Enable search operation in unified BMAD tool (default: false) */
+  enableSearch: false,
+} as const;
 
-export interface LoggingConfig {
-  debug: boolean;
-  level: 'debug' | 'info' | 'warn' | 'error';
-}
+/**
+ * Default BMAD configuration values
+ * These are used when user hasn't customized their config.yaml
+```
+ */
+export const DEFAULT_BMAD_CONFIG = {
+  user_name: 'User',
+  communication_language: 'English',
+  output_folder: './docs',
+} as const;
 
-export interface CLIConfig {
-  modeArg?: string;
-  remotes: string[];
-  rawArgs: string[];
+/**
+ * Instructions configuration
+ */
+export interface InstructionsConfig {
+  /** Instructions for accessing BMAD resources (used by both agents and workflows) */
+  resourceAccess: string;
+  /** Instructions for agent activation and persona embodiment */
+  agentActivation: string;
+  /** Instructions for workflow execution */
+  workflowExecution: string;
 }
 
 /**
- * Instructions injected when loading agents and workflows.
- * These provide the LLM with guidance on how to process and adopt agent personas
- * and execute workflows according to BMAD methodology.
+ * Get the complete instruction set for agent invocation
+ *
+ * @returns Complete instructions including resource access and agent activation
  */
-export interface InstructionsConfig {
-  /** Instructions appended to agent content when loading agents */
+export function getAgentExecutionPrompt(context: {
   agent: string;
-  /** Instructions appended to workflow content when executing workflows */
+  userContext?: string;
+}): string {
+  // Build the YAML frontmatter
+  const frontmatter = `---
+
+agent: ${context.agent}
+user-prompt: ${context.userContext || '(no prompt provided)'}
+
+---`;
+
+  // Add resource access instructions
+  const resourceInstructions = `
+${getResourceAccessInstructions()}
+
+---`;
+
+  // Simple activation message
+  const activationMessage = `
+This agent has been requested.
+
+**CRITICAL:** Use the \`bmad\` tool to read the full agent definition:
+  bmad({ operation: "read", agent: "${context.agent}" })
+
+The agent definition contains your persona, role, capabilities, menu items, and all instructions.
+Embody that agent completely and respond to the user's prompt.`;
+
+  return `${frontmatter}${resourceInstructions}${activationMessage}
+`;
+}
+
+/**
+ * Get the complete instruction set for workflow execution
+ *
+ * @param _workflowName - Name of the workflow being executed (unused but kept for API compatibility)
+ * @param _context - Optional user-provided context (unused but kept for API compatibility)
+ * @returns Complete instructions including resource access
+ */
+export function getWorkflowInstructions(
+  _workflowName: string,
+  _context?: string,
+): string {
+  return `
+${getResourceAccessInstructions()}`;
+}
+
+/**
+ * Build the workflow execution prompt with minimal injection.
+ *
+ * Injects only:
+ * 1. Agent's workflow handler instructions (tells LLM what to do)
+ * 2. workflow.yaml (raw YAML - configuration)
+ *
+ * The agent's workflow handler will instruct the LLM to load workflow.xml
+ * and any other files via bmad-resources tool.
+ */
+export function getWorkflowExecutionPrompt(context: {
   workflow: string;
+  workflowPath: string;
+  userContext?: string;
+  agent?: string;
+  agentWorkflowHandler?: string;
+}): string {
+  // Build the YAML frontmatter
+  const frontmatter = `---
+
+agent: ${context.agent || 'unknown'}
+menu-item: ${context.workflow}
+workflow: ${context.workflowPath}
+user-prompt: ${context.userContext || '(no prompt provided)'}
+
+---`;
+
+  // Add resource access instructions FIRST
+  const resourceInstructions = `
+${getResourceAccessInstructions()}
+
+---`;
+
+  // Build handler section
+  const handlerSection = context.agentWorkflowHandler
+    ? `
+This workflow has been requested to be executed.
+
+${context.agentWorkflowHandler}`
+    : '\nThis workflow has been requested to be executed.';
+
+  return `${frontmatter}${resourceInstructions}${handlerSection}
+`;
 }
 
-export interface BMADConfig {
-  discovery: DiscoveryConfig;
-  git: GitConfig;
-  logging: LoggingConfig;
-  cli: CLIConfig;
-  instructions: InstructionsConfig;
+/**
+ * Resource access instructions for agents and workflows
+ * These tell the LLM how to properly access BMAD files using the bmad tool
+ */
+export function getResourceAccessInstructions(): string {
+  return `## HOW TO ACCESS BMAD RESOURCES
+
+**CRITICAL:** ALL BMAD files MUST be accessed through the \`bmad\` tool:
+- ✅ USE: \`bmad\` tool with appropriate operation
+- ❌ DO NOT: Use MCP Resources API (not supported in all clients)
+- ❌ DO NOT: Search the user's workspace for BMAD files
+- ❌ DO NOT: Use filesystem paths like ./bmad/ or {project-root}/bmad/
+
+**WORKFLOW HANDLING BEHAVIOR:**
+- ⚡ **BE SILENT**: When loading workflow instructions, configurations, or internal BMAD files
+- ⚡ **NO COMMENTARY**: Don't explain what you're doing when accessing bmad:// resources
+- ⚡ **DIRECT EXECUTION**: Load required files quietly and proceed directly to workflow execution
+- ⚡ **USER FOCUS**: Only communicate with user for workflow outputs, questions, or results
+
+**COMMON BMAD OPERATIONS:**
+  - **List agents**: bmad({ operation: "list", query: "agents" })
+  - **List workflows**: bmad({ operation: "list", query: "workflows" })
+  - **Read agent definition**: bmad({ operation: "read", agent: "analyst" })
+  - **Read workflow definition**: bmad({ operation: "read", workflow: "prd" })
+  - **Execute agent**: bmad({ operation: "execute", agent: "analyst", message: "your request" })
+  - **Execute workflow**: bmad({ operation: "execute", workflow: "prd", message: "context" })
+
+**FILE LOCATIONS (for reference only):**
+  - Configuration: {project-root}/bmad/core/config.yaml
+  - Core tasks: {project-root}/bmad/core/tasks/workflow.xml
+  - Agent definitions: {project-root}/bmad/{module}/agents/{agent-name}.md
+  - Workflow definitions: {project-root}/bmad/{module}/workflows/{workflow-name}/workflow.yaml
+
+**Note:** The agent workflow handler instructions will tell you which files to load and how.`;
 }
-
-function toBool(value: string | undefined, defaultValue: boolean): boolean {
-  if (value === undefined) return defaultValue;
-  const v = value.toLowerCase();
-  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
-}
-
-function parseDiscoveryMode(value?: string): DiscoveryMode {
-  if (value === 'auto' || value === 'strict') return value;
-  return 'auto';
-}
-
-function parseNumber(value: string | undefined, defaultValue: number): number {
-  if (value === undefined) return defaultValue;
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : defaultValue;
-}
-
-function splitList(value: string | undefined, defaults: string[]): string[] {
-  if (!value) return defaults;
-  return value
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
-
-export function loadConfig(options?: {
-  argv?: string[];
-  env?: NodeJS.ProcessEnv;
-}): BMADConfig {
-  const argv = options?.argv ?? process.argv.slice(2);
-  const env = options?.env ?? process.env;
-
-  const modeArg = argv.find((a) => a.startsWith('--mode='));
-  const modeValue = modeArg?.split('=')[1];
-  const envMode = env.BMAD_DISCOVERY_MODE;
-  const mode = parseDiscoveryMode(modeValue || envMode || 'auto');
-
-  const envRoot = env.BMAD_ROOT || undefined;
-
-  const userBmadPath = env.BMAD_USER_PATH || path.join(os.homedir(), '.bmad');
-  const includeUserBmad = !toBool(env.BMAD_DISABLE_USER_BMAD, false);
-  const rootSearchMaxDepth = parseNumber(env.BMAD_ROOT_SEARCH_MAX_DEPTH, 3);
-  const excludeDirs = splitList(env.BMAD_EXCLUDE_DIRS, [
-    '.git',
-    'git',
-    'node_modules',
-    'cache',
-    'build',
-    'dist',
-    'bin',
-  ]);
-
-  const gitCacheDir =
-    env.BMAD_GIT_CACHE_DIR || path.join(userBmadPath, 'cache', 'git');
-  const gitAutoUpdate = toBool(env.BMAD_GIT_AUTO_UPDATE, true); // Default true, tests override to false
-  const gitCacheTTL = parseInt(env.BMAD_GIT_CACHE_TTL || '86400', 10); // 24 hours default
-
-  const debug = toBool(env.BMAD_DEBUG, false);
-
-  if (debug) {
-    console.error(
-      `🔧 Git config: cacheDir=${gitCacheDir}, autoUpdate=${gitAutoUpdate}, cacheTTL=${gitCacheTTL}s, env.BMAD_GIT_CACHE_DIR=${env.BMAD_GIT_CACHE_DIR}`,
-    );
-  }
-
-  const levelEnv = (env.BMAD_LOG_LEVEL || '').toLowerCase();
-  const level: LoggingConfig['level'] =
-    levelEnv === 'debug' ||
-    levelEnv === 'info' ||
-    levelEnv === 'warn' ||
-    levelEnv === 'error'
-      ? levelEnv
-      : debug
-        ? 'debug'
-        : 'info';
-
-  const remotes = argv.filter((a) => a.startsWith('--remote='));
-
-  // Agent instructions - appended to all loaded agents
-  // Modify these to change how the LLM processes agent personas
-  const agentInstructions = [
-    '<!-- Powered by BMAD-CORE™ -->',
-    '',
-    '## INSTRUCTIONS FOR AGENT OVERRIDES',
-    '',
-    '1. Read the agent definition markdown to understand role, identity, and principles',
-    '2. Apply the communication style specified in the agent definition',
-    '3. Follow activation rules and command handling as defined in the agent XML/markdown',
-    '',
-    '## DEFAULT CONFIGURATION (config.yaml)',
-    '',
-    '- user_name: User',
-    '- communication_language: English',
-    '- output_folder: ./docs',
-    '',
-    '---',
-    '',
-  ].join('\n');
-
-  // Workflow instructions - appended to all executed workflows
-  // Modify these to change how the LLM processes workflow definitions
-  const workflowInstructions = [
-    '<!-- Powered by BMAD-CORE™ -->',
-    '',
-    '## WORKFLOW EXECUTION INSTRUCTIONS',
-    'Process this workflow according to BMAD workflow execution methodology:',
-    '',
-    '1. **Read the complete workflow.yaml configuration**',
-    '2. **IMPORTANT - MCP Resource Resolution:**',
-    '   - All `{mcp-resources}` placeholders refer to the MCP server installation',
-    "   - DO NOT search the user's workspace for manifest files or agent data",
-    '   - USE the Agent Roster JSON provided in the Workflow Context section above',
-    '   - The MCP server has already resolved all paths and loaded all necessary data',
-    '3. **Resolve variables:** Replace any `{{variables}}` with user input or defaults',
-    '4. **Follow instructions:** Execute steps in exact order as defined',
-    '5. **Generate content:** Process `<template-output>` sections as needed',
-    '6. **Request input:** Use `<elicit-required>` sections to gather additional user input',
-    '',
-    '**CRITICAL:** The Agent Roster JSON in the Workflow Context contains all agent metadata',
-    'from the MCP server. Use this data directly - do not attempt to read files from the',
-    "user's workspace.",
-    '',
-    'Begin workflow execution now.',
-  ].join('\n');
-
-  return {
-    discovery: {
-      mode,
-      envRoot,
-      userBmadPath,
-      includeUserBmad,
-      rootSearchMaxDepth,
-      excludeDirs,
-    },
-    git: {
-      cacheDir: gitCacheDir,
-      autoUpdate: gitAutoUpdate,
-      cacheTTL: gitCacheTTL,
-    },
-    logging: {
-      debug,
-      level,
-    },
-    cli: {
-      modeArg,
-      remotes,
-      rawArgs: argv,
-    },
-    instructions: {
-      agent: agentInstructions,
-      workflow: workflowInstructions,
-    },
-  };
-}
-
-export default loadConfig;
