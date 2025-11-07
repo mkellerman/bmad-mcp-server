@@ -350,6 +350,7 @@ The server searches for BMAD content in this order:
 - **[Architecture](./docs/architecture.md)** - System design and components
 - **[API Contracts](./docs/api-contracts.md)** - MCP tools and TypeScript APIs
 - **[Development Guide](./docs/development-guide.md)** - Contributing and testing
+- **[Release Process](./.github/RELEASE_PROCESS.md)** - Release workflow for maintainers
 
 ---
 

@@ -2,7 +2,7 @@ name: Publish Release
 
 on:
   release:
-    types: [published]
+    types: [released]
 
 permissions:
   contents: write
@@ -12,10 +12,8 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
-    # Only run if this is NOT a prerelease
-    if: |
-      github.event.release.draft == false &&
-      github.event.release.prerelease == false
+    # Only run if this is a full release (not a prerelease)
+    if: github.event.release.prerelease == false
     steps:
       - name: Checkout at release tag
         uses: actions/checkout@v5
