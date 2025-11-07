@@ -40,6 +40,7 @@ import { load as parseYaml } from 'js-yaml';
 import { XMLParser } from 'fast-xml-parser';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { GitSourceResolver } from '../utils/git-source-resolver.js';
+import { ManifestCache } from './manifest-cache.js';
 import type { Workflow } from '../types/index.js';
 
 /**
@@ -109,6 +110,7 @@ export class ResourceLoaderGit {
   private paths: ResourcePaths;
   private gitResolver?: GitSourceResolver;
   private resolvedGitPaths: Map<string, string> = new Map();
+  private manifestCache: ManifestCache;
 
   /**
    * Creates a new BMAD resource loader with multi-source support
@@ -148,6 +150,9 @@ export class ResourceLoaderGit {
     if (gitRemotes && gitRemotes.length > 0) {
       this.gitResolver = new GitSourceResolver();
     }
+
+    // Initialize manifest cache
+    this.manifestCache = new ManifestCache(this);
   }
 
   /**
@@ -1199,6 +1204,27 @@ export class ResourceLoaderGit {
    * ```
    */
   async listAgentsWithMetadata(): Promise<AgentMetadata[]> {
+    // Try manifest-based loading first (unless explicitly disabled)
+    if (process.env.BMAD_USE_MANIFESTS !== 'false') {
+      try {
+        return await this.manifestCache.getAllAgents();
+      } catch (error) {
+        console.warn(
+          'Manifest cache failed, falling back to runtime scan:',
+          error,
+        );
+      }
+    }
+
+    // Fallback: runtime scanning
+    return await this.scanAgentsRuntime();
+  }
+
+  /**
+   * Fallback method: scans agents at runtime (slower, original behavior)
+   * @private
+   */
+  private async scanAgentsRuntime(): Promise<AgentMetadata[]> {
     const agentNames = await this.listAgents();
     const metadata: AgentMetadata[] = [];
 
@@ -1234,6 +1260,27 @@ export class ResourceLoaderGit {
    * ```
    */
   async listWorkflowsWithMetadata(): Promise<Workflow[]> {
+    // Try manifest-based loading first (unless explicitly disabled)
+    if (process.env.BMAD_USE_MANIFESTS !== 'false') {
+      try {
+        return await this.manifestCache.getAllWorkflows();
+      } catch (error) {
+        console.warn(
+          'Manifest cache failed, falling back to runtime scan:',
+          error,
+        );
+      }
+    }
+
+    // Fallback: runtime scanning
+    return await this.scanWorkflowsRuntime();
+  }
+
+  /**
+   * Fallback method: scans workflows at runtime (slower, original behavior)
+   * @private
+   */
+  private async scanWorkflowsRuntime(): Promise<Workflow[]> {
     try {
       // Load workflow-manifest.csv
       const manifestContent = await this.loadFile('_cfg/workflow-manifest.csv');
