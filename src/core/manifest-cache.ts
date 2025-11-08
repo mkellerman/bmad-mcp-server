@@ -25,6 +25,38 @@ import type { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
 import type { Tool, Task } from '../types/index.js';
 
 /**
+ * Directories to exclude when scanning for BMAD modules
+ */
+const EXCLUDED_DIRECTORIES = new Set([
+  '.git',
+  '.github',
+  '.vscode',
+  '.idea',
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  'target',
+  'cache',
+  '.cache',
+  'tmp',
+  '.tmp',
+  'temp',
+  '.temp',
+  'logs',
+  '.logs',
+  'coverage',
+  '.nyc_output',
+  '__pycache__',
+  '.pytest_cache',
+  '.tox',
+  'venv',
+  '.venv',
+  'virtualenv',
+  '.DS_Store',
+]);
+
+/**
  * Workflow metadata structure
  */
 export interface Workflow {
@@ -88,6 +120,8 @@ export class ManifestCache {
   private cache: Map<string, CachedManifests>;
   private manifestTTL: number;
   private cacheDir: string;
+  private cachedSources: ManifestSource[] | null = null;
+  private sourcesPromise: Promise<ManifestSource[]> | null = null;
 
   /**
    * Create a new ManifestCache
@@ -246,6 +280,8 @@ export class ManifestCache {
    */
   clearCache(): void {
     this.cache.clear();
+    this.cachedSources = null;
+    this.sourcesPromise = null;
   }
 
   /**
@@ -678,6 +714,29 @@ export class ManifestCache {
    * @returns Array of manifest sources
    */
   private async getSources(): Promise<ManifestSource[]> {
+    // Return cached sources if available
+    if (this.cachedSources !== null) {
+      return this.cachedSources;
+    }
+
+    // If a sources promise is already in flight, wait for it
+    if (this.sourcesPromise !== null) {
+      return this.sourcesPromise;
+    }
+
+    // Create and cache the promise to prevent parallel execution
+    this.sourcesPromise = this.loadSources();
+    const sources = await this.sourcesPromise;
+
+    // Cache the result
+    this.cachedSources = sources;
+    return sources;
+  }
+
+  /**
+   * Internal method to load sources (called only once)
+   */
+  private async loadSources(): Promise<ManifestSource[]> {
     const sources: ManifestSource[] = [];
     const discoveryMode = this.resourceLoader.getDiscoveryMode();
 
@@ -705,6 +764,9 @@ export class ManifestCache {
 
     // Git remotes (lowest priority) - include if mode allows
     if (discoveryMode === 'auto' || discoveryMode === 'strict') {
+      // Ensure git remotes are resolved before getting paths
+      await this.resourceLoader['resolveGitRemotes']();
+
       const gitPaths = this.resourceLoader.getResolvedGitPaths();
       let gitPriority = 3;
       for (const [_url, localPath] of gitPaths) {
@@ -738,6 +800,8 @@ export class ManifestCache {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       if (entry.name === 'core' || entry.name === '_cfg') continue;
+      // Skip excluded directories
+      if (EXCLUDED_DIRECTORIES.has(entry.name)) continue;
 
       const entryPath = join(bmadRoot, entry.name);
       const hasAgents = await pathExists(join(entryPath, 'agents'));
@@ -773,7 +837,7 @@ export class ManifestCache {
 
         // Skip excluded directories
         if (entry.isDirectory()) {
-          if (['node_modules', '.git', 'cache'].includes(entry.name)) {
+          if (EXCLUDED_DIRECTORIES.has(entry.name)) {
             continue;
           }
           await walk(fullPath);

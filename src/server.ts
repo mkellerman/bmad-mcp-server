@@ -24,14 +24,19 @@ import {
   handleBMADTool,
   type BMADToolParams,
 } from './tools/index.js';
+import type { DiscoveryMode } from './types/index.js';
 
 export class BMADServerLiteMultiToolGit {
   private server: Server;
   private engine: BMADEngine;
   private initialized = false;
 
-  constructor(projectRoot?: string, gitRemotes?: string[]) {
-    this.engine = new BMADEngine(projectRoot, gitRemotes);
+  constructor(
+    projectRoot?: string,
+    gitRemotes?: string[],
+    discoveryMode?: DiscoveryMode,
+  ) {
+    this.engine = new BMADEngine(projectRoot, gitRemotes, discoveryMode);
     this.server = new Server(
       {
         name: SERVER_CONFIG.name,

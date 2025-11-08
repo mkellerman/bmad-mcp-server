@@ -50,6 +50,39 @@ import type { Workflow, DiscoveryMode } from '../types/index.js';
 /** Maximum length for agent identity strings: 500 characters (increased to show full persona) */
 const AGENT_IDENTITY_MAX_LENGTH = 500;
 
+/**
+ * Directories to exclude when scanning for BMAD content
+ * These are common system, build, and cache directories that should never contain BMAD modules
+ */
+const EXCLUDED_DIRECTORIES = new Set([
+  '.git',
+  '.github',
+  '.vscode',
+  '.idea',
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  'target',
+  'cache',
+  '.cache',
+  'tmp',
+  '.tmp',
+  'temp',
+  '.temp',
+  'logs',
+  '.logs',
+  'coverage',
+  '.nyc_output',
+  '__pycache__',
+  '.pytest_cache',
+  '.tox',
+  'venv',
+  '.venv',
+  'virtualenv',
+  '.DS_Store',
+]);
+
 /** Regex patterns for parsing BMAD content */
 
 /** Extract agent XML block from content */
@@ -244,7 +277,12 @@ export class ResourceLoaderGit {
       if (existsSync(parentDir)) {
         try {
           const siblings = readdirSync(parentDir, { withFileTypes: true })
-            .filter((d) => d.isDirectory() && d.name !== currentDirName)
+            .filter(
+              (d) =>
+                d.isDirectory() &&
+                d.name !== currentDirName &&
+                !EXCLUDED_DIRECTORIES.has(d.name),
+            )
             .map((d) => d.name);
 
           // If siblings have 'agents' directories, parent is likely BMAD root
@@ -271,7 +309,7 @@ export class ResourceLoaderGit {
     // Check if this path has module subdirectories (it's a BMAD root)
     try {
       const subdirs = readdirSync(localPath, { withFileTypes: true })
-        .filter((d) => d.isDirectory())
+        .filter((d) => d.isDirectory() && !EXCLUDED_DIRECTORIES.has(d.name))
         .map((d) => d.name);
 
       const hasModules = subdirs.some((subdir) =>
