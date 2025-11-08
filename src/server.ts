@@ -176,17 +176,30 @@ export class BMADServerLiteMultiToolGit {
           };
         }
 
-        // TODO: Tool and Task manifests not yet implemented
         if (relativePath === '_cfg/tool-manifest.csv') {
-          throw new Error(
-            'Tool manifest generation not yet implemented - coming soon! This will provide virtual tool metadata from loaded BMAD modules.',
-          );
+          const content = this.engine.generateToolManifest();
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/csv',
+                text: content,
+              },
+            ],
+          };
         }
 
         if (relativePath === '_cfg/task-manifest.csv') {
-          throw new Error(
-            'Task manifest generation not yet implemented - coming soon! This will provide virtual task metadata from loaded BMAD modules.',
-          );
+          const content = this.engine.generateTaskManifest();
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/csv',
+                text: content,
+              },
+            ],
+          };
         }
 
         // Default: Load file from filesystem

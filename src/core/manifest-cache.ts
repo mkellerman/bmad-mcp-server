@@ -17,12 +17,12 @@
 
 import { pathExists } from 'fs-extra';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { parse as parseCsv } from 'csv-parse/sync';
 import type { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
+import type { Tool, Task } from '../types/index.js';
 
 /**
  * Workflow metadata structure
@@ -35,6 +35,11 @@ export interface Workflow {
   trigger?: string;
   standalone: boolean;
 }
+
+/**
+ * Re-export Tool and Task types from types module
+ */
+export type { Tool, Task } from '../types/index.js';
 
 /**
  * File entry from files-manifest.csv
@@ -62,6 +67,8 @@ interface ManifestSource {
 interface CachedManifests {
   agents: AgentMetadata[];
   workflows: Workflow[];
+  tools: Tool[];
+  tasks: Task[];
   files: FileEntry[];
   timestamp: number;
 }
@@ -107,7 +114,13 @@ export class ManifestCache {
       await this.ensureManifests(source.root);
       const manifests = await this.loadManifests(source.root);
 
-      for (const agent of manifests.agents) {
+      // Enrich agents with workflow information from XML
+      const enrichedAgents = await this.enrichAgentsWithWorkflows(
+        manifests.agents,
+        source.root,
+      );
+
+      for (const agent of enrichedAgents) {
         allAgents.push({ ...agent, _priority: source.priority });
       }
     }
@@ -148,6 +161,64 @@ export class ManifestCache {
 
     // Write merged results to cache for visibility
     await this.writeMergedManifests({ workflows: deduplicated });
+
+    return deduplicated;
+  }
+
+  /**
+   * Get all tools from all sources, merged with priority
+   *
+   * @returns Promise resolving to deduplicated tool list
+   */
+  async getAllTools(): Promise<Tool[]> {
+    const sources = await this.getSources();
+    const allTools: Array<Tool & { _priority: number }> = [];
+
+    for (const source of sources) {
+      await this.ensureManifests(source.root);
+      const manifests = await this.loadManifests(source.root);
+
+      for (const tool of manifests.tools) {
+        allTools.push({ ...tool, _priority: source.priority });
+      }
+    }
+
+    const deduplicated = this.deduplicateByPriority(
+      allTools,
+      (tool) => `${tool.module}:${tool.name}`,
+    );
+
+    // Write merged results to cache for visibility
+    await this.writeMergedManifests({ tools: deduplicated });
+
+    return deduplicated;
+  }
+
+  /**
+   * Get all tasks from all sources, merged with priority
+   *
+   * @returns Promise resolving to deduplicated task list
+   */
+  async getAllTasks(): Promise<Task[]> {
+    const sources = await this.getSources();
+    const allTasks: Array<Task & { _priority: number }> = [];
+
+    for (const source of sources) {
+      await this.ensureManifests(source.root);
+      const manifests = await this.loadManifests(source.root);
+
+      for (const task of manifests.tasks) {
+        allTasks.push({ ...task, _priority: source.priority });
+      }
+    }
+
+    const deduplicated = this.deduplicateByPriority(
+      allTasks,
+      (task) => `${task.module}:${task.name}`,
+    );
+
+    // Write merged results to cache for visibility
+    await this.writeMergedManifests({ tasks: deduplicated });
 
     return deduplicated;
   }
@@ -219,75 +290,65 @@ export class ManifestCache {
   }
 
   /**
-   * Generate manifests for a bmad_root using ManifestGenerator
+   * Generate manifests for a bmad_root using our local ManifestGenerator
    *
-   * @param bmadRoot - Source path (temporarily writes here, then moves to cache)
+   * @param bmadRoot - Source path to scan for BMAD files
    */
   private async generateManifests(bmadRoot: string): Promise<void> {
-    const { mkdir, rename, rm } = await import('node:fs/promises');
+    const { mkdir, symlink, rm } = await import('node:fs/promises');
+    const { existsSync } = await import('node:fs');
 
-    // Import ManifestGenerator dynamically to avoid startup cost
-    // Resolve the package path and construct the correct generator path
-    const pkgPath = import.meta.resolve('bmad-method');
-    const pkgFile = fileURLToPath(pkgPath);
-    const pkgRoot = dirname(dirname(dirname(pkgFile))); // up 3 levels from tools/cli/bmad-cli.js
-    const generatorPath = pathToFileURL(
-      join(pkgRoot, 'tools/cli/installers/lib/core/manifest-generator.js'),
-    ).href;
+    // Import our LOCAL ManifestGenerator (not from bmad-method package!)
+    const { ManifestGenerator } = await import('./manifest-generator.js');
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const module = await import(generatorPath);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
-    const ManifestGenerator = (module as any).ManifestGenerator;
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const generator = new ManifestGenerator();
 
-    // Detect modules in this root
+    // Detect modules in the SOURCE
     const modules = await this.detectModules(bmadRoot);
 
-    // Build complete file list
+    // Build complete file list from SOURCE
     const files = await this.walkDirectory(bmadRoot);
 
-    // Generate manifests to SOURCE (ManifestGenerator limitation)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    await generator.generateManifests(bmadRoot, modules, files, {
-      ides: [],
-      preservedModules: [],
-    });
-
-    // Now MOVE manifests from source/_cfg to cache/_cfg
-    const sourceCfg = join(bmadRoot, '_cfg');
+    // Get CACHE directory - this is where manifests will be written!
     const cacheDir = this.getCacheDir(bmadRoot);
-    const cacheCfg = join(cacheDir, '_cfg');
+    await mkdir(cacheDir, { recursive: true });
 
-    // Ensure cache directory exists
-    await mkdir(cacheCfg, { recursive: true });
+    // Handle flat module structure: if bmadRoot has agents/ at root level,
+    // create a core symlink so ManifestGenerator can scan it properly
+    const hasFlatStructure =
+      existsSync(join(bmadRoot, 'agents')) ||
+      existsSync(join(bmadRoot, 'workflows')) ||
+      existsSync(join(bmadRoot, 'tasks'));
 
-    // Move manifest files to cache
-    const manifestFiles = [
-      'agent-manifest.csv',
-      'workflow-manifest.csv',
-      'task-manifest.csv',
-      'tool-manifest.csv',
-      'files-manifest.csv',
-      'manifest.yaml',
-    ];
+    let scanDir = bmadRoot;
+    let tempCoreLink: string | null = null;
 
-    for (const file of manifestFiles) {
-      const sourcePath = join(sourceCfg, file);
-      const cachePath = join(cacheCfg, file);
-
-      if (await pathExists(sourcePath)) {
-        await rename(sourcePath, cachePath);
-      }
+    if (hasFlatStructure && modules.length === 0) {
+      // Create temporary directory with core symlink pointing to bmadRoot
+      const { mkdtemp } = await import('node:fs/promises');
+      const { tmpdir } = await import('node:os');
+      const tempDir = await mkdtemp(join(tmpdir(), 'bmad-scan-'));
+      tempCoreLink = join(tempDir, 'core');
+      await symlink(bmadRoot, tempCoreLink, 'dir');
+      scanDir = tempDir; // Scan temp dir that has core -> bmadRoot symlink
     }
 
-    // Clean up empty _cfg directory from source if it was created
     try {
-      await rm(sourceCfg, { recursive: true, force: true });
-    } catch {
-      // Ignore if directory doesn't exist or can't be removed
+      // Generate manifests directly to CACHE directory
+      // ManifestGenerator will write to {cacheDir}/_cfg/
+      // But it will SCAN from scanDir (source or temp with symlink)
+      await generator.generateManifests(cacheDir, modules, files, {
+        ides: [],
+        preservedModules: [],
+        scanDir, // Scan source (or temp with core symlink)
+        bmadRoot, // Original source path for manifest.yaml
+      });
+    } finally {
+      // Cleanup temporary symlink if created
+      if (tempCoreLink) {
+        const tempDir = join(tempCoreLink, '..');
+        await rm(tempDir, { recursive: true, force: true });
+      }
     }
   }
 
@@ -310,6 +371,8 @@ export class ManifestCache {
     const manifests: CachedManifests = {
       agents: await this.loadAgentManifest(cfgDir),
       workflows: await this.loadWorkflowManifest(cfgDir),
+      tools: await this.loadToolsManifest(cfgDir),
+      tasks: await this.loadTasksManifest(cfgDir),
       files: await this.loadFilesManifest(cfgDir),
       timestamp: Date.now(),
     };
@@ -414,6 +477,68 @@ export class ManifestCache {
   }
 
   /**
+   * Load and parse tool-manifest.csv
+   *
+   * @param cfgDir - Path to _cfg directory
+   * @returns Array of tools
+   */
+  private async loadToolsManifest(cfgDir: string): Promise<Tool[]> {
+    const csvPath = join(cfgDir, 'tool-manifest.csv');
+
+    if (!(await pathExists(csvPath))) {
+      return [];
+    }
+
+    const content = await readFile(csvPath, 'utf-8');
+    const records: Array<Record<string, string>> = parseCsv(content, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true,
+    });
+
+    return records.map((record) => ({
+      name: record.name || '',
+      displayName: record.displayName || record.name || '',
+      description: record.description || '',
+      module: record.module || 'unknown',
+      path: record.path || '',
+      standalone: record.standalone?.toLowerCase() === 'true',
+    }));
+  }
+
+  /**
+   * Load and parse task-manifest.csv
+   *
+   * @param cfgDir - Path to _cfg directory
+   * @returns Array of tasks
+   */
+  private async loadTasksManifest(cfgDir: string): Promise<Task[]> {
+    const csvPath = join(cfgDir, 'task-manifest.csv');
+
+    if (!(await pathExists(csvPath))) {
+      return [];
+    }
+
+    const content = await readFile(csvPath, 'utf-8');
+    const records: Array<Record<string, string>> = parseCsv(content, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true,
+    });
+
+    return records.map((record) => ({
+      name: record.name || '',
+      displayName: record.displayName || record.name || '',
+      description: record.description || '',
+      module: record.module || 'unknown',
+      path: record.path || '',
+      standalone: record.standalone?.toLowerCase() === 'true',
+    }));
+  }
+
+  /**
    * Deduplicate items by key, keeping highest priority (lowest number)
    *
    * @param items - Items with _priority field
@@ -441,41 +566,88 @@ export class ManifestCache {
   }
 
   /**
+   * Enrich agent metadata with workflow information from XML files
+   *
+   * @param agents - Agent metadata from manifest
+   * @returns Enriched agent metadata with workflow info
+   */
+  private async enrichAgentsWithWorkflows(
+    agents: AgentMetadata[],
+    _bmadRoot: string,
+  ): Promise<AgentMetadata[]> {
+    // Use resource loader to get agent metadata with full XML parsing
+    // This will extract workflow information from menu items
+    const enrichedAgents = [...agents];
+
+    for (const agent of enrichedAgents) {
+      try {
+        // Get full metadata which includes workflow extraction
+        const fullMetadata = await this.resourceLoader['getAgentMetadata'](
+          agent.name,
+        );
+        if (fullMetadata) {
+          // Copy workflow-related fields from full metadata
+          agent.workflows = fullMetadata.workflows;
+          agent.workflowPaths = fullMetadata.workflowPaths;
+          agent.workflowMenuItems = fullMetadata.workflowMenuItems;
+          agent.workflowHandlerInstructions =
+            fullMetadata.workflowHandlerInstructions;
+          agent.menuItems = fullMetadata.menuItems;
+          agent.capabilities = fullMetadata.capabilities;
+          agent.persona = fullMetadata.persona;
+        }
+      } catch {
+        // Silently skip if agent file can't be loaded
+        // This can happen if manifest references an agent that was deleted
+      }
+    }
+
+    return enrichedAgents;
+  }
+
+  /**
    * Get all bmad_root sources with priority order
    *
    * @returns Array of manifest sources
    */
   private async getSources(): Promise<ManifestSource[]> {
     const sources: ManifestSource[] = [];
+    const discoveryMode = this.resourceLoader.getDiscoveryMode();
 
-    // Project bmad (highest priority)
-    const projectPathInfo = this.resourceLoader['getProjectBmadPath']();
-    sources.push({
-      root: projectPathInfo.bmadRoot,
-      priority: 1,
-      type: 'project',
-    });
-
-    // User bmad
-    const userBmad = this.resourceLoader.getPaths().userBmad;
-    if (await pathExists(userBmad)) {
+    // Project bmad (highest priority) - include if mode allows
+    if (discoveryMode === 'auto' || discoveryMode === 'local') {
+      const projectPathInfo = this.resourceLoader['getProjectBmadPath']();
       sources.push({
-        root: userBmad,
-        priority: 2,
-        type: 'user',
+        root: projectPathInfo.bmadRoot,
+        priority: 1,
+        type: 'project',
       });
     }
 
-    // Git remotes (lowest priority)
-    const gitPaths = this.resourceLoader.getResolvedGitPaths();
-    let gitPriority = 3;
-    for (const [_url, localPath] of gitPaths) {
-      const pathInfo = this.resourceLoader['detectPathType'](localPath);
-      sources.push({
-        root: pathInfo.bmadRoot,
-        priority: gitPriority++,
-        type: 'git',
-      });
+    // User bmad - include if mode allows
+    if (discoveryMode === 'auto' || discoveryMode === 'user') {
+      const userBmad = this.resourceLoader.getPaths().userBmad;
+      if (await pathExists(userBmad)) {
+        sources.push({
+          root: userBmad,
+          priority: 2,
+          type: 'user',
+        });
+      }
+    }
+
+    // Git remotes (lowest priority) - include if mode allows
+    if (discoveryMode === 'auto' || discoveryMode === 'strict') {
+      const gitPaths = this.resourceLoader.getResolvedGitPaths();
+      let gitPriority = 3;
+      for (const [_url, localPath] of gitPaths) {
+        const pathInfo = this.resourceLoader['detectPathType'](localPath);
+        sources.push({
+          root: pathInfo.bmadRoot,
+          priority: gitPriority++,
+          type: 'git',
+        });
+      }
     }
 
     return sources;
@@ -626,6 +798,8 @@ export class ManifestCache {
   private async writeMergedManifests(manifests: {
     agents?: AgentMetadata[];
     workflows?: Workflow[];
+    tools?: Tool[];
+    tasks?: Task[];
   }): Promise<void> {
     const mergedDir = this.getMergedCacheDir();
     const { mkdir, writeFile } = await import('node:fs/promises');
@@ -655,6 +829,36 @@ export class ManifestCache {
         }
         await writeFile(
           join(mergedDir, 'workflow-manifest.csv'),
+          csvLines.join('\n'),
+        );
+      }
+
+      if (manifests.tools) {
+        const csvLines = [
+          'name,displayName,description,module,path,standalone',
+        ];
+        for (const tool of manifests.tools) {
+          csvLines.push(
+            `"${tool.name}","${tool.displayName}","${tool.description}","${tool.module}","${tool.path}","${tool.standalone}"`,
+          );
+        }
+        await writeFile(
+          join(mergedDir, 'tool-manifest.csv'),
+          csvLines.join('\n'),
+        );
+      }
+
+      if (manifests.tasks) {
+        const csvLines = [
+          'name,displayName,description,module,path,standalone',
+        ];
+        for (const task of manifests.tasks) {
+          csvLines.push(
+            `"${task.name}","${task.displayName}","${task.description}","${task.module}","${task.path}","${task.standalone}"`,
+          );
+        }
+        await writeFile(
+          join(mergedDir, 'task-manifest.csv'),
           csvLines.join('\n'),
         );
       }
