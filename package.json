@@ -5,10 +5,10 @@
   "type": "module",
   "bin": {
     "bmad-mcp-server": "./build/index.js",
-    "bmad": "./build/cli.js"
+    "bmad-cli": "./build/cli-tester.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x build/index.js && chmod +x build/cli.js",
+    "build": "tsc && chmod +x build/index.js && chmod +x build/cli.js && chmod +x build/cli-tester.js",
     "clean": "rm -rf build/ coverage/ test-results/ .bmad/cache/",
     "clean:all": "npm run clean && rm -rf node_modules/ package-lock.json",
     "prepare": "npm run build || true",
@@ -36,7 +36,12 @@
     "cli:list-tools": "node scripts/bmad-cli.mjs tools/list",
     "cli:list-resources": "node scripts/bmad-cli.mjs resources/list",
     "cli:list-agents": "node scripts/show-list-agents.mjs",
-    "cli:list-workflows": "node scripts/show-list-workflows.mjs"
+    "cli:list-workflows": "node scripts/show-list-workflows.mjs",
+    "mcp": "node build/cli-tester.js",
+    "mcp:tools": "node build/cli-tester.js tools",
+    "mcp:resources": "node build/cli-tester.js resources",
+    "mcp:agents": "node build/cli-tester.js agents",
+    "mcp:workflows": "node build/cli-tester.js workflows"
   },
   "files": [
     "build/"
@@ -44,6 +49,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "bmad-method": "alpha",
+    "commander": "^12.1.0",
     "csv-parse": "^6.1.0",
     "fast-xml-parser": "^5.3.1",
     "fs-extra": "^11.2.0",

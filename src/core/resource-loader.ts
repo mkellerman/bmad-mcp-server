@@ -232,9 +232,10 @@ export class ResourceLoaderGit {
       case 'user':
         // Only ~/.bmad
         return source === 'user';
+      case 'first':
       case 'auto':
       default:
-        // All sources
+        // All sources (first mode logic is handled in source discovery order)
         return true;
     }
   }

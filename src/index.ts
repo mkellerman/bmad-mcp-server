@@ -82,15 +82,21 @@ async function main() {
   for (const arg of args) {
     if (arg.startsWith('--mode=')) {
       const mode = arg.slice(7) as DiscoveryMode;
-      if (['strict', 'local', 'user', 'auto'].includes(mode)) {
+      if (['strict', 'local', 'user', 'first', 'auto'].includes(mode)) {
         discoveryMode = mode;
       }
     }
   }
 
   // Allow overriding project root via BMAD_ROOT environment variable
-  // This is useful for testing and custom deployments
-  const projectRoot = process.env.BMAD_ROOT;
+  // If BMAD_ROOT is a git URL, treat it as a git remote instead of project root
+  let projectRoot: string | undefined = process.env.BMAD_ROOT;
+
+  if (projectRoot?.startsWith('git+')) {
+    // BMAD_ROOT is a git URL - add it to gitRemotes and clear projectRoot
+    gitRemotes.push(projectRoot);
+    projectRoot = undefined;
+  }
 
   console.error(`BMAD MCP Server - v${VERSION}`);
   console.error(`Discovery mode: ${discoveryMode}`);

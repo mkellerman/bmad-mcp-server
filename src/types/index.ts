@@ -9,9 +9,10 @@
  * - strict: Only load from git remotes provided as CLI arguments (no local discovery)
  * - local: Only load from project root directory (no user ~/.bmad, no git remotes)
  * - user: Only load from user ~/.bmad directory (no project, no git remotes)
- * - auto: Load from all sources with priority-based resolution (project > user > git)
+ * - first: Load first source found (CLI args → ENV → local → user), single-source mode
+ * - auto: Load from all sources with priority-based resolution (CLI args > local > user)
  */
-export type DiscoveryMode = 'strict' | 'local' | 'user' | 'auto';
+export type DiscoveryMode = 'strict' | 'local' | 'user' | 'first' | 'auto';
 
 /**
  * Server configuration options
@@ -28,9 +29,17 @@ export interface ServerConfig {
    * - 'strict': Only uses git remotes provided as CLI arguments (no local/user discovery)
    * - 'local': Only searches project root directory (no ~/.bmad, no git remotes)
    * - 'user': Only uses ~/.bmad directory (no project, no git remotes)
-   * - 'auto': Searches all sources with priority-based resolution (project > user > git) (default)
+   * - 'first': Uses first source found in priority order (CLI args → ENV → local → user), single-source mode
+   * - 'auto': Searches all sources with priority-based merging (CLI args > local > user) (default)
    *
-   * Auto mode provides the best user experience with priority-based merging.
+   * Priority order explanation:
+   * 1. CLI args (--path): Explicit user choice, highest priority
+   * 2. ENV variables: Configuration-based source
+   * 3. Local project: Project-specific BMAD installation
+   * 4. User ~/.bmad: User-wide fallback, lowest priority
+   *
+   * Auto mode merges all discovered sources with deduplication.
+   * First mode stops at the first discovered source for predictable single-source behavior.
    * Strict mode is useful for isolated testing with specific git sources.
    * Local and user modes are useful for development and debugging specific sources.
    */

@@ -779,44 +779,79 @@ export class ManifestCache {
   private async loadSources(): Promise<ManifestSource[]> {
     const sources: ManifestSource[] = [];
     const discoveryMode = this.resourceLoader.getDiscoveryMode();
+    let currentPriority = 1;
 
-    // Project bmad (highest priority) - include if mode allows
-    if (discoveryMode === 'auto' || discoveryMode === 'local') {
-      const projectPathInfo = this.resourceLoader['getProjectBmadPath']();
-      sources.push({
-        root: projectPathInfo.bmadRoot,
-        priority: 1,
-        type: 'project',
-      });
+    // Priority 1: Git remotes from CLI args (--path) - HIGHEST PRIORITY
+    // These are explicit user choices and should override everything
+    if (
+      discoveryMode === 'auto' ||
+      discoveryMode === 'first' ||
+      discoveryMode === 'strict'
+    ) {
+      await this.resourceLoader['resolveGitRemotes']();
+      const gitPaths = this.resourceLoader.getResolvedGitPaths();
+
+      for (const [_url, localPath] of gitPaths) {
+        const pathInfo = this.resourceLoader['detectPathType'](localPath);
+        sources.push({
+          root: pathInfo.bmadRoot,
+          priority: currentPriority++,
+          type: 'git',
+        });
+      }
     }
 
-    // User bmad - include if mode allows
-    if (discoveryMode === 'auto' || discoveryMode === 'user') {
+    // Priority N: ENV variables (BMAD_ROOT, BMAD_SOURCES)
+    // TODO: Add support for BMAD_SOURCES environment variable
+    // For now, ENV is handled via projectRoot parameter which gets treated as git remote
+
+    // Priority N+1: Local project bmad
+    if (
+      discoveryMode === 'auto' ||
+      discoveryMode === 'first' ||
+      discoveryMode === 'local'
+    ) {
+      const projectPathInfo = this.resourceLoader['getProjectBmadPath']();
+      // Only add if the path actually contains BMAD content (has agents/workflows/modules)
+      const hasAgents = await pathExists(
+        join(projectPathInfo.bmadRoot, 'agents'),
+      );
+      const hasWorkflows = await pathExists(
+        join(projectPathInfo.bmadRoot, 'workflows'),
+      );
+      const hasModules =
+        (await pathExists(join(projectPathInfo.bmadRoot, 'bmm'))) ||
+        (await pathExists(join(projectPathInfo.bmadRoot, 'core')));
+
+      if (hasAgents || hasWorkflows || hasModules) {
+        sources.push({
+          root: projectPathInfo.bmadRoot,
+          priority: currentPriority++,
+          type: 'project',
+        });
+      }
+    }
+
+    // Priority N+2: User ~/.bmad - LOWEST PRIORITY
+    if (
+      discoveryMode === 'auto' ||
+      discoveryMode === 'first' ||
+      discoveryMode === 'user'
+    ) {
       const userBmad = this.resourceLoader.getPaths().userBmad;
       if (await pathExists(userBmad)) {
         sources.push({
           root: userBmad,
-          priority: 2,
+          priority: currentPriority++,
           type: 'user',
         });
       }
     }
 
-    // Git remotes (lowest priority) - include if mode allows
-    if (discoveryMode === 'auto' || discoveryMode === 'strict') {
-      // Ensure git remotes are resolved before getting paths
-      await this.resourceLoader['resolveGitRemotes']();
-
-      const gitPaths = this.resourceLoader.getResolvedGitPaths();
-      let gitPriority = 3;
-      for (const [_url, localPath] of gitPaths) {
-        const pathInfo = this.resourceLoader['detectPathType'](localPath);
-        sources.push({
-          root: pathInfo.bmadRoot,
-          priority: gitPriority++,
-          type: 'git',
-        });
-      }
+    // For 'first' mode, filter to only the highest priority source(s)
+    if (discoveryMode === 'first' && sources.length > 0) {
+      const minPriority = Math.min(...sources.map((s) => s.priority));
+      return sources.filter((s) => s.priority === minPriority);
     }
 
     return sources;
