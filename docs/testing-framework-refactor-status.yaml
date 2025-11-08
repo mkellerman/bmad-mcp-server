@@ -153,19 +153,22 @@ phase-2-llm-eval:
       - 'Cost tracking utilities'
 
   design-llm-judge-api:
-    status: 'not-started'
+    status: 'complete'
     dependencies: ['create-config-files']
-    note: 'Core framework for LLM-as-judge evaluation'
+    note: 'Core framework for LLM-as-judge evaluation - LLM integration is placeholder'
     deliverables:
-      - 'tests/helpers/llm-evaluation/llm-judge.ts'
-      - 'tests/helpers/llm-evaluation/evaluation-runner.ts'
-      - 'tests/helpers/llm-evaluation/score-aggregator.ts'
-    interfaces:
-      - 'LLMEvaluatedTest'
-      - 'EvaluationCriteria'
-      - 'LLMJudge'
-      - 'ScoringConfig'
-      - 'EvaluationResult'
+      - 'tests/helpers/llm-evaluation/types.ts - Core type definitions'
+      - 'tests/helpers/llm-evaluation/llm-judge.ts - Judge LLM executor'
+      - 'tests/helpers/llm-evaluation/consistency-checker.ts - Multi-sample variance checking'
+      - 'tests/helpers/llm-evaluation/evaluation-runner.ts - High-level orchestration'
+      - 'tests/helpers/llm-evaluation/index.ts - Public API exports'
+    features:
+      - 'LLMJudge class for calling judge LLM (placeholder for LiteLLM integration)'
+      - 'ConsistencyChecker for multi-sample evaluation with variance checking'
+      - 'EvaluationRunner for orchestrating evaluation with cost tracking'
+      - 'Evidence validation (anti-hallucination)'
+      - 'Score band retesting (anti-flakiness)'
+      - 'Simplified evaluateTest() API'
 
   create-judge-prompts:
     status: 'not-started'
