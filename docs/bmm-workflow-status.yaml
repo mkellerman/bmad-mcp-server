@@ -69,8 +69,10 @@ workflow_status:
         - 'Session-based intelligent ranking (4 signals: recency, frequency, manifest, boosts)'
         - 'Centralized ranking configuration with agent/module priority boosts'
         - 'Optimized ambiguous responses (52.3% token reduction)'
+        - 'MCP sampling capability detection (Phase 1)'
+        - 'Standalone workflow execution mode fix (agent: unknown → execution-mode: standalone)'
       in-progress:
-        - 'MCP sampling API integration for LLM-powered ranking'
+        - 'MCP sampling API integration for LLM-powered ranking (Phase 2-5)'
       planned:
         - 'Client capability detection (sampling support)'
         - 'Hybrid ranking strategy (LLM when available, session-based fallback)'
