@@ -20,6 +20,7 @@ export * from './types.js';
 export * from './llm-judge.js';
 export * from './consistency-checker.js';
 export * from './evaluation-runner.js';
+export * from './test-matrix.js';
 
 import type {
   MCPResponse,

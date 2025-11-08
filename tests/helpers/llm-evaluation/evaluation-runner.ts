@@ -101,9 +101,9 @@ export class EvaluationRunner {
         }
       }
 
-      // Log results
-      if (options.logVerbose ?? this.config.reporting.verbose) {
-        this.logResult(testName, result);
+      // Log result
+      if (options.logVerbose || result.passed === false) {
+        this.logResult(testName, result, judgeConfig.model, response);
       }
 
       return result;
@@ -161,13 +161,35 @@ Provide your evaluation in JSON format:
   /**
    * Log evaluation result
    */
-  private logResult(testName: string, result: ConsistencyResult): void {
+  private logResult(
+    testName: string,
+    result: ConsistencyResult,
+    judgeModel: string,
+    response: MCPResponse,
+  ): void {
+    // Extract subject model from response if available
+    let subjectModel = 'unknown';
+    try {
+      if (response.content?.[0]?.type === 'text') {
+        const content = JSON.parse(response.content[0].text);
+        // Try to find model info in common locations
+        subjectModel =
+          content.model ||
+          content.metadata?.model ||
+          content.config?.model ||
+          'unknown';
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+
     console.log(`\n📊 LLM Evaluation: ${testName}`);
     console.log(
       `   Score: ${result.finalScore}/100 (${result.passed ? '✅ PASS' : '❌ FAIL'})`,
     );
     console.log(`   Samples: ${result.samples.length}`);
     console.log(`   Variance: ${result.variance.toFixed(1)}%`);
+    console.log(`   Subject: ${subjectModel} → Judge: ${judgeModel}`);
 
     if (result.consistencyWarning) {
       console.log(`   ⚠️  High variance detected`);
