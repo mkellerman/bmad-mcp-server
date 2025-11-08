@@ -18,11 +18,99 @@ import {
   readFileSync,
 } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 import type {
   ConsistencyResult,
   EvaluationCriteria,
   MCPResponse,
 } from './types.js';
+
+/**
+ * Capture current version information
+ */
+function captureVersionInfo(): VersionInfo {
+  const timestamp = Date.now();
+
+  // Get package version
+  let packageVersion = 'unknown';
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),
+    );
+    packageVersion = packageJson.version;
+  } catch {
+    // Ignore errors
+  }
+
+  // Get git information
+  let gitSha: string | undefined;
+  let gitShortSha: string | undefined;
+  let gitBranch: string | undefined;
+  let isDirty = false;
+
+  try {
+    // Full SHA
+    gitSha = execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim();
+    gitShortSha = gitSha.substring(0, 7);
+
+    // Branch name
+    gitBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+      encoding: 'utf-8',
+    }).trim();
+
+    // Check if working directory is dirty
+    const status = execSync('git status --porcelain', {
+      encoding: 'utf-8',
+    }).trim();
+    isDirty = status.length > 0;
+  } catch {
+    // Not a git repo or git not available
+  }
+
+  // Try to extract PR number from branch name or env
+  let prNumber: string | undefined;
+  if (gitBranch?.includes('/')) {
+    const match = gitBranch.match(/(?:pr|pull)[-/](\d+)/i);
+    if (match) prNumber = match[1];
+  }
+  // Check environment variables for PR number
+  if (!prNumber) {
+    prNumber =
+      process.env.GITHUB_PR_NUMBER ||
+      process.env.PULL_REQUEST_NUMBER ||
+      process.env.PR_NUMBER;
+  }
+
+  return {
+    package: packageVersion,
+    gitSha,
+    gitShortSha,
+    gitBranch,
+    prNumber,
+    isDirty,
+    capturedAt: timestamp,
+  };
+}
+
+/**
+ * Version information for the tested code
+ */
+export interface VersionInfo {
+  /** Package version from package.json (e.g., "3.0.1") */
+  package: string;
+  /** Full git SHA (e.g., "a58f5681234...") */
+  gitSha?: string;
+  /** Short git SHA (first 7 chars) */
+  gitShortSha?: string;
+  /** Git branch name */
+  gitBranch?: string;
+  /** PR number if testing a PR */
+  prNumber?: string;
+  /** Whether working directory has uncommitted changes */
+  isDirty?: boolean;
+  /** Timestamp when version was captured */
+  capturedAt: number;
+}
 
 /**
  * Stored evaluation record
@@ -40,14 +128,13 @@ export interface EvaluationRecord {
   // Results
   result: ConsistencyResult;
 
+  // Version information
+  version: VersionInfo;
+
   // Metadata
   environment: {
     profile: string;
     ci: boolean;
-    git?: {
-      branch?: string;
-      commit?: string;
-    };
   };
 }
 
@@ -82,6 +169,39 @@ export interface TrendAnalysis {
     currentScore: number;
     drop: number;
   }>;
+}
+
+/**
+ * Version-specific statistics
+ */
+export interface VersionStats {
+  version: VersionInfo;
+  count: number;
+  passRate: number;
+  averageScore: number;
+  scoreStdDev: number;
+  totalCost: number;
+  firstSeen: number;
+  lastSeen: number;
+}
+
+/**
+ * Comparison between two versions
+ */
+export interface VersionComparison {
+  testName: string;
+  baseline: VersionStats;
+  current: VersionStats;
+
+  deltas: {
+    passRate: number; // Percentage point change
+    averageScore: number; // Score point change
+    scoreStdDev: number;
+    cost: number; // Cost change
+  };
+
+  improvement: boolean;
+  regression: boolean;
 }
 
 /**
@@ -123,11 +243,10 @@ export class EvaluationStorage {
     const environment = {
       profile: process.env.TEST_PROFILE || 'development',
       ci: process.env.CI === 'true',
-      git: {
-        branch: process.env.GITHUB_REF_NAME || process.env.GIT_BRANCH,
-        commit: process.env.GITHUB_SHA || process.env.GIT_COMMIT,
-      },
     };
+
+    // Capture version information
+    const version = captureVersionInfo();
 
     const record: EvaluationRecord = {
       id,
@@ -137,6 +256,7 @@ export class EvaluationStorage {
       criteria,
       subjectModel,
       result,
+      version,
       environment,
     };
 
@@ -344,7 +464,189 @@ export class EvaluationStorage {
       }
     }
 
-    console.log('\n' + '═'.repeat(80) + '\n');
+    console.log('═'.repeat(80) + '\n');
+  }
+
+  /**
+   * Group evaluations by version and calculate statistics for each
+   */
+  analyzeByVersion(testName: string): Map<string, VersionStats> {
+    const evaluations = this.loadTest(testName);
+    const byVersion = new Map<string, EvaluationRecord[]>();
+
+    // Group by version key (package@sha or package@sha-dirty)
+    for (const record of evaluations) {
+      const versionKey = this.getVersionKey(record.version);
+      if (!byVersion.has(versionKey)) {
+        byVersion.set(versionKey, []);
+      }
+      byVersion.get(versionKey)!.push(record);
+    }
+
+    // Calculate statistics for each version
+    const stats = new Map<string, VersionStats>();
+    for (const [versionKey, records] of byVersion) {
+      const scores = records.map((r) => r.result.finalScore);
+      const passed = records.filter((r) => r.result.passed);
+      const costs = records.map((r) =>
+        r.result.samples.reduce((sum, s) => sum + s.metadata.cost, 0),
+      );
+
+      const count = records.length;
+      const passRate = passed.length / count;
+      const averageScore = scores.reduce((a, b) => a + b, 0) / count;
+      const variance =
+        scores.reduce(
+          (sum, score) => sum + Math.pow(score - averageScore, 2),
+          0,
+        ) / count;
+      const scoreStdDev = Math.sqrt(variance);
+      const totalCost = costs.reduce((a, b) => a + b, 0);
+
+      stats.set(versionKey, {
+        version: records[0].version,
+        count,
+        passRate,
+        averageScore,
+        scoreStdDev,
+        totalCost,
+        firstSeen: Math.min(...records.map((r) => r.timestamp)),
+        lastSeen: Math.max(...records.map((r) => r.timestamp)),
+      });
+    }
+
+    return stats;
+  }
+
+  /**
+   * Compare two versions for a specific test
+   */
+  compareVersions(
+    testName: string,
+    baselineVersion: string,
+    currentVersion: string,
+  ): VersionComparison | null {
+    const versionStats = this.analyzeByVersion(testName);
+
+    const baseline = versionStats.get(baselineVersion);
+    const current = versionStats.get(currentVersion);
+
+    if (!baseline || !current) {
+      return null;
+    }
+
+    const deltas = {
+      passRate: (current.passRate - baseline.passRate) * 100, // Convert to percentage points
+      averageScore: current.averageScore - baseline.averageScore,
+      scoreStdDev: current.scoreStdDev - baseline.scoreStdDev,
+      cost:
+        current.totalCost / current.count - baseline.totalCost / baseline.count,
+    };
+
+    const improvement =
+      deltas.passRate > 5 || // 5% improvement in pass rate
+      (deltas.passRate >= 0 && deltas.averageScore > 5); // Same pass rate but 5+ point score improvement
+
+    const regression =
+      deltas.passRate < -5 || // 5% drop in pass rate
+      (deltas.passRate <= 0 && deltas.averageScore < -5); // Same/worse pass rate and 5+ point score drop
+
+    return {
+      testName,
+      baseline,
+      current,
+      deltas,
+      improvement,
+      regression,
+    };
+  }
+
+  /**
+   * Print version comparison in a readable format
+   */
+  printVersionComparison(comparison: VersionComparison): void {
+    console.log('\n' + '═'.repeat(80));
+    console.log(`📊 VERSION COMPARISON: ${comparison.testName}`);
+    console.log('═'.repeat(80));
+
+    const baselineKey = this.getVersionKey(comparison.baseline.version);
+    const currentKey = this.getVersionKey(comparison.current.version);
+
+    console.log('\n📌 Baseline Version:');
+    console.log(`   ${baselineKey}`);
+    console.log(`   Evaluations: ${comparison.baseline.count}`);
+    console.log(
+      `   Pass Rate: ${(comparison.baseline.passRate * 100).toFixed(1)}%`,
+    );
+    console.log(
+      `   Avg Score: ${comparison.baseline.averageScore.toFixed(1)}/100`,
+    );
+    console.log(
+      `   Avg Cost: $${(comparison.baseline.totalCost / comparison.baseline.count).toFixed(4)}`,
+    );
+
+    console.log('\n🆕 Current Version:');
+    console.log(`   ${currentKey}`);
+    console.log(`   Evaluations: ${comparison.current.count}`);
+    console.log(
+      `   Pass Rate: ${(comparison.current.passRate * 100).toFixed(1)}%`,
+    );
+    console.log(
+      `   Avg Score: ${comparison.current.averageScore.toFixed(1)}/100`,
+    );
+    console.log(
+      `   Avg Cost: $${(comparison.current.totalCost / comparison.current.count).toFixed(4)}`,
+    );
+
+    console.log('\n📈 Performance Delta:');
+    const passRateIcon =
+      comparison.deltas.passRate > 0
+        ? '📈'
+        : comparison.deltas.passRate < 0
+          ? '📉'
+          : '➡️';
+    const scoreIcon =
+      comparison.deltas.averageScore > 0
+        ? '📈'
+        : comparison.deltas.averageScore < 0
+          ? '📉'
+          : '➡️';
+    const costIcon =
+      comparison.deltas.cost < 0
+        ? '💰'
+        : comparison.deltas.cost > 0
+          ? '💸'
+          : '➡️';
+
+    console.log(
+      `   ${passRateIcon} Pass Rate: ${comparison.deltas.passRate > 0 ? '+' : ''}${comparison.deltas.passRate.toFixed(1)}%`,
+    );
+    console.log(
+      `   ${scoreIcon} Avg Score: ${comparison.deltas.averageScore > 0 ? '+' : ''}${comparison.deltas.averageScore.toFixed(1)}`,
+    );
+    console.log(
+      `   ${costIcon} Avg Cost: ${comparison.deltas.cost > 0 ? '+' : ''}$${comparison.deltas.cost.toFixed(4)}`,
+    );
+
+    console.log('\n🎯 Assessment:');
+    if (comparison.improvement) {
+      console.log('   ✅ IMPROVEMENT - Performance is better');
+    } else if (comparison.regression) {
+      console.log('   ⚠️  REGRESSION - Performance has degraded');
+    } else {
+      console.log('   ➡️  NEUTRAL - No significant change');
+    }
+
+    console.log('═'.repeat(80) + '\n');
+  }
+
+  /**
+   * Get a unique key for a version
+   */
+  private getVersionKey(version: VersionInfo): string {
+    const sha = version.gitShortSha || 'unknown';
+    const dirty = version.isDirty ? '-dirty' : '';
+    return `${version.package}@${sha}${dirty}`;
   }
 
   /**

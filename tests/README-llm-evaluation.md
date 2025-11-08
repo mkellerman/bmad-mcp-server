@@ -79,6 +79,36 @@ console.log(`Pass rate: ${(summary.overallPassRate * 100).toFixed(1)}%`);
 console.log(`Total cost: $${summary.totalCost.toFixed(4)}`);
 ```
 
+### Version Comparison
+
+```typescript
+import { getEvaluationStorage } from './helpers/llm-evaluation';
+
+const storage = getEvaluationStorage();
+
+// Analyze performance by version
+const versionStats = storage.analyzeByVersion('workflow-ranking-quality');
+for (const [versionKey, stats] of versionStats) {
+  console.log(`${versionKey}: ${stats.averageScore}/100 (${stats.count} runs)`);
+}
+
+// Compare two specific versions
+const comparison = storage.compareVersions(
+  'workflow-ranking-quality',
+  '3.0.0@abc1234', // baseline
+  '3.0.1@def4567', // current
+);
+
+if (comparison) {
+  storage.printVersionComparison(comparison);
+
+  // Check for regression before merging PR
+  if (comparison.regression) {
+    throw new Error('⚠️ Performance regression detected - review before merge');
+  }
+}
+```
+
 ## What You Can See
 
 ### Individual Evaluation Output
@@ -404,6 +434,56 @@ console.log(`Average score: ${trends.statistics.averageScore}/100`);
 console.log(`Score std dev: ${trends.statistics.scoreStdDev.toFixed(1)}`);
 console.log(`Total cost: $${trends.statistics.totalCost.toFixed(4)}`);
 ```
+
+### Version Tracking
+
+Every evaluation automatically captures version information:
+
+```typescript
+// Version info captured in each evaluation record:
+{
+  version: {
+    package: "3.0.1",           // From package.json
+    gitSha: "a58f568...",       // Full commit SHA
+    gitShortSha: "a58f568",     // Short SHA (7 chars)
+    gitBranch: "feature/...",   // Current branch
+    prNumber: "30",             // PR number if applicable
+    isDirty: false,             // Uncommitted changes?
+    capturedAt: 1699488000000   // When captured
+  }
+}
+
+// Group results by version
+const versionStats = storage.analyzeByVersion('test-name');
+for (const [version, stats] of versionStats) {
+  console.log(`${version}: ${stats.averageScore}/100`);
+}
+
+// Compare versions
+const comparison = storage.compareVersions(
+  'test-name',
+  '3.0.0@abc1234',  // baseline version
+  '3.0.1@def4567'   // current version
+);
+
+if (comparison?.regression) {
+  console.warn('⚠️ Performance regression detected!');
+  console.log(`Score dropped by ${-comparison.deltas.averageScore} points`);
+}
+```
+
+Version comparison output shows:
+
+- **Baseline vs Current**: Side-by-side metrics
+- **Performance Deltas**: Score, pass rate, cost changes with 📈📉 indicators
+- **Assessment**: Improvement ✅, Regression ⚠️, or Neutral ➡️
+
+Use cases:
+
+- **PR validation**: Compare PR branch against main
+- **Release testing**: Verify new release performs as well or better
+- **A/B testing**: Compare algorithm variants across commits
+- **Performance monitoring**: Track quality trends across versions
 
 ### Cross-Test Summary
 
