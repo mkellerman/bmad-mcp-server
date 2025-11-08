@@ -57,17 +57,20 @@ export class MockMCPServer {
    * Mock getClientCapabilities() - returns capabilities based on config
    */
   getClientCapabilities(): ClientCapabilities | undefined {
-    if (!this.config.samplingSupported) {
-      return {
-        // No sampling capability
-      } as ClientCapabilities;
-    }
-
-    return {
-      sampling: {}, // Presence indicates support
+    const baseCapabilities = {
       ...(this.config.clientInfo && {
         clientInfo: this.config.clientInfo,
       }),
+    } as ClientCapabilities;
+
+    if (!this.config.samplingSupported) {
+      // No sampling capability, but still include clientInfo
+      return baseCapabilities;
+    }
+
+    return {
+      ...baseCapabilities,
+      sampling: {}, // Presence indicates support
     } as ClientCapabilities;
   }
 

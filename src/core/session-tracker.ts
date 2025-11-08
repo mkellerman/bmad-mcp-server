@@ -254,6 +254,13 @@ export class SessionTracker {
   }
 
   /**
+   * Get usage record for a specific key (for LLM ranking context)
+   */
+  getUsageRecord(key: string): UsageRecord | undefined {
+    return this.usageMap.get(key);
+  }
+
+  /**
    * Reset all session data (for testing or new session)
    */
   reset(): void {

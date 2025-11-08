@@ -25,6 +25,13 @@ import {
 } from '../config.js';
 import { SessionTracker } from './session-tracker.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import {
+  buildRankingPrompt,
+  parseRankingResponse,
+  shouldUseLLMRanking,
+  type RankingCandidate,
+  type UsageInfo,
+} from './llm-ranker.js';
 
 // ============================================================================
 // Core Types (Transport-Agnostic)
@@ -316,7 +323,7 @@ export class BMADEngine {
   }
 
   // ============================================================================
-  // RANKING HELPERS (Session-based Intelligence)
+  // RANKING HELPERS (Session-based + LLM Intelligence)
   // ============================================================================
 
   /**
@@ -338,6 +345,122 @@ export class BMADEngine {
       }))
       .sort((a, b) => b.score - a.score) // Descending order
       .map((ranked) => ranked.item);
+  }
+
+  /**
+   * Rank items using LLM-based intelligent ranking via MCP sampling
+   *
+   * Hybrid strategy:
+   * 1. Decides whether to use LLM or session-based ranking
+   * 2. If LLM: calls createMessage for ranking, parses response
+   * 3. On error/timeout: falls back to session-based ranking
+   *
+   * @param items Array of items to rank
+   * @param keyExtractor Function to extract composite key from item
+   * @param descExtractor Function to extract description from item
+   * @param userQuery Optional user query for context
+   * @returns Ranked array (highest relevance first)
+   */
+  private async rankWithHybridStrategy<T>(
+    items: T[],
+    keyExtractor: (item: T) => string,
+    descExtractor: (item: T) => string,
+    userQuery?: string,
+  ): Promise<T[]> {
+    // Decision: should we use LLM ranking?
+    const decision = shouldUseLLMRanking(
+      this.isSamplingAvailable(),
+      items.length,
+      !!userQuery,
+    );
+
+    // Fast path: use session-based ranking
+    if (!decision.useLLM) {
+      console.warn(`⚡ Using session-based ranking: ${decision.reason}`);
+      return this.rankByUsage(items, keyExtractor);
+    }
+
+    // Try LLM ranking
+    try {
+      console.log(
+        '🎯 Using LLM-based ranking for better context understanding',
+      );
+
+      // Build ranking context
+      const candidates: RankingCandidate[] = items.map((item) => {
+        const key = keyExtractor(item);
+        const parts = key.split(':');
+        return {
+          key,
+          name: parts[1] || parts[0],
+          module: parts[0],
+          description: descExtractor(item),
+        };
+      });
+
+      // Get usage history for context
+      const usageHistory: UsageInfo[] = candidates
+        .map((c) => {
+          const usage = this.sessionTracker.getUsageRecord(c.key);
+          if (!usage) return null;
+          return {
+            key: c.key,
+            lastUsed: new Date(usage.lastAccess),
+            useCount: usage.count,
+          };
+        })
+        .filter((u): u is UsageInfo => u !== null);
+
+      // Build prompt
+      const prompt = buildRankingPrompt({
+        userQuery: userQuery || 'general ranking',
+        candidates,
+        usageHistory,
+      });
+
+      // Call LLM via MCP sampling
+      const startTime = Date.now();
+      const response = await this.mcpServer!.createMessage({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: prompt,
+            },
+          },
+        ],
+        maxTokens: 100,
+      });
+
+      const latency = Date.now() - startTime;
+      console.log(`✅ LLM ranking completed in ${latency}ms`);
+
+      // Parse response
+      const validKeys = new Set(candidates.map((c) => c.key));
+      const llmText =
+        response.content.type === 'text' ? response.content.text : '';
+      const rankedKeys = parseRankingResponse(llmText, validKeys);
+
+      // Reorder items according to LLM ranking
+      const itemMap = new Map(items.map((item) => [keyExtractor(item), item]));
+      const rankedItems = rankedKeys
+        .map((key) => itemMap.get(key))
+        .filter((item): item is T => item !== undefined);
+
+      return rankedItems;
+    } catch (error) {
+      // Fallback to session-based ranking on any error
+      console.warn(
+        '⚠️  LLM ranking failed, falling back to session-based ranking',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          userQuery,
+          candidateCount: items.length,
+        },
+      );
+      return this.rankByUsage(items, keyExtractor);
+    }
   }
 
   // ============================================================================

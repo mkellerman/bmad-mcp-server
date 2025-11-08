@@ -246,7 +246,7 @@ describe('E2E: workflow-status Execution Flow', () => {
 
     // Assertions
     expect(trace.toolCalls.length).toBeGreaterThan(0);
-    expect(trace.totalDurationMs).toBeGreaterThan(0);
+    expect(trace.totalDurationMs).toBeGreaterThanOrEqual(0); // Can be 0ms on fast systems
   });
 
   it('should show sampling capability status', () => {
