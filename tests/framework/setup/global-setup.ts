@@ -5,7 +5,7 @@
  * and generates the final report after all tests complete.
  *
  * For E2E tests, it ensures LiteLLM proxy is running.
- * For E2E-Evaluated tests, it ensures Copilot Proxy is running.
+ * For Manual LLM-Evaluated tests, it ensures Copilot Proxy is running.
  */
 
 import { reporter } from '../core/reporter.js';
@@ -34,11 +34,11 @@ export async function setup() {
     testType,
   );
 
-  // Detect if we're running e2e-evaluated tests from command line args
+  // Detect if we're running manual/llm-evaluated tests from command line args
   const isRunningEvaluatedTests =
-    testType === 'e2e-evaluated' ||
+    testType === 'manual' ||
     process.env.RUN_LLM_EVALUATION === 'true' ||
-    process.argv.some((arg) => arg.includes('e2e-evaluated'));
+    process.argv.some((arg) => arg.includes('manual/llm-evaluated'));
 
   try {
     // Remove old fragments and contexts for this test type only
@@ -78,7 +78,7 @@ export async function setup() {
     }
   }
 
-  // For E2E-Evaluated tests, ensure Copilot Proxy is running
+  // For Manual LLM-Evaluated tests, ensure Copilot Proxy is running
   if (isRunningEvaluatedTests) {
     console.log('\n🔍 Checking Copilot Proxy for LLM evaluation tests...');
 
@@ -90,12 +90,12 @@ export async function setup() {
       // FAIL-FAST: Don't skip, fail the entire test suite
       console.error('\n❌ FATAL: Copilot Proxy startup failed');
       console.error('   Error:', error.message);
-      console.error('\n   All e2e-evaluated tests will FAIL.');
+      console.error('\n   All manual/llm-evaluated tests will FAIL.');
       console.error('   Fix the issue and retry.\n');
 
       // Throw to fail the global setup, which fails all tests
       throw new Error(
-        `Copilot Proxy required for e2e-evaluated tests but failed to start: ${error.message}`,
+        `Copilot Proxy required for manual/llm-evaluated tests but failed to start: ${error.message}`,
       );
     }
   }
