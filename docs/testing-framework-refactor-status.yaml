@@ -1,0 +1,443 @@
+# Workflow Status - Testing Framework Refactor
+# Major refactoring project to modernize test infrastructure and consolidate technical debt
+# Parallel track to MCP optimizer work
+
+generated: '2025-11-08T18:30:00Z'
+project: 'bmad-mcp-server-testing-refactor'
+project_type: 'infrastructure'
+selected_track: 'custom'
+field_type: 'brownfield'
+workflow_path: 'custom-refactor'
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - not-started: Planned but not yet begun
+#   - in-progress: Currently working on
+#   - blocked: Waiting on dependency
+#
+# Completion Status:
+#   - {file-path}: File created/completed
+#   - complete: Non-file deliverable completed
+#   - skipped: Decided not to do
+
+# ============================================================================
+# PHASE 0: Discovery & Planning
+# ============================================================================
+phase-0:
+  product-feature-audit:
+    status: 'in-progress'
+    note: 'Party-mode session with Winston/Diana/Murat - initial audit completed'
+    findings:
+      core-product:
+        - 'MCP Server (864 lines) - ships to users'
+        - 'BMAD Engine (1602 lines) - business logic'
+        - 'Resource Loader (1681 lines) - loads agents/workflows'
+        - 'Manifest Cache (1076 lines) - performance layer'
+        - 'Unified BMAD Tool (662 lines) - MCP tool implementation'
+        - 'Session Tracker (270 lines) - usage patterns'
+        - 'LLM Ranker (150 lines) - Phase 2 optimization'
+      cli-tools:
+        - 'bmad-cli (302 lines) - user-facing CLI'
+        - 'cli-tester (464 lines) - interactive testing'
+      test-infrastructure:
+        - 'Vitest framework - 524 passing tests (235 unit, 289 E2E)'
+        - 'tests/ directory structure - good organization'
+      bloat-to-delete:
+        - 'scripts/ directory - 29 manual test scripts (5297 total lines)'
+        - 'Most are ad-hoc validation from development'
+        - 'Zero CI/CD integration'
+        - 'Duplicative with proper tests'
+      files-needing-refactor:
+        - 'resource-loader.ts (1681 lines) - extract git resolver, manifest parser'
+        - 'bmad-engine.ts (1602 lines) - separate ranking, execution, message handling'
+        - 'manifest-cache.ts (1076 lines) - split caching from generation'
+
+  architecture-design:
+    status: 'in-progress'
+    note: 'Winston architectural vision - phased approach, not clean slate'
+    decisions:
+      - 'Keep existing test infrastructure (Vitest, test organization)'
+      - 'Delete scripts/ bloat'
+      - 'Add new LLM-evaluation layer on top of E2E tests'
+      - 'Refactor large files through extraction'
+
+  test-strategy-design:
+    status: 'in-progress'
+    note: 'Murat test strategy - dual-LLM evaluation framework'
+    framework-design:
+      layer-1-unit:
+        - 'Keep existing 235 unit tests'
+        - 'Add snapshot testing for formatted outputs'
+        - 'Add parameterized tests for ranking scenarios'
+      layer-2-integration:
+        - 'Keep existing structure'
+        - 'Add MCP protocol tests'
+        - 'Add proper TypeScript fixtures (not text files)'
+      layer-3-e2e:
+        - 'Keep existing 289 E2E tests (LiteLLM → MCP)'
+        - 'Structural assertions (status codes, response shape)'
+      layer-4-llm-evaluated:
+        - 'NEW: Subset of critical user flows'
+        - 'First LLM: Makes request (existing)'
+        - 'Second LLM: Evaluates response quality (NEW)'
+        - 'Behavioral validation (quality, relevance, coherence)'
+        - 'Scoring system (0-100) with pass/fail thresholds'
+
+  failure-modes-analysis:
+    status: 'in-progress'
+    note: 'Diana defect analysis - identified 5 critical failure modes'
+    failure-modes:
+      - 'Judge LLM unavailable → graceful degradation, skip evaluation'
+      - 'Inconsistent scoring → multi-sample with variance check'
+      - 'Judge hallucination → structured output + fact checking'
+      - 'Cost explosion → selective evaluation of critical tests only'
+      - 'Flaky tests → score bands instead of hard thresholds'
+
+# ============================================================================
+# PHASE 1: Scripts Consolidation
+# ============================================================================
+phase-1-scripts:
+  audit-scripts-usage:
+    status: 'not-started'
+    note: 'Identify which scripts are actually used vs abandoned'
+    tasks:
+      - 'Check git history for last usage of each script'
+      - 'Identify scripts with equivalent test coverage'
+      - 'List scripts to keep/migrate vs delete'
+
+  archive-scripts:
+    status: 'not-started'
+    dependencies: ['audit-scripts-usage']
+    note: 'Move all to scripts/archive/ before deletion'
+    tasks:
+      - 'Create scripts/archive/ if not exists'
+      - 'Move all .mjs files except bmad-cli.mjs'
+      - 'Update scripts/README.md with archive notice'
+
+  migrate-bmad-cli:
+    status: 'not-started'
+    dependencies: ['archive-scripts']
+    note: 'Enhance src/cli.ts with functionality from bmad-cli.mjs'
+    tasks:
+      - 'Review bmad-cli.mjs features (302 lines)'
+      - 'Identify missing features in src/cli.ts'
+      - 'Migrate useful commands'
+      - 'Update CLI documentation'
+
+  delete-archived-scripts:
+    status: 'not-started'
+    dependencies: ['migrate-bmad-cli']
+    note: 'Final deletion after verification'
+    verification:
+      - 'All tests still passing'
+      - 'No references in CI/CD'
+      - 'Documentation updated'
+
+# ============================================================================
+# PHASE 2: LLM Evaluation Framework
+# ============================================================================
+phase-2-llm-eval:
+  create-config-files:
+    status: 'complete'
+    note: 'Configuration system for LLM evaluation framework'
+    deliverables:
+      - 'tests/config/llm-evaluation.config.ts - Main config with profiles'
+      - 'tests/config/critical-tests.config.ts - Test prioritization rules'
+      - 'tests/config/judge-models.config.ts - Model costs and budget tracking'
+    features:
+      - 'Environment profiles (development, ci, nightly)'
+      - 'Cost controls and budget limits'
+      - 'Per-test custom thresholds'
+      - 'Failure mode configuration'
+      - 'Cost tracking utilities'
+
+  design-llm-judge-api:
+    status: 'not-started'
+    dependencies: ['create-config-files']
+    note: 'Core framework for LLM-as-judge evaluation'
+    deliverables:
+      - 'tests/helpers/llm-evaluation/llm-judge.ts'
+      - 'tests/helpers/llm-evaluation/evaluation-runner.ts'
+      - 'tests/helpers/llm-evaluation/score-aggregator.ts'
+    interfaces:
+      - 'LLMEvaluatedTest'
+      - 'EvaluationCriteria'
+      - 'LLMJudge'
+      - 'ScoringConfig'
+      - 'EvaluationResult'
+
+  create-judge-prompts:
+    status: 'not-started'
+    dependencies: ['design-llm-judge-api']
+    note: 'Reusable judge prompt templates'
+    deliverables:
+      - 'tests/fixtures/evaluation-prompts/ranking-judge.ts'
+      - 'tests/fixtures/evaluation-prompts/relevance-judge.ts'
+      - 'tests/fixtures/evaluation-prompts/completeness-judge.ts'
+
+  implement-consistency-handling:
+    status: 'not-started'
+    dependencies: ['design-llm-judge-api']
+    note: 'Multi-sample variance checking'
+    features:
+      - 'Retry on high variance (>10%)'
+      - 'Median selection from multiple samples'
+      - 'Variance threshold configuration'
+
+  implement-failure-modes:
+    status: 'not-started'
+    dependencies: ['design-llm-judge-api']
+    note: 'All 5 failure modes from Diana analysis'
+    implementations:
+      - 'Graceful degradation on LLM unavailable'
+      - 'Multi-sample consistency checking'
+      - 'Evidence validation (anti-hallucination)'
+      - 'Selective evaluation (cost control)'
+      - 'Score bands (anti-flakiness)'
+
+  create-first-evaluated-tests:
+    status: 'not-started'
+    dependencies: ['create-judge-prompts', 'implement-failure-modes']
+    note: 'Initial LLM-evaluated E2E tests'
+    deliverables:
+      - 'tests/e2e-evaluated/ranking-quality.eval.test.ts'
+      - 'tests/e2e-evaluated/response-relevance.eval.test.ts'
+      - 'tests/e2e-evaluated/workflow-selection.eval.test.ts'
+    coverage:
+      - 'Workflow ranking with query'
+      - 'Agent response relevance'
+      - 'Sampling prioritization behavior'
+
+  add-evaluation-storage:
+    status: 'not-started'
+    dependencies: ['create-first-evaluated-tests']
+    note: 'Store evaluation results for trend analysis'
+    deliverables:
+      - 'tests/results/evaluations/ directory'
+      - 'Timestamped JSON evaluation results'
+      - 'Aggregation and reporting tools'
+
+# ============================================================================
+# PHASE 3: Test Infrastructure Enhancements
+# ============================================================================
+phase-3-test-infra:
+  add-snapshot-testing:
+    status: 'not-started'
+    note: 'Snapshot tests for response formatting'
+    tasks:
+      - 'Install Vitest snapshot plugin if needed'
+      - 'Add snapshots for agent activation responses'
+      - 'Add snapshots for workflow list formatting'
+      - 'Add snapshots for error responses'
+
+  enhance-test-fixtures:
+    status: 'not-started'
+    note: 'Convert text fixtures to TypeScript'
+    tasks:
+      - 'Remove tests/fixtures/test-responses/*.txt (created for test operation)'
+      - 'Create proper TypeScript fixture files'
+      - 'Type-safe fixture factories'
+
+  add-parameterized-tests:
+    status: 'not-started'
+    note: 'Test ranking scenarios with multiple inputs'
+    tasks:
+      - 'Parameterize ranking tests (query combinations)'
+      - 'Parameterize response formatting tests'
+      - 'Use describe.each for test matrices'
+
+  add-mcp-protocol-tests:
+    status: 'not-started'
+    note: 'Integration tests for MCP protocol layer'
+    tasks:
+      - 'Test request/response validation'
+      - 'Test error handling at protocol level'
+      - 'Test sampling capability negotiation'
+
+# ============================================================================
+# PHASE 4: Code Refactoring
+# ============================================================================
+phase-4-refactor:
+  extract-manifest-parser:
+    status: 'not-started'
+    note: 'Extract from resource-loader.ts (1681 lines)'
+    deliverables:
+      - 'src/core/manifest-parser.ts'
+    extracted-responsibilities:
+      - 'CSV parsing logic'
+      - 'Manifest validation'
+      - 'Metadata extraction'
+
+  extract-git-resolver:
+    status: 'not-started'
+    note: 'Already partially extracted to utils/git-source-resolver.ts'
+    tasks:
+      - 'Review current git-source-resolver.ts (744 lines)'
+      - 'Complete extraction from resource-loader.ts'
+      - 'Ensure single responsibility'
+
+  split-bmad-engine:
+    status: 'not-started'
+    note: 'Split bmad-engine.ts (1602 lines)'
+    deliverables:
+      - 'src/core/ranking-service.ts - All ranking logic'
+      - 'src/core/message-formatter.ts - Response formatting'
+      - 'src/core/execution-context.ts - Execution state management'
+    keep-in-engine:
+      - 'Core orchestration'
+      - 'Agent/workflow dispatch'
+      - 'Error handling coordination'
+
+  split-manifest-cache:
+    status: 'not-started'
+    note: 'Split manifest-cache.ts (1076 lines)'
+    deliverables:
+      - 'src/core/cache-manager.ts - Caching logic only'
+      - 'src/core/manifest-generator.ts - Generation logic'
+    responsibilities:
+      cache-manager:
+        - 'Cache storage/retrieval'
+        - 'Invalidation logic'
+        - 'TTL management'
+      manifest-generator:
+        - 'Manifest building'
+        - 'Optimization logic'
+        - 'Format generation'
+
+  update-tests-after-refactor:
+    status: 'not-started'
+    dependencies:
+      ['extract-manifest-parser', 'split-bmad-engine', 'split-manifest-cache']
+    note: 'Ensure all tests pass after refactoring'
+    tasks:
+      - 'Update imports in test files'
+      - 'Add unit tests for new extracted modules'
+      - 'Verify 100% test pass rate'
+      - 'Verify no regression in functionality'
+
+# ============================================================================
+# PHASE 5: Cleanup & Documentation
+# ============================================================================
+phase-5-cleanup:
+  remove-test-operation:
+    status: 'not-started'
+    note: 'Remove test operation added for experimentation'
+    tasks:
+      - 'Remove test operation from src/tools/bmad-unified.ts'
+      - 'Remove tests/fixtures/test-responses/ directory'
+      - 'Remove scripts/test-new-response.mjs'
+      - 'Remove docs/test-operation-implementation.md'
+      - 'Update docs/execute-response-proposal.md status'
+
+  update-documentation:
+    status: 'not-started'
+    dependencies: ['phase-2-llm-eval', 'phase-4-refactor']
+    deliverables:
+      - 'docs/testing-strategy.md - Comprehensive testing guide'
+      - 'docs/llm-evaluation-framework.md - LLM-as-judge documentation'
+      - 'docs/architecture.md - Update with refactored structure'
+      - 'README.md - Update testing section'
+
+  final-validation:
+    status: 'not-started'
+    dependencies: ['remove-test-operation', 'update-documentation']
+    checklist:
+      - 'All tests passing (unit, integration, E2E, LLM-evaluated)'
+      - 'No scripts/ bloat remaining'
+      - 'Code coverage maintained/improved'
+      - 'Documentation complete and accurate'
+      - 'CI/CD pipeline updated if needed'
+
+# ============================================================================
+# METRICS & TARGETS
+# ============================================================================
+metrics:
+  current:
+    total-tests: 524
+    unit-tests: 235
+    e2e-tests: 289
+    llm-evaluated-tests: 0
+    test-pass-rate: '100%'
+    scripts-count: 29
+    scripts-lines: 5297
+    large-files: 3 # >1000 lines
+
+  targets:
+    total-tests: 550-600
+    unit-tests: 250-280
+    integration-tests: 50-70
+    e2e-tests: 289 # keep existing
+    llm-evaluated-tests: 20-50
+    test-pass-rate: '100%'
+    scripts-count: 0 # all deleted or migrated
+    scripts-lines: 0
+    large-files: 0 # all refactored to <800 lines
+
+  success-criteria:
+    - 'Scripts directory empty or only bmad-cli as real CLI tool'
+    - 'LLM evaluation framework functional with 20+ critical test cases'
+    - 'All source files <800 lines'
+    - 'Test coverage maintained at 100%'
+    - 'CI/CD runs include LLM-evaluated tests (with skip option)'
+    - 'Documentation complete for new testing patterns'
+
+# ============================================================================
+# CURRENT STATE
+# ============================================================================
+current_phase: 'phase-2'
+current_task: 'create-config-files'
+status: 'complete'
+
+next_actions:
+  immediate:
+    - 'Design LLM judge API (core framework interfaces)'
+    - 'Create judge prompt templates'
+    - 'Implement cost tracker integration'
+
+  short-term:
+    - 'Implement consistency handling (multi-sample variance checking)'
+    - 'Implement all 5 failure modes'
+    - 'Create first LLM-evaluated test'
+
+  long-term:
+    - 'Build out full LLM evaluation framework'
+    - 'Phase 1: Scripts consolidation'
+    - 'Phase 4: Code refactoring'
+
+# ============================================================================
+# RISKS & DEPENDENCIES
+# ============================================================================
+risks:
+  - risk: 'LLM evaluation costs could be high'
+    mitigation: 'Selective evaluation, only critical tests, configurable skip'
+
+  - risk: 'Refactoring could introduce regressions'
+    mitigation: 'Maintain 100% test pass rate throughout, incremental changes'
+
+  - risk: 'Judge LLM inconsistency causing flaky tests'
+    mitigation: 'Multi-sample variance checking, score bands, evidence validation'
+
+  - risk: 'Time investment vs value delivered'
+    mitigation: 'Phased approach, can stop after any phase if value drops'
+
+dependencies:
+  external:
+    - 'LiteLLM for judge LLM calls'
+    - 'Vitest framework (already in use)'
+    - 'MCP SDK (already in use)'
+
+  internal:
+    - 'Must not break existing MCP optimizer work'
+    - 'Can run in parallel with MCP optimizer'
+    - 'Some test refactoring may benefit MCP optimizer tests'
+
+# ============================================================================
+# NOTES
+# ============================================================================
+notes:
+  - 'This is a parallel track to MCP optimizer feature work'
+  - 'Can be done incrementally without blocking other work'
+  - 'Party-mode session with Winston/Diana/Murat provided initial design'
+  - 'Focus on measurable improvements: fewer lines, better tests, clearer code'
+  - 'LLM evaluation framework is novel - may become reusable pattern'
