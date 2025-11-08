@@ -285,6 +285,14 @@ export class ManifestCache {
       return;
     }
 
+    // Check if source already has manifests (e.g., test fixtures, pre-built packages)
+    // If manifests exist in source, copy them to cache instead of generating
+    const sourceManifestPath = join(bmadRoot, '_cfg', 'manifest.yaml');
+    if (await pathExists(sourceManifestPath)) {
+      await this.copySourceManifestsToCache(bmadRoot);
+      return;
+    }
+
     // Generate new manifests to cache
     await this.generateManifests(bmadRoot);
   }
@@ -302,69 +310,111 @@ export class ManifestCache {
 
     // Import ManifestGenerator from bmad-method package dynamically
     // Resolve the package path and construct the correct generator path
-    const pkgPath = import.meta.resolve('bmad-method');
-    const pkgFile = fileURLToPath(pkgPath);
-    const pkgRoot = pathModule.dirname(
-      pathModule.dirname(pathModule.dirname(pkgFile)),
-    ); // up 3 levels from tools/cli/bmad-cli.js
-    const generatorPath = pathToFileURL(
-      join(pkgRoot, 'tools/cli/installers/lib/core/manifest-generator.js'),
-    ).href;
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const module = await import(generatorPath);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
-    const ManifestGenerator = (module as any).ManifestGenerator;
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const generator = new ManifestGenerator();
-
-    // Detect modules in the SOURCE
-    const modules = await this.detectModules(bmadRoot);
-
-    // Build complete file list from SOURCE
-    const files = await this.walkDirectory(bmadRoot);
-
-    // Get CACHE directory - this is where manifests will be written!
-    const cacheDir = this.getCacheDir(bmadRoot);
-    await mkdir(cacheDir, { recursive: true });
-
-    // Handle flat module structure: if bmadRoot has agents/ at root level,
-    // create a core symlink so ManifestGenerator can scan it properly
-    const hasFlatStructure =
-      existsSync(join(bmadRoot, 'agents')) ||
-      existsSync(join(bmadRoot, 'workflows')) ||
-      existsSync(join(bmadRoot, 'tasks'));
-
-    let scanDir = bmadRoot;
-    let tempCoreLink: string | null = null;
-
-    if (hasFlatStructure && modules.length === 0) {
-      // Create temporary directory with core symlink pointing to bmadRoot
-      const { mkdtemp } = await import('node:fs/promises');
-      const { tmpdir } = await import('node:os');
-      const tempDir = await mkdtemp(join(tmpdir(), 'bmad-scan-'));
-      tempCoreLink = join(tempDir, 'core');
-      await symlink(bmadRoot, tempCoreLink, 'dir');
-      scanDir = tempDir; // Scan temp dir that has core -> bmadRoot symlink
-    }
-
     try {
-      // Generate manifests directly to CACHE directory
-      // ManifestGenerator will write to {cacheDir}/_cfg/
-      // But it will SCAN from scanDir (source or temp with symlink)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      await generator.generateManifests(cacheDir, modules, files, {
-        ides: [],
-        preservedModules: [],
-        scanDir, // Scan source (or temp with core symlink)
-        bmadRoot, // Original source path for manifest.yaml
-      });
-    } finally {
-      // Cleanup temporary symlink if created
-      if (tempCoreLink) {
-        const tempDir = join(tempCoreLink, '..');
-        await rm(tempDir, { recursive: true, force: true });
+      const pkgPath = import.meta.resolve('bmad-method');
+      const pkgFile = fileURLToPath(pkgPath);
+      const pkgRoot = pathModule.dirname(
+        pathModule.dirname(pathModule.dirname(pkgFile)),
+      ); // up 3 levels from tools/cli/bmad-cli.js
+      const generatorPath = pathToFileURL(
+        join(pkgRoot, 'tools/cli/installers/lib/core/manifest-generator.js'),
+      ).href;
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const module = await import(generatorPath);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
+      const ManifestGenerator = (module as any).ManifestGenerator;
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      const generator = new ManifestGenerator();
+
+      // Detect modules in the SOURCE
+      const modules = await this.detectModules(bmadRoot);
+
+      // Build complete file list from SOURCE
+      const files = await this.walkDirectory(bmadRoot);
+
+      // Get CACHE directory - this is where manifests will be written!
+      const cacheDir = this.getCacheDir(bmadRoot);
+      await mkdir(cacheDir, { recursive: true });
+
+      // Handle flat module structure: if bmadRoot has agents/ at root level,
+      // create a core symlink so ManifestGenerator can scan it properly
+      const hasFlatStructure =
+        existsSync(join(bmadRoot, 'agents')) ||
+        existsSync(join(bmadRoot, 'workflows')) ||
+        existsSync(join(bmadRoot, 'tasks'));
+
+      let scanDir = bmadRoot;
+      let tempCoreLink: string | null = null;
+
+      if (hasFlatStructure && modules.length === 0) {
+        // Create temporary directory with core symlink pointing to bmadRoot
+        const { mkdtemp } = await import('node:fs/promises');
+        const { tmpdir } = await import('node:os');
+        const tempDir = await mkdtemp(join(tmpdir(), 'bmad-scan-'));
+        tempCoreLink = join(tempDir, 'core');
+        await symlink(bmadRoot, tempCoreLink, 'dir');
+        scanDir = tempDir; // Scan temp dir that has core -> bmadRoot symlink
+      }
+
+      try {
+        // Generate manifests directly to CACHE directory
+        // ManifestGenerator will write to {cacheDir}/_cfg/
+        // But it will SCAN from scanDir (source or temp with symlink)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        await generator.generateManifests(cacheDir, modules, files, {
+          ides: [],
+          preservedModules: [],
+          scanDir, // Scan source (or temp with core symlink)
+          bmadRoot, // Original source path for manifest.yaml
+        });
+      } finally {
+        // Cleanup temporary symlink if created
+        if (tempCoreLink) {
+          const tempDir = join(tempCoreLink, '..');
+          await rm(tempDir, { recursive: true, force: true });
+        }
+      }
+    } catch (error) {
+      // If ManifestGenerator import or execution fails, log and throw
+      console.error(`Failed to generate manifests for ${bmadRoot}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Copy pre-existing manifests from source directory to cache
+   * Used for test fixtures or pre-built BMAD packages that already have manifests
+   *
+   * @param bmadRoot - Source path containing _cfg/ directory with manifests
+   */
+  private async copySourceManifestsToCache(bmadRoot: string): Promise<void> {
+    const { mkdir, copyFile } = await import('node:fs/promises');
+
+    const sourceCfgDir = join(bmadRoot, '_cfg');
+    const cacheDir = this.getCacheDir(bmadRoot);
+    const cacheCfgDir = join(cacheDir, '_cfg');
+
+    // Create cache _cfg directory
+    await mkdir(cacheCfgDir, { recursive: true });
+
+    // Copy all manifest files from source to cache
+    const manifestFiles = [
+      'manifest.yaml',
+      'agent-manifest.csv',
+      'workflow-manifest.csv',
+      'tool-manifest.csv',
+      'task-manifest.csv',
+      'files-manifest.csv',
+    ];
+
+    for (const filename of manifestFiles) {
+      const sourcePath = join(sourceCfgDir, filename);
+      const cachePath = join(cacheCfgDir, filename);
+
+      if (await pathExists(sourcePath)) {
+        await copyFile(sourcePath, cachePath);
       }
     }
   }
