@@ -28,6 +28,12 @@ import { Tool, TextContent } from '@modelcontextprotocol/sdk/types.js';
 import type { BMADEngine } from '../core/bmad-engine.js';
 import type { AgentMetadata } from '../core/resource-loader.js';
 import type { Workflow } from '../types/index.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Import operation handlers
 import {
@@ -60,7 +66,7 @@ import {
  */
 export interface BMADToolParams {
   /** Operation to perform */
-  operation: 'list' | 'search' | 'read' | 'execute';
+  operation: 'list' | 'search' | 'read' | 'execute' | 'test';
 
   // List operation params
   /** Query for list operation (agents, workflows, modules, resources) */
@@ -83,6 +89,10 @@ export interface BMADToolParams {
   // Execute operation params
   /** User message/context (for execute operation) */
   message?: string;
+
+  // Test operation params
+  /** Test scenario to return */
+  testScenario?: string;
 
   // Common params
   /** Optional module filter (core, bmm, cis) */
@@ -118,8 +128,8 @@ export function createBMADTool(
 
   // Build operation enum based on config
   const operations = enableSearch
-    ? ['list', 'search', 'read', 'execute']
-    : ['list', 'read', 'execute'];
+    ? ['list', 'search', 'read', 'execute', 'test']
+    : ['list', 'read', 'execute', 'test'];
 
   // Build operation description
   const operationDesc = enableSearch
@@ -127,11 +137,13 @@ export function createBMADTool(
       '- list: Get available agents/workflows/modules\n' +
       '- search: Find agents/workflows by fuzzy search\n' +
       '- read: Inspect agent or workflow details (read-only)\n' +
-      '- execute: Run agent or workflow with user context (action)'
+      '- execute: Run agent or workflow with user context (action)\n' +
+      '- test: Return hardcoded test response for development'
     : 'Operation type:\n' +
       '- list: Get available agents/workflows/modules\n' +
       '- read: Inspect agent or workflow details (read-only)\n' +
-      '- execute: Run agent or workflow with user context (action)';
+      '- execute: Run agent or workflow with user context (action)\n' +
+      '- test: Return hardcoded test response for development';
 
   return {
     name: 'bmad',
@@ -169,6 +181,11 @@ export function createBMADTool(
           type: 'string',
           description:
             "For execute operation: User's message, question, or context. Optional - some agents/workflows may work without an initial message.",
+        },
+        testScenario: {
+          type: 'string',
+          description:
+            'For test operation: Scenario to test (e.g., "new-response-v1", "workflow-response"). Returns hardcoded response for development/testing.',
         },
       },
       required: ['operation'],
@@ -378,6 +395,8 @@ export async function handleBMADTool(
       return await handleRead(params, engine);
     case 'execute':
       return await handleExecute(params, engine);
+    case 'test':
+      return handleTest(params);
     default:
       return {
         content: [
@@ -587,4 +606,57 @@ async function handleExecute(
       },
     ],
   };
+}
+
+/**
+ * Handles test operation - returns hardcoded responses for development/testing
+ */
+function handleTest(params: BMADToolParams): { content: TextContent[] } {
+  const scenario = params.testScenario || 'new-response-v1';
+
+  // Construct path to test response file (in source tree, not build/)
+  // __dirname points to build/tools/, so go up to project root then into tests/
+  const projectRoot = join(__dirname, '..', '..');
+  const responsePath = join(
+    projectRoot,
+    'tests',
+    'fixtures',
+    'test-responses',
+    `${scenario}.txt`,
+  );
+
+  try {
+    // Check if file exists
+    if (!existsSync(responsePath)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Test scenario "${scenario}" not found.\n\nLooking for: ${responsePath}\n\nTo add a new test scenario, create:\ntests/fixtures/test-responses/${scenario}.txt`,
+          },
+        ],
+      };
+    }
+
+    // Read and return file contents
+    const response = readFileSync(responsePath, 'utf-8');
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: response,
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error loading test scenario "${scenario}":\n${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
 }
