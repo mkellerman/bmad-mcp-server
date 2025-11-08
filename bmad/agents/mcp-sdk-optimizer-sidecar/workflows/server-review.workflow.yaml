@@ -1,0 +1,12 @@
+name: mcp-server-review
+description: 'Full MCP server review with actionable suggestions and prioritized improvements'
+author: 'MCP SDK Optimizer'
+standalone: true
+instructions: '{project-root}/bmad/agents/mcp-sdk-optimizer-sidecar/workflows/server-review.instructions.md'
+validation: '{project-root}/bmad/agents/mcp-sdk-optimizer-sidecar/workflows/server-review.checklist.md'
+inputs:
+  entrypoint: 'Main server file path (e.g., src/index.ts)'
+  package_json: '{project-root}/package.json'
+  scan_paths: 'Folders to inspect (default: src/, scripts/, build/)'
+outputs:
+  report: '{project-root}/bmad/agents/mcp-sdk-optimizer-sidecar/workflows/server-review-report-{{date}}.md'
