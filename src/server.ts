@@ -33,6 +33,7 @@ import {
   handleBMADTool,
   type BMADToolParams,
 } from './tools/index.js';
+import { buildError, formatErrorMarkdown } from './utils/errors.js';
 import type { DiscoveryMode } from './types/index.js';
 import {
   shapeEnabled,
@@ -80,6 +81,23 @@ export class BMADServerLiteMultiToolGit {
     if (this.initialized) return;
     await this.engine.initialize();
     this.initialized = true;
+    // Advisory logging when nothing is discovered to help CLI users
+    try {
+      const agents = this.engine.getAgentMetadata?.();
+      const workflows = this.engine.getWorkflowMetadata?.();
+      if (Array.isArray(agents) && agents.length === 0) {
+        console.error(
+          'Warning: 0 agents discovered. Provide a BMAD source (local bmad/ or git remote).',
+        );
+      }
+      if (Array.isArray(workflows) && workflows.length === 0) {
+        console.error(
+          'Warning: 0 workflows discovered. Provide a BMAD source (local bmad/ or git remote).',
+        );
+      }
+    } catch {
+      /* ignore advisory logging errors */
+    }
   }
 
   private setupHandlers(): void {
@@ -108,6 +126,9 @@ export class BMADServerLiteMultiToolGit {
             let payloadSample: unknown = resp;
             let sections = 0;
             let affordances = 0;
+            // Extract structural + list metrics safely
+            let listOriginalCount: number | undefined;
+            let listReturnedCount: number | undefined;
             try {
               if (resp && typeof resp === 'object') {
                 const top = resp as Record<string, unknown>;
@@ -127,6 +148,55 @@ export class BMADServerLiteMultiToolGit {
                     }
                   }
                 }
+                // Narrow helper
+                const extractMeta = (
+                  arr: unknown,
+                ):
+                  | {
+                      originalCount: number;
+                      returnedCount: number;
+                    }
+                  | undefined => {
+                  if (Array.isArray(arr)) {
+                    const meta = (
+                      arr as unknown as {
+                        _listMeta?: {
+                          originalCount: number;
+                          returnedCount: number;
+                        };
+                      }
+                    )._listMeta;
+                    if (
+                      meta &&
+                      typeof meta.originalCount === 'number' &&
+                      typeof meta.returnedCount === 'number'
+                    ) {
+                      return meta;
+                    }
+                  }
+                  return undefined;
+                };
+                if ('resources' in top) {
+                  const m = extractMeta(top.resources);
+                  if (m) {
+                    listOriginalCount = m.originalCount;
+                    listReturnedCount = m.returnedCount;
+                  }
+                }
+                if (!listOriginalCount && 'tools' in top) {
+                  const m = extractMeta(top.tools);
+                  if (m) {
+                    listOriginalCount = m.originalCount;
+                    listReturnedCount = m.returnedCount;
+                  }
+                }
+                if (!listOriginalCount && 'prompts' in top) {
+                  const m = extractMeta(top.prompts);
+                  if (m) {
+                    listOriginalCount = m.originalCount;
+                    listReturnedCount = m.returnedCount;
+                  }
+                }
               }
             } catch {
               /* ignore metric derivation errors */
@@ -141,7 +211,15 @@ export class BMADServerLiteMultiToolGit {
             let adherenceTotal: number | undefined;
             if (shapeEnabled()) {
               const conds: boolean[] = [];
-              // Condition: listLimited for list endpoints
+              // Condition: list limited (returned < original) AND counts present
+              conds.push(
+                !!(
+                  listOriginalCount !== undefined &&
+                  listReturnedCount !== undefined &&
+                  listReturnedCount <= listOriginalCount &&
+                  listReturnedCount < listOriginalCount
+                ),
+              );
               if (
                 name === 'ListResources' ||
                 name === 'ListTools' ||
@@ -156,8 +234,15 @@ export class BMADServerLiteMultiToolGit {
               adherenceTotal = conds.length;
               adherenceScore = conds.reduce((a, b) => a + (b ? 1 : 0), 0);
             }
+            const listLimited =
+              listOriginalCount !== undefined &&
+              listReturnedCount !== undefined &&
+              listReturnedCount < listOriginalCount;
             await emit({
               event: 'response_ready',
+              listOriginalCount,
+              listReturnedCount,
+              listLimited,
               id,
               route: name,
               variant,
@@ -258,11 +343,18 @@ export class BMADServerLiteMultiToolGit {
           description: `BMAD resource: ${file.relativePath}`,
           mimeType: this.getMimeType(file.relativePath),
         }));
-
+        const originalCount = resources.length;
         if (shapeEnabled()) {
           resources = shapeResources(resources);
         }
-
+        const returnedCount = resources.length;
+        try {
+          (
+            resources as unknown as {
+              _listMeta?: { originalCount: number; returnedCount: number };
+            }
+          )._listMeta = { originalCount, returnedCount };
+        } catch {}
         return { resources };
       }),
     );
@@ -420,10 +512,18 @@ export class BMADServerLiteMultiToolGit {
           ),
         );
 
+        const originalCount = tools.length;
         if (shapeEnabled()) {
           tools = shapeTools(tools) as Tool[];
         }
-
+        const returnedCount = tools.length;
+        try {
+          (
+            tools as unknown as {
+              _listMeta?: { originalCount: number; returnedCount: number };
+            }
+          )._listMeta = { originalCount, returnedCount };
+        } catch {}
         return { tools };
       }),
     );
@@ -435,9 +535,67 @@ export class BMADServerLiteMultiToolGit {
         const toolName = (
           request as { params: { name: string; arguments?: unknown } }
         ).params.name;
-        const args =
+        const rawArgs =
           (request as { params: { name: string; arguments?: unknown } }).params
             .arguments ?? {};
+
+        // Normalize input: support both BMADToolParams and content-array text JSON
+        let args: BMADToolParams | undefined;
+        try {
+          // Case A: already BMADToolParams shape
+          if (
+            rawArgs &&
+            typeof rawArgs === 'object' &&
+            'operation' in (rawArgs as Record<string, unknown>)
+          ) {
+            args = rawArgs as BMADToolParams;
+          } else if (
+            rawArgs &&
+            typeof rawArgs === 'object' &&
+            'content' in (rawArgs as Record<string, unknown>)
+          ) {
+            const content = (rawArgs as { content?: unknown }).content as
+              | unknown[]
+              | undefined;
+            const first = Array.isArray(content) ? content[0] : undefined;
+            const text =
+              first &&
+              typeof first === 'object' &&
+              'type' in first &&
+              (first as { type?: string }).type === 'text' &&
+              'text' in first
+                ? (first as { text?: unknown }).text
+                : undefined;
+            if (typeof text === 'string') {
+              // Try parse JSON from text; fallback to lightweight heuristics
+              try {
+                const parsedUnknown: unknown = JSON.parse(text);
+                if (
+                  parsedUnknown &&
+                  typeof parsedUnknown === 'object' &&
+                  'operation' in (parsedUnknown as Record<string, unknown>)
+                ) {
+                  args = parsedUnknown as BMADToolParams;
+                }
+              } catch {
+                // Heuristic mapping: "list agents" → {operation:'list',query:'agents'}
+                const lower = text.trim().toLowerCase();
+                if (lower.startsWith('list')) {
+                  const q = lower.includes('agent')
+                    ? 'agents'
+                    : lower.includes('workflow')
+                      ? 'workflows'
+                      : lower.includes('resource')
+                        ? 'resources'
+                        : 'agents';
+                  args = { operation: 'list', query: q } as BMADToolParams;
+                }
+              }
+            }
+          }
+        } catch {
+          // fall through to structured error below
+        }
 
         // Emit tool_invoked with correlation id
         if (metricsEnabled()) {
@@ -450,18 +608,38 @@ export class BMADServerLiteMultiToolGit {
             route: 'CallTool',
             variant: metricsVariant(),
             toolName,
-            hasArgs:
-              typeof args === 'object' &&
-              args !== null &&
-              Object.keys(args as Record<string, unknown>).length > 0,
+            hasArgs: (() => {
+              try {
+                if (!args || typeof args !== 'object') return false;
+                const keys = Object.keys(
+                  args as unknown as Record<string, unknown>,
+                );
+                return keys.length > 0;
+              } catch {
+                return false;
+              }
+            })(),
           });
         }
 
         if (toolName === 'bmad') {
-          return await handleBMADTool(
-            args as unknown as BMADToolParams,
-            this.engine,
-          );
+          if (!args) {
+            const err = buildError(
+              'INVALID_INPUT',
+              'Invalid or missing BMAD tool parameters.',
+              'Provide arguments matching the schema (operation: list|read|execute) or pass content[0].text as JSON with these fields.',
+              'Example: {"operation":"list","query":"agents"}',
+            );
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: formatErrorMarkdown(err),
+                },
+              ],
+            } as unknown as ReturnType<typeof handleBMADTool>;
+          }
+          return await handleBMADTool(args, this.engine);
         }
 
         throw new Error(
@@ -496,14 +674,21 @@ export class BMADServerLiteMultiToolGit {
           };
         });
 
+        const originalCount = prompts.length;
+        let finalPrompts = prompts;
         if (shapeEnabled()) {
-          // Limit prompts list to max list size to keep UI concise
           const limit = Number(process.env.BMAD_SHAPE_MAX_LIST || 20);
-          return {
-            prompts: prompts.slice(0, Math.max(1, Math.min(200, limit))),
-          };
+          finalPrompts = prompts.slice(0, Math.max(1, Math.min(200, limit)));
         }
-        return { prompts };
+        const returnedCount = finalPrompts.length;
+        try {
+          (
+            finalPrompts as unknown as {
+              _listMeta?: { originalCount: number; returnedCount: number };
+            }
+          )._listMeta = { originalCount, returnedCount };
+        } catch {}
+        return { prompts: finalPrompts };
       }),
     );
 

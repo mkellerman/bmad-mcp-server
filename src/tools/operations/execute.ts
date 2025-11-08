@@ -18,6 +18,37 @@ import type {
   BMADResult,
   ExecuteParams,
 } from '../../core/bmad-engine.js';
+import {
+  emit,
+  metricsEnabled,
+  metricsVariant,
+  correlationId,
+} from '../../utils/metrics.js';
+
+function withTimeout<T>(
+  p: Promise<T>,
+  ms: number,
+  onTimeout: () => void,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  return new Promise<T>((resolve, reject) => {
+    timer = setTimeout(() => {
+      try {
+        onTimeout();
+      } catch {
+        /* noop */
+      }
+      reject(new Error('EXECUTE_TIMEOUT'));
+    }, ms);
+    p.then((v) => {
+      if (timer) clearTimeout(timer);
+      resolve(v);
+    }).catch((e) => {
+      if (timer) clearTimeout(timer);
+      reject(e instanceof Error ? e : new Error(String(e)));
+    });
+  });
+}
 
 /**
  * Parameters for execute operation
@@ -46,6 +77,11 @@ export async function executeExecuteOperation(
   engine: BMADEngine,
   params: ExecuteOperationParams,
 ): Promise<BMADResult> {
+  const timeoutMs = Math.max(
+    1000,
+    Number(process.env.BMAD_EXECUTE_TIMEOUT_MS || 60000),
+  );
+  const corr = correlationId();
   // Build ExecuteParams for engine
   const execParams: ExecuteParams = {
     agent: params.agent,
@@ -63,7 +99,49 @@ export async function executeExecuteOperation(
           text: '',
         };
       }
-      return await engine.executeAgent(execParams);
+      if (metricsEnabled()) {
+        await emit({
+          event: 'execute_step',
+          variant: metricsVariant(),
+          id: corr,
+          stage: 'agent:start',
+          agent: params.agent ?? '',
+        });
+      }
+      try {
+        const result = await withTimeout(
+          engine.executeAgent(execParams),
+          timeoutMs,
+          () => {
+            if (metricsEnabled())
+              void emit({
+                event: 'execute_timeout',
+                variant: metricsVariant(),
+                id: corr,
+                stage: 'agent:timeout',
+                timeoutMs,
+              });
+          },
+        );
+        if (metricsEnabled())
+          await emit({
+            event: 'execute_step',
+            variant: metricsVariant(),
+            id: corr,
+            stage: 'agent:done',
+          });
+        return result;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg === 'EXECUTE_TIMEOUT') {
+          return {
+            success: false,
+            error: `Execution timed out after ${timeoutMs}ms`,
+            text: '',
+          };
+        }
+        return { success: false, error: msg, text: '' };
+      }
 
     case 'workflow':
       if (!params.workflow) {
@@ -73,7 +151,49 @@ export async function executeExecuteOperation(
           text: '',
         };
       }
-      return await engine.executeWorkflow(execParams);
+      if (metricsEnabled()) {
+        await emit({
+          event: 'execute_step',
+          variant: metricsVariant(),
+          id: corr,
+          stage: 'workflow:start',
+          workflow: params.workflow ?? '',
+        });
+      }
+      try {
+        const result = await withTimeout(
+          engine.executeWorkflow(execParams),
+          timeoutMs,
+          () => {
+            if (metricsEnabled())
+              void emit({
+                event: 'execute_timeout',
+                variant: metricsVariant(),
+                id: corr,
+                stage: 'workflow:timeout',
+                timeoutMs,
+              });
+          },
+        );
+        if (metricsEnabled())
+          await emit({
+            event: 'execute_step',
+            variant: metricsVariant(),
+            id: corr,
+            stage: 'workflow:done',
+          });
+        return result;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg === 'EXECUTE_TIMEOUT') {
+          return {
+            success: false,
+            error: `Execution timed out after ${timeoutMs}ms`,
+            text: '',
+          };
+        }
+        return { success: false, error: msg, text: '' };
+      }
 
     default:
       return {

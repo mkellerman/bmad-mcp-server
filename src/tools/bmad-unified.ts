@@ -507,13 +507,24 @@ async function handleRead(
 
   // Execute operation
   const result = await executeReadOperation(engine, readParams);
-
-  // Return JSON data for discovery operations
+  // Always return some text (even on failure) so downstream parsers don't choke on undefined
+  const payloadText = result.success
+    ? JSON.stringify(result.data, null, 2)
+    : JSON.stringify(
+        {
+          success: false,
+          error: result.error || 'Unknown read error',
+          remediation:
+            'Verify the agent/workflow exists and (if needed) supply module. Example: {"operation":"read","type":"agent","agent":"analyst"}',
+        },
+        null,
+        2,
+      );
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(result.data, null, 2),
+        text: payloadText,
       },
     ],
   };

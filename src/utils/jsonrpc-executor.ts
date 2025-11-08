@@ -413,16 +413,18 @@ export function extractBmadContent(response: JsonRpcResponse): unknown {
   const result = response.result as
     | { content?: Array<{ text?: string }> }
     | undefined;
-  const text = result?.content?.[0]?.text;
-
-  if (!text) {
-    throw new Error('Invalid BMAD response format');
+  const first = result?.content?.[0];
+  const text = first?.text;
+  if (!first) {
+    throw new Error('BMAD response missing content array');
   }
-
+  if (!text || text.trim() === '') {
+    // Gracefully return empty marker instead of throwing to improve UX
+    return { success: false, error: 'Empty content', raw: first };
+  }
   try {
     return JSON.parse(text);
   } catch {
-    // Return raw text if not JSON
     return text;
   }
 }

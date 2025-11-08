@@ -36,8 +36,50 @@ function percentile(sorted, p) {
 function summarize(events) {
   const byRoute = new Map();
   const variants = new Set();
+  const variantAgg = new Map(); // variant -> aggregates
   for (const e of events) {
     if (e.variant) variants.add(e.variant);
+    if (e.variant) {
+      if (!variantAgg.has(e.variant)) {
+        variantAgg.set(e.variant, {
+          durations: [],
+          count: 0,
+          tokens: 0,
+          shaped: 0,
+          truncated: 0,
+          ranged: 0,
+          adherenceScore: 0,
+          adherenceTotal: 0,
+          listEvents: 0,
+          listLimited: 0,
+        });
+      }
+      const va = variantAgg.get(e.variant);
+      if (e.event === 'response_ready') {
+        va.count += 1;
+        if (typeof e.durationMs === 'number') va.durations.push(e.durationMs);
+        if (typeof e.tokenEstimate === 'number') va.tokens += e.tokenEstimate;
+        if (e.shaped) va.shaped += 1;
+        if (e.shapedTruncated) va.truncated += 1;
+        if (e.shapedRange) va.ranged += 1;
+        if (typeof e.adherenceScore === 'number')
+          va.adherenceScore += e.adherenceScore;
+        if (typeof e.adherenceTotal === 'number')
+          va.adherenceTotal += e.adherenceTotal;
+        if (
+          typeof e.listOriginalCount === 'number' &&
+          typeof e.listReturnedCount === 'number'
+        ) {
+          va.listEvents += 1;
+          if (
+            e.listLimited === true ||
+            e.listReturnedCount < e.listOriginalCount
+          ) {
+            va.listLimited += 1;
+          }
+        }
+      }
+    }
     if (e.event === 'response_ready' || e.event === 'response_error') {
       const key = e.route || 'unknown';
       if (!byRoute.has(key))
@@ -54,6 +96,8 @@ function summarize(events) {
           ranged: 0,
           adherenceScore: 0,
           adherenceTotal: 0,
+          listEvents: 0,
+          listLimited: 0,
         });
       const agg = byRoute.get(key);
       agg.count += 1;
@@ -72,6 +116,18 @@ function summarize(events) {
           agg.adherenceScore += e.adherenceScore;
         if (typeof e.adherenceTotal === 'number')
           agg.adherenceTotal += e.adherenceTotal;
+        if (
+          typeof e.listOriginalCount === 'number' &&
+          typeof e.listReturnedCount === 'number'
+        ) {
+          agg.listEvents += 1;
+          if (
+            e.listLimited === true ||
+            e.listReturnedCount < e.listOriginalCount
+          ) {
+            agg.listLimited += 1;
+          }
+        }
       }
     }
   }
@@ -87,6 +143,7 @@ function summarize(events) {
         : 0,
       p50DurationMs: percentile(ds, 50),
       p95DurationMs: percentile(ds, 95),
+      p99DurationMs: percentile(ds, 99),
       avgTokens: agg.count ? +(agg.tokens / agg.count).toFixed(2) : 0,
       totalTokens: agg.tokens,
       avgSizeBytes: agg.count ? +(agg.size / agg.count).toFixed(2) : 0,
@@ -98,6 +155,9 @@ function summarize(events) {
       adherenceAvg: agg.adherenceTotal
         ? +(agg.adherenceScore / agg.adherenceTotal).toFixed(2)
         : 0,
+      listLimitedRate: agg.listEvents
+        ? +(agg.listLimited / agg.listEvents).toFixed(2)
+        : 0,
     });
   }
   routeSummaries.sort((a, b) => a.route.localeCompare(b.route));
@@ -105,6 +165,30 @@ function summarize(events) {
     routes: routeSummaries,
     variantCount: variants.size,
     variants: [...variants],
+    variantSummary: [...variantAgg.entries()].map(([variant, agg]) => {
+      const ds = agg.durations.sort((a, b) => a - b);
+      return {
+        variant,
+        count: agg.count,
+        avgDurationMs: agg.count
+          ? +(ds.reduce((a, b) => a + b, 0) / ds.length).toFixed(2)
+          : 0,
+        p95DurationMs: percentile(ds, 95),
+        p99DurationMs: percentile(ds, 99),
+        avgTokens: agg.count ? +(agg.tokens / agg.count).toFixed(2) : 0,
+        shapedRate: agg.count ? +(agg.shaped / agg.count).toFixed(2) : 0,
+        truncatedRate: agg.shaped
+          ? +(agg.truncated / agg.shaped).toFixed(2)
+          : 0,
+        rangeRate: agg.shaped ? +(agg.ranged / agg.shaped).toFixed(2) : 0,
+        adherenceAvg: agg.adherenceTotal
+          ? +(agg.adherenceScore / agg.adherenceTotal).toFixed(2)
+          : 0,
+        listLimitedRate: agg.listEvents
+          ? +(agg.listLimited / agg.listEvents).toFixed(2)
+          : 0,
+      };
+    }),
   };
 }
 
@@ -137,6 +221,7 @@ function formatTable(rows, headers) {
     'avgDurationMs',
     'p50DurationMs',
     'p95DurationMs',
+    'p99DurationMs',
     'avgTokens',
     'totalTokens',
     'avgSizeBytes',
@@ -146,6 +231,7 @@ function formatTable(rows, headers) {
     'truncatedRate',
     'rangeRate',
     'adherenceAvg',
+    'listLimitedRate',
   ];
   console.warn('\nBMAD Metrics Summary');
   console.warn('File:', filePath);
@@ -154,6 +240,23 @@ function formatTable(rows, headers) {
   }
   console.warn('\nPer-Route KPIs:\n');
   console.warn(formatTable(summary.routes, headers));
+  if (summary.variantSummary.length) {
+    console.warn('\nPer-Variant KPIs:\n');
+    const vHeaders = [
+      'variant',
+      'count',
+      'avgDurationMs',
+      'p95DurationMs',
+      'p99DurationMs',
+      'avgTokens',
+      'shapedRate',
+      'truncatedRate',
+      'rangeRate',
+      'adherenceAvg',
+      'listLimitedRate',
+    ];
+    console.warn(formatTable(summary.variantSummary, vHeaders));
+  }
   const totalCount = summary.routes.reduce((a, r) => a + r.count, 0);
   const totalErrors = summary.routes.reduce(
     (a, r) => a + Math.round(r.errorRate * r.count),
