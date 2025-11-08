@@ -131,12 +131,20 @@ export class BMADServerLiteMultiToolGit {
             } catch {
               /* ignore metric derivation errors */
             }
+            const shapedTruncated = (
+              request as unknown as { _shapedTruncated?: boolean }
+            )._shapedTruncated;
+            const shapedRange = (
+              request as unknown as { _shapedRange?: boolean }
+            )._shapedRange;
             await emit({
               event: 'response_ready',
               id,
               route: name,
               variant,
               shaped: shapeEnabled(),
+              shapedTruncated: !!shapedTruncated,
+              shapedRange: !!shapedRange,
               durationMs: Date.now() - t0,
               tokenEstimate: estimateTokens(payloadSample),
               sizeBytes: sizeBytes(payloadSample),
@@ -251,7 +259,20 @@ export class BMADServerLiteMultiToolGit {
           throw new Error(`Invalid resource URI: ${uri}`);
         }
 
-        const relativePath: string = pathMatch[1];
+        let relativePath: string = pathMatch[1];
+        let rangeStart: number | undefined;
+        let rangeEnd: number | undefined;
+        const hashIdx = relativePath.indexOf('#');
+        if (hashIdx !== -1) {
+          const base = relativePath.slice(0, hashIdx);
+          const frag = relativePath.slice(hashIdx + 1);
+          relativePath = base;
+          const m = frag.match(/^lines=(\d+)-(\d+)$/);
+          if (m) {
+            rangeStart = parseInt(m[1], 10);
+            rangeEnd = parseInt(m[2], 10);
+          }
+        }
 
         // Handle virtual manifest generation for _cfg/*.csv files
         if (relativePath === '_cfg/agent-manifest.csv') {
@@ -312,12 +333,38 @@ export class BMADServerLiteMultiToolGit {
           const mimeType = this.getMimeType(relativePath);
 
           if (
+            typeof content === 'string' &&
+            typeof rangeStart === 'number' &&
+            typeof rangeEnd === 'number' &&
+            rangeStart > 0 &&
+            rangeEnd >= rangeStart &&
+            mimeType.startsWith('text/')
+          ) {
+            const allLines = content.split(/\r?\n/);
+            const total = allLines.length;
+            const startIdx = Math.max(1, rangeStart);
+            const endIdx = Math.min(total, rangeEnd);
+            const excerpt = allLines.slice(startIdx - 1, endIdx).join('\n');
+            const header = `[Excerpt lines ${startIdx}-${endIdx} of ${total}]\n`;
+            content = header + excerpt;
+            try {
+              (request as unknown as { _shapedRange?: boolean })._shapedRange =
+                true;
+            } catch {}
+          }
+
+          if (
             shapeEnabled() &&
             typeof content === 'string' &&
             mimeType.startsWith('text/')
           ) {
             const shaped = shapeTextContent(content);
             content = shaped.text;
+            try {
+              (
+                request as unknown as { _shapedTruncated?: boolean }
+              )._shapedTruncated = !!shaped.truncated;
+            } catch {}
           }
 
           return {
