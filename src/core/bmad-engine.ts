@@ -305,6 +305,13 @@ export class BMADEngine {
     return this.samplingCapability.supported && !!this.mcpServer;
   }
 
+  /**
+   * Get sampling capability status (for debugging/diagnostics)
+   */
+  getSamplingCapability(): SamplingCapability {
+    return { ...this.samplingCapability };
+  }
+
   // ============================================================================
   // RANKING HELPERS (Session-based Intelligence)
   // ============================================================================
