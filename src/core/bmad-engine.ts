@@ -18,7 +18,7 @@
  */
 
 import { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
-import type { Workflow } from '../types/index.js';
+import type { Workflow, Tool, Task, DiscoveryMode } from '../types/index.js';
 import {
   getAgentExecutionPrompt,
   getWorkflowExecutionPrompt,
@@ -40,6 +40,76 @@ export interface BMADResult {
   error?: string;
   /** Human-readable text output */
   text: string;
+}
+
+/**
+ * Workflow match for ambiguous results
+ */
+export interface WorkflowMatch {
+  /** Composite key: module:agent:workflow */
+  key: string;
+  /** Module name */
+  module: string;
+  /** Agent name */
+  agentName: string;
+  /** Agent display name */
+  agentDisplayName: string;
+  /** Agent title */
+  agentTitle: string;
+  /** Workflow name */
+  workflow: string;
+  /** Workflow description */
+  description: string;
+  /** Example action for retry */
+  action: string;
+}
+
+/**
+ * Agent match for ambiguous results
+ */
+export interface AgentMatch {
+  /** Composite key: module:agent */
+  key: string;
+  /** Module name */
+  module: string;
+  /** Agent name */
+  agentName: string;
+  /** Agent display name */
+  agentDisplayName: string;
+  /** Agent title */
+  agentTitle: string;
+  /** Agent role */
+  role: string;
+  /** Agent description/identity */
+  description: string;
+  /** Example action for retry */
+  action: string;
+}
+
+/**
+ * Ambiguous workflow result when multiple workflows match
+ */
+export interface AmbiguousWorkflowResult extends BMADResult {
+  success: true;
+  /** Indicates this is an ambiguous result requiring user/LLM choice */
+  ambiguous: true;
+  /** Type discriminator */
+  type: 'workflow';
+  /** Array of matching workflows */
+  matches: WorkflowMatch[];
+}
+
+/**
+ * Ambiguous agent result when multiple agents match
+ */
+export interface AmbiguousAgentResult extends BMADResult {
+  success: true;
+  /** Indicates this is an ambiguous result requiring user/LLM choice */
+  ambiguous: true;
+  /** Type discriminator */
+  type: 'agent';
+  /** Array of matching agents */
+  matches: AgentMatch[];
 }
 
 /**
@@ -109,6 +179,8 @@ export class BMADEngine {
   private loader: ResourceLoaderGit;
   private agentMetadata: AgentMetadata[] = [];
   private workflows: Workflow[] = [];
+  private tools: Tool[] = [];
+  private tasks: Task[] = [];
   private cachedResources: Array<{ uri: string; relativePath: string }> = [];
   private initialized = false;
 
@@ -117,9 +189,14 @@ export class BMADEngine {
    *
    * @param projectRoot - Optional project root directory
    * @param gitRemotes - Optional array of Git remote URLs
+   * @param discoveryMode - Discovery mode for source filtering (strict/local/user/auto)
    */
-  constructor(projectRoot?: string, gitRemotes?: string[]) {
-    this.loader = new ResourceLoaderGit(projectRoot, gitRemotes);
+  constructor(
+    projectRoot?: string,
+    gitRemotes?: string[],
+    discoveryMode?: DiscoveryMode,
+  ) {
+    this.loader = new ResourceLoaderGit(projectRoot, gitRemotes, discoveryMode);
   }
 
   /**
@@ -133,6 +210,12 @@ export class BMADEngine {
 
     // Load all workflows with metadata
     this.workflows = await this.loader.listWorkflowsWithMetadata();
+
+    // Load all tools with metadata
+    this.tools = await this.loader.listToolsWithMetadata();
+
+    // Load all tasks with metadata
+    this.tasks = await this.loader.listTasksWithMetadata();
 
     // Pre-build resource list
     this.cachedResources = [];
@@ -215,9 +298,11 @@ export class BMADEngine {
       for (let i = 0; i < agent.workflows.length; i++) {
         const workflowName = agent.workflows[i];
         const menuItemDesc = agent.workflowMenuItems?.[i] || workflowName;
+        // Use module:name as the unique key for deduplication
+        const workflowKey = `${agent.module || 'core'}:${workflowName}`;
 
-        if (!workflowMap.has(workflowName)) {
-          workflowMap.set(workflowName, {
+        if (!workflowMap.has(workflowKey)) {
+          workflowMap.set(workflowKey, {
             name: workflowName,
             description: menuItemDesc,
             module: agent.module,
@@ -226,7 +311,7 @@ export class BMADEngine {
           });
         } else {
           // Workflow offered by multiple agents
-          workflowMap.get(workflowName)!.agents.push(agent.name);
+          workflowMap.get(workflowKey)!.agents.push(agent.name);
         }
       }
     }
@@ -429,13 +514,9 @@ export class BMADEngine {
       } else if (relativePath === '_cfg/workflow-manifest.csv') {
         content = this.generateWorkflowManifest();
       } else if (relativePath === '_cfg/tool-manifest.csv') {
-        throw new Error(
-          'Tool manifest generation not yet implemented - coming soon! This will provide virtual tool metadata from loaded BMAD modules.',
-        );
+        content = this.generateToolManifest();
       } else if (relativePath === '_cfg/task-manifest.csv') {
-        throw new Error(
-          'Task manifest generation not yet implemented - coming soon! This will provide virtual task metadata from loaded BMAD modules.',
-        );
+        content = this.generateTaskManifest();
       } else {
         // Default: Load file from filesystem
         content = await this.loader.loadFile(relativePath);
@@ -478,7 +559,9 @@ export class BMADEngine {
   /**
    * Execute an agent with user message
    */
-  async executeAgent(params: ExecuteParams): Promise<BMADResult> {
+  async executeAgent(
+    params: ExecuteParams,
+  ): Promise<BMADResult | AmbiguousAgentResult> {
     if (!params.agent) {
       return {
         success: false,
@@ -490,6 +573,57 @@ export class BMADEngine {
     await this.initialize();
 
     try {
+      // Find all agents matching the name
+      const matchingAgents = this.agentMetadata.filter(
+        (a) => a.name === params.agent,
+      );
+
+      // Filter by module if specified
+      const filteredAgents = params.module
+        ? matchingAgents.filter((a) => a.module === params.module)
+        : matchingAgents;
+
+      // Check for ambiguity: multiple matches without module filter
+      if (!params.module && filteredAgents.length > 1) {
+        // Build matches array
+        const matches: AgentMatch[] = filteredAgents.map((agent) => {
+          const module = agent.module || 'core';
+          const key = `${module}:${agent.name}`;
+
+          return {
+            key,
+            module,
+            agentName: agent.name,
+            agentDisplayName: agent.displayName,
+            agentTitle: agent.title,
+            role: agent.role || 'Agent',
+            description:
+              agent.description || agent.persona || 'No description available',
+            action: `bmad({ operation: "execute", agent: "${agent.name}", module: "${module}" })`,
+          };
+        });
+
+        // Return ambiguous result
+        return {
+          success: true,
+          ambiguous: true,
+          type: 'agent',
+          matches,
+          text: this.formatAmbiguousAgentResponse(matches),
+        };
+      }
+
+      // Single match or module-filtered result
+      const selectedAgent = filteredAgents[0];
+
+      if (!selectedAgent) {
+        return {
+          success: false,
+          error: `Agent not found: ${params.agent}${params.module ? ` in module: ${params.module}` : ''}`,
+          text: this.formatAgentNotFound(params.agent),
+        };
+      }
+
       // Build minimal execution context (NO agent content loading!)
       const executionContext = {
         agent: params.agent,
@@ -523,7 +657,9 @@ export class BMADEngine {
    * The agent's workflow handler will instruct the LLM to load workflow.xml
    * and any other files needed.
    */
-  async executeWorkflow(params: ExecuteParams): Promise<BMADResult> {
+  async executeWorkflow(
+    params: ExecuteParams,
+  ): Promise<BMADResult | AmbiguousWorkflowResult> {
     if (!params.workflow) {
       return {
         success: false,
@@ -535,7 +671,49 @@ export class BMADEngine {
     await this.initialize();
 
     try {
-      // Find which agent(s) offer this workflow
+      // Find all agents that offer this workflow
+      const matchingAgents = this.agentMetadata.filter((a) =>
+        a.workflows?.includes(params.workflow!),
+      );
+
+      // Filter by module if specified
+      const filteredAgents = params.module
+        ? matchingAgents.filter((a) => a.module === params.module)
+        : matchingAgents;
+
+      // Check for ambiguity: multiple matches without module filter
+      if (!params.module && filteredAgents.length > 1) {
+        // Build matches array
+        const matches: WorkflowMatch[] = filteredAgents.map((agent) => {
+          const module = agent.module || 'core';
+          const key = `${module}:${agent.name}:${params.workflow}`;
+          const workflowIndex = agent.workflows!.indexOf(params.workflow!);
+          const description =
+            agent.workflowMenuItems?.[workflowIndex] || params.workflow!;
+
+          return {
+            key,
+            module,
+            agentName: agent.name,
+            agentDisplayName: agent.displayName,
+            agentTitle: agent.title,
+            workflow: params.workflow!,
+            description,
+            action: `bmad({ operation: "execute", workflow: "${params.workflow}", module: "${module}" })`,
+          };
+        });
+
+        // Return ambiguous result
+        return {
+          success: true,
+          ambiguous: true,
+          type: 'workflow',
+          matches,
+          text: this.formatAmbiguousWorkflowResponse(matches),
+        };
+      }
+
+      // Single match or module-filtered result
       let agentForWorkflow: AgentMetadata | undefined;
 
       if (params.agent) {
@@ -544,10 +722,16 @@ export class BMADEngine {
           (a) => a.name === params.agent,
         );
       } else {
-        // Find first agent that offers this workflow
-        agentForWorkflow = this.agentMetadata.find((a) =>
-          a.workflows?.includes(params.workflow!),
-        );
+        // Use first filtered match
+        agentForWorkflow = filteredAgents[0];
+      }
+
+      if (!agentForWorkflow) {
+        return {
+          success: false,
+          error: `No agent found offering workflow: ${params.workflow}${params.module ? ` in module: ${params.module}` : ''}`,
+          text: this.formatWorkflowNotFound(params.workflow),
+        };
       }
 
       // Get workflow path from agent metadata
@@ -666,6 +850,70 @@ export class BMADEngine {
   // ============================================================================
   // FORMATTING HELPERS (Private)
   // ============================================================================
+
+  /**
+   * Format ambiguous workflow response when multiple workflows match
+   */
+  private formatAmbiguousWorkflowResponse(matches: WorkflowMatch[]): string {
+    const lines = [
+      `**Ambiguous Request:** Multiple Workflows Match`,
+      '',
+      `Found ${matches.length} workflows matching your request:`,
+      '',
+    ];
+
+    matches.forEach((match, index) => {
+      lines.push(`${index + 1}. **${match.key}**`);
+      lines.push(`   - module: ${match.module}`);
+      lines.push(
+        `   - agent: ${match.agentName} (${match.agentDisplayName}) - ${match.agentTitle}`,
+      );
+      lines.push(`   - workflow: ${match.workflow}`);
+      lines.push(`   - description: ${match.description}`);
+      lines.push(`   - action: ${match.action}`);
+      lines.push('');
+    });
+
+    lines.push('**LLM Decision Guidance:**');
+    lines.push('Proceed if you feel 95% confident in your selection.');
+    lines.push(
+      'Or provide a numbered menu selection for the user to select from.',
+    );
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Format ambiguous agent response when multiple agents match
+   */
+  private formatAmbiguousAgentResponse(matches: AgentMatch[]): string {
+    const lines = [
+      `**Ambiguous Request:** Multiple Agents Match`,
+      '',
+      `Found ${matches.length} agents matching your request:`,
+      '',
+    ];
+
+    matches.forEach((match, index) => {
+      lines.push(`${index + 1}. **${match.key}**`);
+      lines.push(`   - module: ${match.module}`);
+      lines.push(
+        `   - agent: ${match.agentName} (${match.agentDisplayName}) - ${match.agentTitle}`,
+      );
+      lines.push(`   - role: ${match.role}`);
+      lines.push(`   - description: ${match.description}`);
+      lines.push(`   - action: ${match.action}`);
+      lines.push('');
+    });
+
+    lines.push('**LLM Decision Guidance:**');
+    lines.push('Proceed if you feel 95% confident in your selection.');
+    lines.push(
+      'Or provide a numbered menu selection for the user to select from.',
+    );
+
+    return lines.join('\n');
+  }
 
   private formatAgentList(
     agents: Array<{
@@ -912,6 +1160,74 @@ export class BMADEngine {
       );
 
       rows.push(`${name},${description},${module},${path},${standalone}`);
+    }
+
+    return rows.join('\n');
+  }
+
+  /**
+   * Generate virtual tool-manifest.csv from loaded tool metadata
+   *
+   * @returns CSV-formatted string matching BMAD tool-manifest.csv schema
+   *
+   * @remarks
+   * Maps Tool fields to CSV columns:
+   * - name, displayName, description, module, path, standalone: direct mapping
+   */
+  generateToolManifest(): string {
+    const rows: string[] = [];
+
+    // CSV header matching BMAD schema
+    rows.push('name,displayName,description,module,path,standalone');
+
+    // Generate row for each tool
+    for (const tool of this.tools) {
+      const name = this.escapeCsvField(tool.name || '');
+      const displayName = this.escapeCsvField(tool.displayName || '');
+      const description = this.escapeCsvField(tool.description || '');
+      const module = this.escapeCsvField(tool.module || 'core');
+      const path = this.escapeCsvField(tool.path || '');
+      const standalone = this.escapeCsvField(
+        tool.standalone ? 'true' : 'false',
+      );
+
+      rows.push(
+        `${name},${displayName},${description},${module},${path},${standalone}`,
+      );
+    }
+
+    return rows.join('\n');
+  }
+
+  /**
+   * Generate virtual task-manifest.csv from loaded task metadata
+   *
+   * @returns CSV-formatted string matching BMAD task-manifest.csv schema
+   *
+   * @remarks
+   * Maps Task fields to CSV columns:
+   * - name, displayName, description, module, path, standalone: direct mapping
+   */
+  generateTaskManifest(): string {
+    const rows: string[] = [];
+
+    // CSV header matching BMAD schema
+    rows.push('name,displayName,description,module,path,standalone');
+
+    // Generate row for each task
+    for (const task of this.tasks) {
+      const name = this.escapeCsvField(task.name || '');
+      const displayName = this.escapeCsvField(task.displayName || '');
+      const description = this.escapeCsvField(task.description || '');
+      const module = this.escapeCsvField(task.module || 'core');
+      const path = this.escapeCsvField(task.path || '');
+      const standalone = this.escapeCsvField(
+        task.standalone ? 'true' : 'false',
+      );
+
+      rows.push(
+        `${name},${displayName},${description},${module},${path},${standalone}`,
+      );
     }
 
     return rows.join('\n');

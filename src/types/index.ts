@@ -6,10 +6,12 @@
 
 /**
  * Discovery mode for BMAD path resolution
- * - auto: Recursive search with priority-based resolution (default)
- * - strict: Exact paths only, no discovery, fail fast
+ * - strict: Only load from git remotes provided as CLI arguments (no local discovery)
+ * - local: Only load from project root directory (no user ~/.bmad, no git remotes)
+ * - user: Only load from user ~/.bmad directory (no project, no git remotes)
+ * - auto: Load from all sources with priority-based resolution (project > user > git)
  */
-export type DiscoveryMode = 'auto' | 'strict';
+export type DiscoveryMode = 'strict' | 'local' | 'user' | 'auto';
 
 /**
  * Server configuration options
@@ -23,11 +25,14 @@ export interface ServerConfig {
    * How the server discovers BMAD installation paths
    *
    * @remarks
-   * - 'auto': Recursively searches for BMAD content with priority-based resolution (recommended)
-   * - 'strict': Only uses exact configured paths, fails fast if not found
+   * - 'strict': Only uses git remotes provided as CLI arguments (no local/user discovery)
+   * - 'local': Only searches project root directory (no ~/.bmad, no git remotes)
+   * - 'user': Only uses ~/.bmad directory (no project, no git remotes)
+   * - 'auto': Searches all sources with priority-based resolution (project > user > git) (default)
    *
-   * Auto mode provides better user experience but may be slower for large directory trees.
-   * Strict mode is faster but requires precise path configuration.
+   * Auto mode provides the best user experience with priority-based merging.
+   * Strict mode is useful for isolated testing with specific git sources.
+   * Local and user modes are useful for development and debugging specific sources.
    */
   discoveryMode: DiscoveryMode;
 }
@@ -190,6 +195,40 @@ export interface Workflow {
 }
 
 /**
+ * Tool metadata from tool-manifest.csv
+ *
+ * @remarks
+ * Represents a tool entry from the BMAD tool manifest.
+ * Tools are reusable utilities that can be called independently or within workflows.
+ * Used for tool discovery and execution.
+ */
+export interface Tool {
+  /** Internal tool identifier */
+  name: string;
+
+  /** Human-readable display name for the tool */
+  displayName: string;
+
+  /** Human-readable description of what the tool does */
+  description: string;
+
+  /** BMAD module this tool belongs to */
+  module: string;
+
+  /** Relative path to the tool definition file */
+  path: string;
+
+  /** Whether this tool can be executed independently (not scoped to a workflow) */
+  standalone: boolean;
+
+  /** Root directory of the BMAD source containing this tool */
+  sourceRoot?: string;
+
+  /** Specific location identifier within the source */
+  sourceLocation?: string;
+}
+
+/**
  * Task metadata from task-manifest.csv
  *
  * @remarks
@@ -201,14 +240,20 @@ export interface Task {
   /** Internal task identifier */
   name: string;
 
+  /** Human-readable display name for the task */
+  displayName: string;
+
   /** Human-readable description of the task's purpose */
   description: string;
 
   /** BMAD module this task belongs to */
   module: string;
 
-  /** Optional relative path to the task definition file */
-  path?: string;
+  /** Relative path to the task definition file */
+  path: string;
+
+  /** Whether this task can be executed independently (not scoped to a workflow) */
+  standalone: boolean;
 
   /** Root directory of the BMAD source containing this task */
   sourceRoot?: string;
