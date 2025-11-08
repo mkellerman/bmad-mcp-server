@@ -1659,4 +1659,22 @@ export class ResourceLoaderGit {
   getResolvedGitPaths(): Map<string, string> {
     return new Map(this.resolvedGitPaths);
   }
+
+  /**
+   * Get the count of loaded sources (project, user, git remotes)
+   *
+   * @returns Promise resolving to number of sources
+   */
+  async getSourceCount(): Promise<number> {
+    return await this.manifestCache.getSourceCount();
+  }
+
+  /**
+   * Get unique module names from all loaded sources
+   *
+   * @returns Promise resolving to array of module names
+   */
+  async getModuleNames(): Promise<string[]> {
+    return await this.manifestCache.getModuleNames();
+  }
 }

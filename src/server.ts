@@ -418,17 +418,18 @@ export class BMADServerLiteMultiToolGit {
 
     await this.initialize();
 
-    const gitPaths = this.engine.getLoader().getResolvedGitPaths();
+    const sourceCount = await this.engine.getLoader().getSourceCount();
+    const moduleNames = await this.engine.getLoader().getModuleNames();
     const agentCount = this.engine.getAgentMetadata().length;
     const workflowCount = this.engine.getWorkflowMetadata().length;
     const resourceCount = this.engine.getCachedResources().length;
 
     console.error('BMAD MCP Server started');
     console.error(
-      `Loaded ${agentCount} agents, ${workflowCount} workflows, ${resourceCount} resources`,
+      `Loaded: ${sourceCount} source${sourceCount !== 1 ? 's' : ''}, ${resourceCount} resources`,
     );
-    if (gitPaths.size > 0) {
-      console.error(`Git remotes resolved: ${gitPaths.size}`);
-    }
+    console.error(
+      `Loaded: ${moduleNames.length} module${moduleNames.length !== 1 ? 's' : ''}, ${agentCount} agents, ${workflowCount} workflows`,
+    );
   }
 }

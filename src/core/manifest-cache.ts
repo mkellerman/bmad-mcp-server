@@ -285,6 +285,46 @@ export class ManifestCache {
   }
 
   /**
+   * Get the count of loaded sources
+   *
+   * @returns Number of sources (project, user, git remotes)
+   */
+  async getSourceCount(): Promise<number> {
+    const sources = await this.getSources();
+    return sources.length;
+  }
+
+  /**
+   * Get unique module names from all loaded agents and workflows
+   *
+   * @returns Array of unique module names
+   */
+  async getModuleNames(): Promise<string[]> {
+    const sources = await this.getSources();
+    const moduleSet = new Set<string>();
+
+    for (const source of sources) {
+      await this.ensureManifests(source.root);
+      const modules = await this.detectModules(source.root);
+
+      // Add 'core' if it exists
+      const coreExists = await pathExists(join(source.root, 'core'));
+      if (coreExists) {
+        moduleSet.add('core');
+      }
+
+      // Add detected modules
+      modules.forEach((m) => moduleSet.add(m));
+    }
+
+    return Array.from(moduleSet).sort();
+  }
+
+  /**
+   * Force regeneration of manifests for a specific root
+   *
+   * @param bmadRoot - Path to bmad_root to regenerate
+```  /**
    * Force regeneration of manifests for a specific root
    *
    * @param bmadRoot - Path to bmad_root to regenerate
