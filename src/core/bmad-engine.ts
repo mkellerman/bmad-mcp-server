@@ -275,14 +275,17 @@ export class BMADEngine {
     this.samplingCapability = {
       supported: !!capabilities?.sampling,
       detected: new Date(),
-      clientInfo: capabilities
-        ? {
-            name: (capabilities as { clientInfo?: { name?: string } })
-              .clientInfo?.name,
-            version: (capabilities as { clientInfo?: { version?: string } })
-              .clientInfo?.version,
-          }
-        : undefined,
+      clientInfo:
+        capabilities &&
+        (capabilities as { clientInfo?: { name?: string; version?: string } })
+          .clientInfo
+          ? {
+              name: (capabilities as { clientInfo?: { name?: string } })
+                .clientInfo?.name,
+              version: (capabilities as { clientInfo?: { version?: string } })
+                .clientInfo?.version,
+            }
+          : undefined,
     };
 
     // Log detection results for debugging
