@@ -34,6 +34,12 @@ import {
   type BMADToolParams,
 } from './tools/index.js';
 import type { DiscoveryMode } from './types/index.js';
+import {
+  shapeEnabled,
+  shapeResources,
+  shapeTextContent,
+  shapeTools,
+} from './utils/shaper.js';
 
 export class BMADServerLiteMultiToolGit {
   private server: Server;
@@ -130,6 +136,7 @@ export class BMADServerLiteMultiToolGit {
               id,
               route: name,
               variant,
+              shaped: shapeEnabled(),
               durationMs: Date.now() - t0,
               tokenEstimate: estimateTokens(payloadSample),
               sizeBytes: sizeBytes(payloadSample),
@@ -216,12 +223,16 @@ export class BMADServerLiteMultiToolGit {
         await this.initialize();
 
         const cachedResources = this.engine.getCachedResources();
-        const resources = cachedResources.map((file) => ({
+        let resources = cachedResources.map((file) => ({
           uri: `bmad://${file.relativePath}`,
           name: file.relativePath,
           description: `BMAD resource: ${file.relativePath}`,
           mimeType: this.getMimeType(file.relativePath),
         }));
+
+        if (shapeEnabled()) {
+          resources = shapeResources(resources);
+        }
 
         return { resources };
       }),
@@ -297,8 +308,17 @@ export class BMADServerLiteMultiToolGit {
 
         // Default: Load file from filesystem
         try {
-          const content = await this.engine.getLoader().loadFile(relativePath);
+          let content = await this.engine.getLoader().loadFile(relativePath);
           const mimeType = this.getMimeType(relativePath);
+
+          if (
+            shapeEnabled() &&
+            typeof content === 'string' &&
+            mimeType.startsWith('text/')
+          ) {
+            const shaped = shapeTextContent(content);
+            content = shaped.text;
+          }
 
           return {
             contents: [
@@ -323,7 +343,7 @@ export class BMADServerLiteMultiToolGit {
       wrap('ListTools', async () => {
         await this.initialize();
 
-        const tools: Tool[] = [];
+        let tools: Tool[] = [];
 
         tools.push(
           createBMADTool(
@@ -331,6 +351,10 @@ export class BMADServerLiteMultiToolGit {
             this.engine.getWorkflowMetadata(),
           ),
         );
+
+        if (shapeEnabled()) {
+          tools = shapeTools(tools) as Tool[];
+        }
 
         return { tools };
       }),
@@ -404,6 +428,13 @@ export class BMADServerLiteMultiToolGit {
           };
         });
 
+        if (shapeEnabled()) {
+          // Limit prompts list to max list size to keep UI concise
+          const limit = Number(process.env.BMAD_SHAPE_MAX_LIST || 20);
+          return {
+            prompts: prompts.slice(0, Math.max(1, Math.min(200, limit))),
+          };
+        }
         return { prompts };
       }),
     );
