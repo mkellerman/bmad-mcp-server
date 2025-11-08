@@ -49,6 +49,11 @@ function summarize(events) {
           size: 0,
           sections: 0,
           affordances: 0,
+          shaped: 0,
+          truncated: 0,
+          ranged: 0,
+          adherenceScore: 0,
+          adherenceTotal: 0,
         });
       const agg = byRoute.get(key);
       agg.count += 1;
@@ -59,6 +64,15 @@ function summarize(events) {
       if (typeof e.sizeBytes === 'number') agg.size += e.sizeBytes;
       if (typeof e.sections === 'number') agg.sections += e.sections;
       if (typeof e.affordances === 'number') agg.affordances += e.affordances;
+      if (e.event === 'response_ready') {
+        if (e.shaped) agg.shaped += 1;
+        if (e.shapedTruncated) agg.truncated += 1;
+        if (e.shapedRange) agg.ranged += 1;
+        if (typeof e.adherenceScore === 'number')
+          agg.adherenceScore += e.adherenceScore;
+        if (typeof e.adherenceTotal === 'number')
+          agg.adherenceTotal += e.adherenceTotal;
+      }
     }
   }
   const routeSummaries = [];
@@ -78,6 +92,12 @@ function summarize(events) {
       avgSizeBytes: agg.count ? +(agg.size / agg.count).toFixed(2) : 0,
       avgSections: agg.count ? +(agg.sections / agg.count).toFixed(2) : 0,
       avgAffordances: agg.count ? +(agg.affordances / agg.count).toFixed(2) : 0,
+      shapedRate: agg.count ? +(agg.shaped / agg.count).toFixed(2) : 0,
+      truncatedRate: agg.shaped ? +(agg.truncated / agg.shaped).toFixed(2) : 0,
+      rangeRate: agg.shaped ? +(agg.ranged / agg.shaped).toFixed(2) : 0,
+      adherenceAvg: agg.adherenceTotal
+        ? +(agg.adherenceScore / agg.adherenceTotal).toFixed(2)
+        : 0,
     });
   }
   routeSummaries.sort((a, b) => a.route.localeCompare(b.route));
@@ -122,6 +142,10 @@ function formatTable(rows, headers) {
     'avgSizeBytes',
     'avgSections',
     'avgAffordances',
+    'shapedRate',
+    'truncatedRate',
+    'rangeRate',
+    'adherenceAvg',
   ];
   console.warn('\nBMAD Metrics Summary');
   console.warn('File:', filePath);

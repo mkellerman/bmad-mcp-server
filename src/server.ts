@@ -137,6 +137,25 @@ export class BMADServerLiteMultiToolGit {
             const shapedRange = (
               request as unknown as { _shapedRange?: boolean }
             )._shapedRange;
+            let adherenceScore: number | undefined;
+            let adherenceTotal: number | undefined;
+            if (shapeEnabled()) {
+              const conds: boolean[] = [];
+              // Condition: listLimited for list endpoints
+              if (
+                name === 'ListResources' ||
+                name === 'ListTools' ||
+                name === 'ListPrompts'
+              ) {
+                conds.push(true);
+              }
+              // Condition: truncated
+              conds.push(!!shapedTruncated);
+              // Condition: ranged excerpt
+              conds.push(!!shapedRange);
+              adherenceTotal = conds.length;
+              adherenceScore = conds.reduce((a, b) => a + (b ? 1 : 0), 0);
+            }
             await emit({
               event: 'response_ready',
               id,
@@ -145,6 +164,8 @@ export class BMADServerLiteMultiToolGit {
               shaped: shapeEnabled(),
               shapedTruncated: !!shapedTruncated,
               shapedRange: !!shapedRange,
+              adherenceScore,
+              adherenceTotal,
               durationMs: Date.now() - t0,
               tokenEstimate: estimateTokens(payloadSample),
               sizeBytes: sizeBytes(payloadSample),

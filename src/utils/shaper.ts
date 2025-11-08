@@ -87,3 +87,7 @@ export function shapeTextContent(text: string): {
     tokenEstimate: estimateTokens(out),
   };
 }
+
+export function shapeMaxList(): number {
+  return maxList();
+}
