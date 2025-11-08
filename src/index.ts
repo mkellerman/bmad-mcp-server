@@ -41,6 +41,16 @@
  */
 
 import { BMADServerLiteMultiToolGit } from './server.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, '../package.json'), 'utf-8'),
+) as { version: string };
+const VERSION = packageJson.version;
 
 /**
  * Main entry point function
@@ -63,7 +73,7 @@ async function main() {
   // This is useful for testing and custom deployments
   const projectRoot = process.env.BMAD_ROOT;
 
-  console.error('BMAD MCP Server (Tool-per-Agent + Git Support)');
+  console.error(`BMAD MCP Server - v${VERSION}`);
   if (gitRemotes.length > 0) {
     console.error(`Git remotes: ${gitRemotes.join(', ')}`);
   }
