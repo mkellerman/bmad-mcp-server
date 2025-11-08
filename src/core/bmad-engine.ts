@@ -727,6 +727,35 @@ export class BMADEngine {
       }
 
       if (!agentForWorkflow) {
+        // Check if this is a standalone workflow
+        const standaloneWorkflow = this.workflows.find(
+          (w) =>
+            w.name === params.workflow &&
+            w.standalone &&
+            (!params.module || w.module === params.module),
+        );
+
+        if (standaloneWorkflow) {
+          // Execute standalone workflow without agent
+          const workflowPath = `{project-root}/bmad/${standaloneWorkflow.module}/workflows/${params.workflow}/workflow.yaml`;
+
+          const executionContext = {
+            workflow: params.workflow,
+            workflowPath,
+            userContext: params.message,
+            agent: undefined,
+            agentWorkflowHandler: undefined,
+          };
+
+          const text = getWorkflowExecutionPrompt(executionContext);
+
+          return {
+            success: true,
+            data: executionContext,
+            text,
+          };
+        }
+
         return {
           success: false,
           error: `No agent found offering workflow: ${params.workflow}${params.module ? ` in module: ${params.module}` : ''}`,
