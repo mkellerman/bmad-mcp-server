@@ -24,14 +24,19 @@ import {
   handleBMADTool,
   type BMADToolParams,
 } from './tools/index.js';
+import type { DiscoveryMode } from './types/index.js';
 
 export class BMADServerLiteMultiToolGit {
   private server: Server;
   private engine: BMADEngine;
   private initialized = false;
 
-  constructor(projectRoot?: string, gitRemotes?: string[]) {
-    this.engine = new BMADEngine(projectRoot, gitRemotes);
+  constructor(
+    projectRoot?: string,
+    gitRemotes?: string[],
+    discoveryMode?: DiscoveryMode,
+  ) {
+    this.engine = new BMADEngine(projectRoot, gitRemotes, discoveryMode);
     this.server = new Server(
       {
         name: SERVER_CONFIG.name,
@@ -176,17 +181,30 @@ export class BMADServerLiteMultiToolGit {
           };
         }
 
-        // TODO: Tool and Task manifests not yet implemented
         if (relativePath === '_cfg/tool-manifest.csv') {
-          throw new Error(
-            'Tool manifest generation not yet implemented - coming soon! This will provide virtual tool metadata from loaded BMAD modules.',
-          );
+          const content = this.engine.generateToolManifest();
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/csv',
+                text: content,
+              },
+            ],
+          };
         }
 
         if (relativePath === '_cfg/task-manifest.csv') {
-          throw new Error(
-            'Task manifest generation not yet implemented - coming soon! This will provide virtual task metadata from loaded BMAD modules.',
-          );
+          const content = this.engine.generateTaskManifest();
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/csv',
+                text: content,
+              },
+            ],
+          };
         }
 
         // Default: Load file from filesystem
@@ -400,17 +418,18 @@ export class BMADServerLiteMultiToolGit {
 
     await this.initialize();
 
-    const gitPaths = this.engine.getLoader().getResolvedGitPaths();
+    const sourceCount = await this.engine.getLoader().getSourceCount();
+    const moduleNames = await this.engine.getLoader().getModuleNames();
     const agentCount = this.engine.getAgentMetadata().length;
     const workflowCount = this.engine.getWorkflowMetadata().length;
     const resourceCount = this.engine.getCachedResources().length;
 
     console.error('BMAD MCP Server started');
     console.error(
-      `Loaded ${agentCount} agents, ${workflowCount} workflows, ${resourceCount} resources`,
+      `Loaded: ${sourceCount} source${sourceCount !== 1 ? 's' : ''}, ${resourceCount} resources`,
     );
-    if (gitPaths.size > 0) {
-      console.error(`Git remotes resolved: ${gitPaths.size}`);
-    }
+    console.error(
+      `Loaded: ${moduleNames.length} module${moduleNames.length !== 1 ? 's' : ''}, ${agentCount} agents, ${workflowCount} workflows`,
+    );
   }
 }

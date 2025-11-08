@@ -1,0 +1,4 @@
+name,displayName,description,module,path,standalone
+"shard-doc","Custom Shard Doc","Custom version that should be overridden by project bmad","core","bmad/core/tools/shard-doc.xml","true"
+"test-analyzer","Test Analyzer","Analyzes test coverage and quality metrics - unique to custom","core","bmad/core/tools/test-analyzer.xml","true"
+"code-formatter","Code Formatter","Formats code according to style guide - unique to custom","core","bmad/core/tools/code-formatter.xml","true"

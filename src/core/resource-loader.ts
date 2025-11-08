@@ -40,7 +40,8 @@ import { load as parseYaml } from 'js-yaml';
 import { XMLParser } from 'fast-xml-parser';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { GitSourceResolver } from '../utils/git-source-resolver.js';
-import type { Workflow } from '../types/index.js';
+import { ManifestCache } from './manifest-cache.js';
+import type { Workflow, DiscoveryMode } from '../types/index.js';
 
 /**
  * Constants for resource loading
@@ -48,6 +49,39 @@ import type { Workflow } from '../types/index.js';
 
 /** Maximum length for agent identity strings: 500 characters (increased to show full persona) */
 const AGENT_IDENTITY_MAX_LENGTH = 500;
+
+/**
+ * Directories to exclude when scanning for BMAD content
+ * These are common system, build, and cache directories that should never contain BMAD modules
+ */
+const EXCLUDED_DIRECTORIES = new Set([
+  '.git',
+  '.github',
+  '.vscode',
+  '.idea',
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  'target',
+  'cache',
+  '.cache',
+  'tmp',
+  '.tmp',
+  'temp',
+  '.temp',
+  'logs',
+  '.logs',
+  'coverage',
+  '.nyc_output',
+  '__pycache__',
+  '.pytest_cache',
+  '.tox',
+  'venv',
+  '.venv',
+  'virtualenv',
+  '.DS_Store',
+]);
 
 /** Regex patterns for parsing BMAD content */
 
@@ -109,6 +143,8 @@ export class ResourceLoaderGit {
   private paths: ResourcePaths;
   private gitResolver?: GitSourceResolver;
   private resolvedGitPaths: Map<string, string> = new Map();
+  private manifestCache: ManifestCache;
+  private discoveryMode: DiscoveryMode;
 
   /**
    * Creates a new BMAD resource loader with multi-source support
@@ -117,6 +153,11 @@ export class ResourceLoaderGit {
    *                     This is where the loader looks for project-local BMAD installations.
    * @param gitRemotes - Optional array of Git remote URLs for additional BMAD content.
    *                    URLs should be in format: `git+https://github.com/user/repo.git` or `git+ssh://git@github.com/user/repo.git`
+   * @param discoveryMode - Discovery mode for source filtering:
+   *                       - 'strict': Only git remotes from CLI (no local/user)
+   *                       - 'local': Only project root (no user/git)
+   *                       - 'user': Only ~/.bmad (no project/git)
+   *                       - 'auto': All sources with priority resolution (default)
    *
    * @remarks
    * The constructor sets up the search paths and initializes Git resolution if remote URLs are provided.
@@ -135,9 +176,21 @@ export class ResourceLoaderGit {
    *   undefined,
    *   ['git+https://github.com/company/bmad-custom.git']
    * );
+   *
+   * // Strict mode - only use git remotes
+   * const loader = new ResourceLoaderGit(
+   *   undefined,
+   *   ['git+https://github.com/company/bmad.git'],
+   *   'strict'
+   * );
    * ```
    */
-  constructor(projectRoot?: string, gitRemotes?: string[]) {
+  constructor(
+    projectRoot?: string,
+    gitRemotes?: string[],
+    discoveryMode: DiscoveryMode = 'auto',
+  ) {
+    this.discoveryMode = discoveryMode;
     this.paths = {
       projectRoot: projectRoot || process.cwd(),
       userBmad: join(homedir(), '.bmad'),
@@ -147,6 +200,43 @@ export class ResourceLoaderGit {
     // Initialize Git resolver if we have remote URLs
     if (gitRemotes && gitRemotes.length > 0) {
       this.gitResolver = new GitSourceResolver();
+    }
+
+    // Initialize manifest cache
+    this.manifestCache = new ManifestCache(this);
+  }
+
+  /**
+   * Get the discovery mode for this loader
+   *
+   * @returns The current discovery mode
+   */
+  getDiscoveryMode(): DiscoveryMode {
+    return this.discoveryMode;
+  }
+
+  /**
+   * Check if a source type should be included based on discovery mode
+   *
+   * @param source - The source type to check
+   * @returns true if this source should be scanned
+   */
+  private shouldIncludeSource(source: Resource['source']): boolean {
+    switch (this.discoveryMode) {
+      case 'strict':
+        // Only git remotes provided via CLI
+        return source === 'git';
+      case 'local':
+        // Only project root
+        return source === 'project';
+      case 'user':
+        // Only ~/.bmad
+        return source === 'user';
+      case 'first':
+      case 'auto':
+      default:
+        // All sources (first mode logic is handled in source discovery order)
+        return true;
     }
   }
 
@@ -188,7 +278,12 @@ export class ResourceLoaderGit {
       if (existsSync(parentDir)) {
         try {
           const siblings = readdirSync(parentDir, { withFileTypes: true })
-            .filter((d) => d.isDirectory() && d.name !== currentDirName)
+            .filter(
+              (d) =>
+                d.isDirectory() &&
+                d.name !== currentDirName &&
+                !EXCLUDED_DIRECTORIES.has(d.name),
+            )
             .map((d) => d.name);
 
           // If siblings have 'agents' directories, parent is likely BMAD root
@@ -215,7 +310,7 @@ export class ResourceLoaderGit {
     // Check if this path has module subdirectories (it's a BMAD root)
     try {
       const subdirs = readdirSync(localPath, { withFileTypes: true })
-        .filter((d) => d.isDirectory())
+        .filter((d) => d.isDirectory() && !EXCLUDED_DIRECTORIES.has(d.name))
         .map((d) => d.name);
 
       const hasModules = subdirs.some((subdir) =>
@@ -345,82 +440,93 @@ export class ResourceLoaderGit {
 
     const candidates: Array<{ path: string; source: Resource['source'] }> = [];
 
-    // Project - using smart path detection
-    const projectPathInfo = this.getProjectBmadPath();
-    const projectBmad = projectPathInfo.bmadRoot;
+    // Project - using smart path detection (if mode allows)
+    if (this.shouldIncludeSource('project')) {
+      const projectPathInfo = this.getProjectBmadPath();
+      const projectBmad = projectPathInfo.bmadRoot;
 
-    if (projectPathInfo.module) {
-      // Specific module - only check this module
-      candidates.push({
-        path: join(projectBmad, projectPathInfo.module, 'agents', `${name}.md`),
-        source: 'project',
-      });
-    } else {
-      // BMAD root - check flat structure
-      candidates.push({
-        path: join(projectBmad, 'agents', `${name}.md`),
-        source: 'project',
-      });
+      if (projectPathInfo.module) {
+        // Specific module - only check this module
+        candidates.push({
+          path: join(
+            projectBmad,
+            projectPathInfo.module,
+            'agents',
+            `${name}.md`,
+          ),
+          source: 'project',
+        });
+      } else {
+        // BMAD root - check flat structure
+        candidates.push({
+          path: join(projectBmad, 'agents', `${name}.md`),
+          source: 'project',
+        });
 
-      // BMAD root - check modular structure (all modules)
-      if (existsSync(projectBmad)) {
-        try {
-          const modules = readdirSync(projectBmad, { withFileTypes: true })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
+        // BMAD root - check modular structure (all modules)
+        if (existsSync(projectBmad)) {
+          try {
+            const modules = readdirSync(projectBmad, { withFileTypes: true })
+              .filter((dirent) => dirent.isDirectory())
+              .map((dirent) => dirent.name);
 
-          for (const module of modules) {
-            candidates.push({
-              path: join(projectBmad, module, 'agents', `${name}.md`),
-              source: 'project',
-            });
+            for (const module of modules) {
+              candidates.push({
+                path: join(projectBmad, module, 'agents', `${name}.md`),
+                source: 'project',
+              });
+            }
+          } catch {
+            // Ignore module scanning errors
           }
-        } catch {
-          // Ignore module scanning errors
         }
       }
     }
 
-    // User - flat structure
-    candidates.push({
-      path: join(this.paths.userBmad, 'agents', `${name}.md`),
-      source: 'user',
-    });
+    // User - flat structure (if mode allows)
+    if (this.shouldIncludeSource('user')) {
+      candidates.push({
+        path: join(this.paths.userBmad, 'agents', `${name}.md`),
+        source: 'user',
+      });
+    }
 
-    // Git remotes - use smart path detection
-    for (const localPath of this.resolvedGitPaths.values()) {
-      const pathInfo = this.detectPathType(localPath);
+    // Git remotes - use smart path detection (if mode allows)
+    if (this.shouldIncludeSource('git')) {
+      for (const localPath of this.resolvedGitPaths.values()) {
+        const pathInfo = this.detectPathType(localPath);
 
-      if (pathInfo.module) {
-        // Specific module was requested - only search this module
-        candidates.push({
-          path: join(localPath, 'agents', `${name}.md`),
-          source: 'git',
-        });
-      } else {
-        // BMAD root - search flat and all modules
-        // Flat structure
-        candidates.push({
-          path: join(pathInfo.bmadRoot, 'agents', `${name}.md`),
-          source: 'git',
-        });
+        if (pathInfo.module) {
+          // Specific module was requested - only search this module
+          candidates.push({
+            path: join(localPath, 'agents', `${name}.md`),
+            source: 'git',
+          });
+        } else {
+          // BMAD root - search flat and all modules
+          // Flat structure
+          candidates.push({
+            path: join(pathInfo.bmadRoot, 'agents', `${name}.md`),
+            source: 'git',
+          });
 
-        // Modular structure
-        try {
-          const modules = readdirSync(pathInfo.bmadRoot, {
-            withFileTypes: true,
-          })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
+          // Modular structure
+          try {
+            const modules = readdirSync(pathInfo.bmadRoot, {
+              withFileTypes: true,
+            })
+              .filter((dirent) => dirent.isDirectory())
+              .map((dirent) => dirent.name);
 
-          for (const module of modules) {
-            candidates.push({
-              path: join(pathInfo.bmadRoot, module, 'agents', `${name}.md`),
-              source: 'git',
-            });
+            for (const module of modules) {
+              candidates.push({
+                path: join(pathInfo.bmadRoot, module, 'agents', `${name}.md`),
+                source: 'git',
+              });
+            }
+          } catch {
+            // Ignore module scanning errors
           }
-        } catch {
-          // Ignore module scanning errors
         }
       }
     }
@@ -641,100 +747,106 @@ export class ResourceLoaderGit {
       return name !== 'readme';
     };
 
-    // Scan project using smart path detection
-    const projectPathInfo = this.getProjectBmadPath();
-    const projectBmad = projectPathInfo.bmadRoot;
+    // Scan project using smart path detection (if mode allows)
+    if (this.shouldIncludeSource('project')) {
+      const projectPathInfo = this.getProjectBmadPath();
+      const projectBmad = projectPathInfo.bmadRoot;
 
-    if (existsSync(projectBmad)) {
-      // If a specific module was detected, only scan that module
-      if (projectPathInfo.module) {
-        const moduleAgents = join(
-          projectBmad,
-          projectPathInfo.module,
-          'agents',
-        );
-        if (existsSync(moduleAgents)) {
-          readdirSync(moduleAgents)
-            .filter(isAgentFile)
-            .forEach((f) => agents.add(basename(f, '.md')));
-        }
-      } else {
-        // Flat structure: bmad/agents/*.md
-        const flatAgents = join(projectBmad, 'agents');
-        if (existsSync(flatAgents)) {
-          readdirSync(flatAgents)
-            .filter(isAgentFile)
-            .forEach((f) => agents.add(basename(f, '.md')));
-        }
-
-        // Modular structure: bmad/{module}/agents/*.md
-        try {
-          const modules = readdirSync(projectBmad, { withFileTypes: true })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
-
-          for (const module of modules) {
-            const moduleAgents = join(projectBmad, module, 'agents');
-            if (existsSync(moduleAgents)) {
-              readdirSync(moduleAgents)
-                .filter(isAgentFile)
-                .forEach((f) => agents.add(basename(f, '.md')));
-            }
+      if (existsSync(projectBmad)) {
+        // If a specific module was detected, only scan that module
+        if (projectPathInfo.module) {
+          const moduleAgents = join(
+            projectBmad,
+            projectPathInfo.module,
+            'agents',
+          );
+          if (existsSync(moduleAgents)) {
+            readdirSync(moduleAgents)
+              .filter(isAgentFile)
+              .forEach((f) => agents.add(basename(f, '.md')));
           }
-        } catch {
-          // Ignore errors scanning modules
+        } else {
+          // Flat structure: bmad/agents/*.md
+          const flatAgents = join(projectBmad, 'agents');
+          if (existsSync(flatAgents)) {
+            readdirSync(flatAgents)
+              .filter(isAgentFile)
+              .forEach((f) => agents.add(basename(f, '.md')));
+          }
+
+          // Modular structure: bmad/{module}/agents/*.md
+          try {
+            const modules = readdirSync(projectBmad, { withFileTypes: true })
+              .filter((dirent) => dirent.isDirectory())
+              .map((dirent) => dirent.name);
+
+            for (const module of modules) {
+              const moduleAgents = join(projectBmad, module, 'agents');
+              if (existsSync(moduleAgents)) {
+                readdirSync(moduleAgents)
+                  .filter(isAgentFile)
+                  .forEach((f) => agents.add(basename(f, '.md')));
+              }
+            }
+          } catch {
+            // Ignore errors scanning modules
+          }
         }
       }
     }
 
-    // Scan user - flat structure only
-    const userAgents = join(this.paths.userBmad, 'agents');
-    if (existsSync(userAgents)) {
-      readdirSync(userAgents)
-        .filter(isAgentFile)
-        .forEach((f) => agents.add(basename(f, '.md')));
+    // Scan user - flat structure only (if mode allows)
+    if (this.shouldIncludeSource('user')) {
+      const userAgents = join(this.paths.userBmad, 'agents');
+      if (existsSync(userAgents)) {
+        readdirSync(userAgents)
+          .filter(isAgentFile)
+          .forEach((f) => agents.add(basename(f, '.md')));
+      }
     }
 
-    // Scan Git remotes - use smart path detection
-    for (const localPath of this.resolvedGitPaths.values()) {
-      const pathInfo = this.detectPathType(localPath);
+    // Scan Git remotes - use smart path detection (if mode allows)
+    if (this.shouldIncludeSource('git')) {
+      for (const localPath of this.resolvedGitPaths.values()) {
+        const pathInfo = this.detectPathType(localPath);
 
-      if (pathInfo.module) {
-        // Specific module was requested
-        const moduleAgents = join(localPath, 'agents');
-        if (existsSync(moduleAgents)) {
-          readdirSync(moduleAgents)
-            .filter(isAgentFile)
-            .forEach((f) => agents.add(basename(f, '.md')));
-        }
-      } else {
-        // BMAD root - scan flat and modular
-        // Flat structure
-        const flatAgents = join(pathInfo.bmadRoot, 'agents');
-        if (existsSync(flatAgents)) {
-          readdirSync(flatAgents)
-            .filter(isAgentFile)
-            .forEach((f) => agents.add(basename(f, '.md')));
-        }
-
-        // Modular structure
-        try {
-          const modules = readdirSync(pathInfo.bmadRoot, {
-            withFileTypes: true,
-          })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
-
-          for (const module of modules) {
-            const moduleAgents = join(pathInfo.bmadRoot, module, 'agents');
-            if (existsSync(moduleAgents)) {
-              readdirSync(moduleAgents)
-                .filter(isAgentFile)
-                .forEach((f) => agents.add(basename(f, '.md')));
-            }
+        if (pathInfo.module) {
+          // Specific module was requested
+          const moduleAgents = join(localPath, 'agents');
+          if (existsSync(moduleAgents)) {
+            readdirSync(moduleAgents)
+              .filter(isAgentFile)
+              .forEach((f) => agents.add(basename(f, '.md')));
           }
-        } catch {
-          // Ignore errors scanning modules
+        } else {
+          // BMAD root - scan flat and modular
+          // Flat structure
+          const flatAgents = join(pathInfo.bmadRoot, 'agents');
+          if (existsSync(flatAgents)) {
+            readdirSync(flatAgents)
+              .filter(isAgentFile)
+              .forEach((f) => agents.add(basename(f, '.md')));
+          }
+
+          // Modular structure
+          try {
+            const modules = readdirSync(pathInfo.bmadRoot, {
+              withFileTypes: true,
+            })
+              .filter((dirent) => dirent.isDirectory())
+              .map((dirent) => dirent.name);
+
+            for (const module of modules) {
+              const moduleAgents = join(pathInfo.bmadRoot, module, 'agents');
+              if (existsSync(moduleAgents)) {
+                readdirSync(moduleAgents)
+                  .filter(isAgentFile)
+                  .forEach((f) => agents.add(basename(f, '.md')));
+              }
+            }
+          } catch {
+            // Ignore errors scanning modules
+          }
         }
       }
     }
@@ -766,133 +878,143 @@ export class ResourceLoaderGit {
 
     const workflows = new Set<string>();
 
-    // Scan project using smart path detection
-    const projectPathInfo = this.getProjectBmadPath();
-    const projectBmad = projectPathInfo.bmadRoot;
+    // Scan project using smart path detection (if mode allows)
+    if (this.shouldIncludeSource('project')) {
+      const projectPathInfo = this.getProjectBmadPath();
+      const projectBmad = projectPathInfo.bmadRoot;
 
-    if (projectPathInfo.module) {
-      // Specific module - only scan this module
-      const moduleWorkflows = join(
-        projectBmad,
-        projectPathInfo.module,
-        'workflows',
-      );
-      if (existsSync(moduleWorkflows)) {
-        readdirSync(moduleWorkflows).forEach((name) => {
-          const workflowPath = join(moduleWorkflows, name, 'workflow.yaml');
-          if (existsSync(workflowPath)) {
-            workflows.add(name);
-          }
-        });
-      }
-    } else {
-      // BMAD root - scan flat structure
-      const flatWorkflows = join(projectBmad, 'workflows');
-      if (existsSync(flatWorkflows)) {
-        readdirSync(flatWorkflows).forEach((name) => {
-          const workflowPath = join(flatWorkflows, name, 'workflow.yaml');
-          if (existsSync(workflowPath)) {
-            workflows.add(name);
-          }
-        });
-      }
-
-      // BMAD root - scan modular structure
-      if (existsSync(projectBmad)) {
-        try {
-          const modules = readdirSync(projectBmad, { withFileTypes: true })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
-
-          for (const module of modules) {
-            const moduleWorkflows = join(projectBmad, module, 'workflows');
-            if (existsSync(moduleWorkflows)) {
-              readdirSync(moduleWorkflows).forEach((name) => {
-                const workflowPath = join(
-                  moduleWorkflows,
-                  name,
-                  'workflow.yaml',
-                );
-                if (existsSync(workflowPath)) {
-                  workflows.add(name);
-                }
-              });
-            }
-          }
-        } catch {
-          // Ignore errors
-        }
-      }
-    }
-
-    // Scan user
-    const userWorkflows = join(this.paths.userBmad, 'workflows');
-    if (existsSync(userWorkflows)) {
-      readdirSync(userWorkflows).forEach((name) => {
-        const workflowPath = join(userWorkflows, name, 'workflow.yaml');
-        if (existsSync(workflowPath)) {
-          workflows.add(name);
-        }
-      });
-    }
-
-    // Scan Git remotes - flat and modular
-    for (const localPath of this.resolvedGitPaths.values()) {
-      const pathInfo = this.detectPathType(localPath);
-
-      if (pathInfo.module) {
-        // Specific module
-        const gitWorkflows = join(localPath, 'workflows');
-        if (existsSync(gitWorkflows)) {
-          readdirSync(gitWorkflows).forEach((name) => {
-            const workflowPath = join(gitWorkflows, name, 'workflow.yaml');
+      if (projectPathInfo.module) {
+        // Specific module - only scan this module
+        const moduleWorkflows = join(
+          projectBmad,
+          projectPathInfo.module,
+          'workflows',
+        );
+        if (existsSync(moduleWorkflows)) {
+          readdirSync(moduleWorkflows).forEach((name) => {
+            const workflowPath = join(moduleWorkflows, name, 'workflow.yaml');
             if (existsSync(workflowPath)) {
               workflows.add(name);
             }
           });
         }
       } else {
-        // BMAD root - scan flat and all modules
-        // Flat
-        const gitWorkflowsFlat = join(pathInfo.bmadRoot, 'workflows');
-        if (existsSync(gitWorkflowsFlat)) {
-          readdirSync(gitWorkflowsFlat).forEach((name) => {
-            const workflowPath = join(gitWorkflowsFlat, name, 'workflow.yaml');
+        // BMAD root - scan flat structure
+        const flatWorkflows = join(projectBmad, 'workflows');
+        if (existsSync(flatWorkflows)) {
+          readdirSync(flatWorkflows).forEach((name) => {
+            const workflowPath = join(flatWorkflows, name, 'workflow.yaml');
             if (existsSync(workflowPath)) {
               workflows.add(name);
             }
           });
         }
 
-        // Modular
-        try {
-          const modules = readdirSync(pathInfo.bmadRoot, {
-            withFileTypes: true,
-          })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
+        // BMAD root - scan modular structure
+        if (existsSync(projectBmad)) {
+          try {
+            const modules = readdirSync(projectBmad, { withFileTypes: true })
+              .filter((dirent) => dirent.isDirectory())
+              .map((dirent) => dirent.name);
 
-          for (const module of modules) {
-            const moduleWorkflows = join(
-              pathInfo.bmadRoot,
-              module,
-              'workflows',
-            );
-            if (existsSync(moduleWorkflows)) {
-              readdirSync(moduleWorkflows).forEach((name) => {
-                const workflowPath = join(
-                  moduleWorkflows,
-                  name,
-                  'workflow.yaml',
-                );
-                if (existsSync(workflowPath)) {
-                  workflows.add(name);
-                }
-              });
+            for (const module of modules) {
+              const moduleWorkflows = join(projectBmad, module, 'workflows');
+              if (existsSync(moduleWorkflows)) {
+                readdirSync(moduleWorkflows).forEach((name) => {
+                  const workflowPath = join(
+                    moduleWorkflows,
+                    name,
+                    'workflow.yaml',
+                  );
+                  if (existsSync(workflowPath)) {
+                    workflows.add(name);
+                  }
+                });
+              }
             }
+          } catch {
+            // Ignore errors
           }
-        } catch {
-          // Ignore errors
+        }
+      }
+    }
+
+    // Scan user (if mode allows)
+    if (this.shouldIncludeSource('user')) {
+      const userWorkflows = join(this.paths.userBmad, 'workflows');
+      if (existsSync(userWorkflows)) {
+        readdirSync(userWorkflows).forEach((name) => {
+          const workflowPath = join(userWorkflows, name, 'workflow.yaml');
+          if (existsSync(workflowPath)) {
+            workflows.add(name);
+          }
+        });
+      }
+    }
+
+    // Scan Git remotes - flat and modular (if mode allows)
+    if (this.shouldIncludeSource('git')) {
+      for (const localPath of this.resolvedGitPaths.values()) {
+        const pathInfo = this.detectPathType(localPath);
+
+        if (pathInfo.module) {
+          // Specific module
+          const gitWorkflows = join(localPath, 'workflows');
+          if (existsSync(gitWorkflows)) {
+            readdirSync(gitWorkflows).forEach((name) => {
+              const workflowPath = join(gitWorkflows, name, 'workflow.yaml');
+              if (existsSync(workflowPath)) {
+                workflows.add(name);
+              }
+            });
+          }
+        } else {
+          // BMAD root - scan flat and all modules
+          // Flat
+          const gitWorkflowsFlat = join(pathInfo.bmadRoot, 'workflows');
+          if (existsSync(gitWorkflowsFlat)) {
+            readdirSync(gitWorkflowsFlat).forEach((name) => {
+              const workflowPath = join(
+                gitWorkflowsFlat,
+                name,
+                'workflow.yaml',
+              );
+              if (existsSync(workflowPath)) {
+                workflows.add(name);
+              }
+            });
+          }
+
+          // Modular
+          try {
+            const modules = readdirSync(pathInfo.bmadRoot, {
+              withFileTypes: true,
+            })
+              .filter((dirent) => dirent.isDirectory())
+              .map((dirent) => dirent.name);
+
+            for (const module of modules) {
+              const moduleWorkflows = join(
+                pathInfo.bmadRoot,
+                module,
+                'workflows',
+              );
+              if (existsSync(moduleWorkflows)) {
+                readdirSync(moduleWorkflows).forEach((name) => {
+                  const workflowPath = join(
+                    moduleWorkflows,
+                    name,
+                    'workflow.yaml',
+                  );
+                  if (existsSync(workflowPath)) {
+                    workflows.add(name);
+                  }
+                });
+              }
+            }
+          } catch {
+            // Ignore errors
+          }
         }
       }
     }
@@ -1199,6 +1321,27 @@ export class ResourceLoaderGit {
    * ```
    */
   async listAgentsWithMetadata(): Promise<AgentMetadata[]> {
+    // Try manifest-based loading first (unless explicitly disabled)
+    if (process.env.BMAD_USE_MANIFESTS !== 'false') {
+      try {
+        return await this.manifestCache.getAllAgents();
+      } catch (error) {
+        console.warn(
+          'Manifest cache failed, falling back to runtime scan:',
+          error,
+        );
+      }
+    }
+
+    // Fallback: runtime scanning
+    return await this.scanAgentsRuntime();
+  }
+
+  /**
+   * Fallback method: scans agents at runtime (slower, original behavior)
+   * @private
+   */
+  private async scanAgentsRuntime(): Promise<AgentMetadata[]> {
     const agentNames = await this.listAgents();
     const metadata: AgentMetadata[] = [];
 
@@ -1234,6 +1377,27 @@ export class ResourceLoaderGit {
    * ```
    */
   async listWorkflowsWithMetadata(): Promise<Workflow[]> {
+    // Try manifest-based loading first (unless explicitly disabled)
+    if (process.env.BMAD_USE_MANIFESTS !== 'false') {
+      try {
+        return await this.manifestCache.getAllWorkflows();
+      } catch (error) {
+        console.warn(
+          'Manifest cache failed, falling back to runtime scan:',
+          error,
+        );
+      }
+    }
+
+    // Fallback: runtime scanning
+    return await this.scanWorkflowsRuntime();
+  }
+
+  /**
+   * Fallback method: scans workflows at runtime (slower, original behavior)
+   * @private
+   */
+  private async scanWorkflowsRuntime(): Promise<Workflow[]> {
     try {
       // Load workflow-manifest.csv
       const manifestContent = await this.loadFile('_cfg/workflow-manifest.csv');
@@ -1268,6 +1432,68 @@ export class ResourceLoaderGit {
         standalone: true,
       }));
     }
+  }
+
+  /**
+   * List all available tools with full metadata from tool-manifest.csv
+   *
+   * @returns Promise resolving to array of Tool metadata objects
+   *
+   * @remarks
+   * Loads tool metadata from the tool-manifest.csv file which contains:
+   * - name: Tool identifier
+   * - displayName: Human-readable display name
+   * - description: Description of what the tool does
+   * - module: BMAD module the tool belongs to
+   * - path: Relative path to tool definition file
+   * - standalone: Whether tool can be executed independently
+   */
+  async listToolsWithMetadata(): Promise<import('../types/index.js').Tool[]> {
+    // Try manifest-based loading first (unless explicitly disabled)
+    if (process.env.BMAD_USE_MANIFESTS !== 'false') {
+      try {
+        return await this.manifestCache.getAllTools();
+      } catch (error) {
+        console.warn(
+          'Manifest cache failed for tools, falling back to empty list:',
+          error,
+        );
+      }
+    }
+
+    // Fallback: return empty array (tools are optional)
+    return [];
+  }
+
+  /**
+   * List all available tasks with full metadata from task-manifest.csv
+   *
+   * @returns Promise resolving to array of Task metadata objects
+   *
+   * @remarks
+   * Loads task metadata from the task-manifest.csv file which contains:
+   * - name: Task identifier
+   * - displayName: Human-readable display name
+   * - description: Description of what the task does
+   * - module: BMAD module the task belongs to
+   * - path: Relative path to task definition file
+   * - standalone: Whether task can be executed independently
+   */
+  async listTasksWithMetadata(): Promise<import('../types/index.js').Task[]> {
+    // Try manifest-based loading first (unless explicitly disabled)
+    if (process.env.BMAD_USE_MANIFESTS !== 'false') {
+      try {
+        return await this.manifestCache.getAllTasks();
+      } catch (error) {
+        console.warn(
+          'Manifest cache failed for tasks, falling back to empty list:',
+          error,
+        );
+      }
+    }
+
+    // Fallback: return empty array (tasks are optional)
+    return [];
   }
 
   /**
@@ -1306,34 +1532,40 @@ export class ResourceLoaderGit {
     }> = [];
     const seenPaths = new Set<string>(); // Deduplicate by relative path
 
-    // Walk project using smart path detection
-    const projectPathInfo = this.getProjectBmadPath();
-    const projectBmad = projectPathInfo.bmadRoot;
-    if (existsSync(projectBmad)) {
-      this.walkDir(projectBmad, projectBmad, 'project', allFiles, seenPaths);
+    // Walk project using smart path detection (if mode allows)
+    if (this.shouldIncludeSource('project')) {
+      const projectPathInfo = this.getProjectBmadPath();
+      const projectBmad = projectPathInfo.bmadRoot;
+      if (existsSync(projectBmad)) {
+        this.walkDir(projectBmad, projectBmad, 'project', allFiles, seenPaths);
+      }
     }
 
-    // Walk user ~/.bmad/
-    if (existsSync(this.paths.userBmad)) {
-      this.walkDir(
-        this.paths.userBmad,
-        this.paths.userBmad,
-        'user',
-        allFiles,
-        seenPaths,
-      );
+    // Walk user ~/.bmad/ (if mode allows)
+    if (this.shouldIncludeSource('user')) {
+      if (existsSync(this.paths.userBmad)) {
+        this.walkDir(
+          this.paths.userBmad,
+          this.paths.userBmad,
+          'user',
+          allFiles,
+          seenPaths,
+        );
+      }
     }
 
-    // Walk git remotes
-    for (const localPath of this.resolvedGitPaths.values()) {
-      const pathInfo = this.detectPathType(localPath);
-      this.walkDir(
-        pathInfo.bmadRoot,
-        pathInfo.bmadRoot,
-        'git',
-        allFiles,
-        seenPaths,
-      );
+    // Walk git remotes (if mode allows)
+    if (this.shouldIncludeSource('git')) {
+      for (const localPath of this.resolvedGitPaths.values()) {
+        const pathInfo = this.detectPathType(localPath);
+        this.walkDir(
+          pathInfo.bmadRoot,
+          pathInfo.bmadRoot,
+          'git',
+          allFiles,
+          seenPaths,
+        );
+      }
     }
 
     return allFiles;
@@ -1427,5 +1659,23 @@ export class ResourceLoaderGit {
    */
   getResolvedGitPaths(): Map<string, string> {
     return new Map(this.resolvedGitPaths);
+  }
+
+  /**
+   * Get the count of loaded sources (project, user, git remotes)
+   *
+   * @returns Promise resolving to number of sources
+   */
+  async getSourceCount(): Promise<number> {
+    return await this.manifestCache.getSourceCount();
+  }
+
+  /**
+   * Get unique module names from all loaded sources
+   *
+   * @returns Promise resolving to array of module names
+   */
+  async getModuleNames(): Promise<string[]> {
+    return await this.manifestCache.getModuleNames();
   }
 }

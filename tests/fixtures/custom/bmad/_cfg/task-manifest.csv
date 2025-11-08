@@ -1,0 +1,4 @@
+name,displayName,description,module,path,standalone
+"index-docs","Custom Index Docs","Custom version that should be overridden by project bmad","core","bmad/core/tasks/index-docs.xml","true"
+"user-interview","User Interview","Conducts structured user interviews - unique to custom","core","bmad/core/tasks/user-interview.xml","true"
+"performance-test","Performance Test","Runs performance benchmarks - unique to custom","core","bmad/core/tasks/performance-test.xml","true"
