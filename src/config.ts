@@ -191,14 +191,26 @@ export function getWorkflowExecutionPrompt(context: {
   agent?: string;
   agentWorkflowHandler?: string;
 }): string {
-  // Build the YAML frontmatter
-  const frontmatter = `---
+  // Build the YAML frontmatter - different format for standalone vs agent-based workflows
+  const frontmatter = context.agent
+    ? `---
 
-agent: ${context.agent || 'unknown'}
-menu-item: ${context.workflow}
-workflow: ${context.workflowPath}
+agent: ${context.agent}
+workflow: ${context.workflow}
+workflow-path: ${context.workflowPath}
 user-prompt: ${context.userContext || '(no prompt provided)'}
 
+---`
+    : `---
+
+execution-mode: standalone
+workflow: ${context.workflow}
+workflow-path: ${context.workflowPath}
+user-prompt: ${context.userContext || '(no prompt provided)'}
+
+# INSTRUCTIONS FOR LLM:
+# This is a standalone workflow that executes without an agent.
+# Follow the workflow instructions below directly.
 ---`;
 
   // Add resource access instructions FIRST
