@@ -24,10 +24,26 @@ import {
   getWorkflowExecutionPrompt,
 } from '../config.js';
 import { SessionTracker } from './session-tracker.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 // ============================================================================
 // Core Types (Transport-Agnostic)
 // ============================================================================
+
+/**
+ * MCP Sampling capability detection
+ */
+export interface SamplingCapability {
+  /** Whether the connected client supports sampling/createMessage */
+  supported: boolean;
+  /** When capability was detected */
+  detected: Date;
+  /** Client information if available */
+  clientInfo?: {
+    name?: string;
+    version?: string;
+  };
+}
 
 /**
  * Result of a BMAD operation
@@ -188,6 +204,15 @@ export class BMADEngine {
   /** Session-based usage tracker for intelligent ranking */
   private sessionTracker: SessionTracker;
 
+  /** MCP sampling capability (LLM-powered ranking when supported) */
+  private samplingCapability: SamplingCapability = {
+    supported: false,
+    detected: new Date(),
+  };
+
+  /** Reference to MCP server for sampling API access */
+  private mcpServer?: Server;
+
   /**
    * Creates a new BMAD Engine instance
    *
@@ -233,6 +258,51 @@ export class BMADEngine {
     }
 
     this.initialized = true;
+  }
+
+  /**
+   * Detect and store MCP sampling capability
+   *
+   * Should be called after MCP server initialization (oninitialized callback)
+   * to check if the connected client supports sampling/createMessage for LLM-powered ranking.
+   *
+   * @param server - MCP Server instance
+   */
+  detectSamplingSupport(server: Server): void {
+    this.mcpServer = server;
+    const capabilities = server.getClientCapabilities();
+
+    this.samplingCapability = {
+      supported: !!capabilities?.sampling,
+      detected: new Date(),
+      clientInfo: capabilities
+        ? {
+            name: (capabilities as { clientInfo?: { name?: string } })
+              .clientInfo?.name,
+            version: (capabilities as { clientInfo?: { version?: string } })
+              .clientInfo?.version,
+          }
+        : undefined,
+    };
+
+    // Log detection results for debugging
+    if (this.samplingCapability.supported) {
+      console.error('✓ MCP Sampling capability detected', {
+        client: this.samplingCapability.clientInfo?.name || 'unknown',
+        version: this.samplingCapability.clientInfo?.version || 'unknown',
+      });
+    } else {
+      console.error(
+        '✗ MCP Sampling not supported by client, using session-based ranking fallback',
+      );
+    }
+  }
+
+  /**
+   * Check if sampling is currently available
+   */
+  isSamplingAvailable(): boolean {
+    return this.samplingCapability.supported && !!this.mcpServer;
   }
 
   // ============================================================================

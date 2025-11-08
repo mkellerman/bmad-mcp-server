@@ -75,6 +75,11 @@ export class BMADServerLiteMultiToolGit {
     );
 
     this.setupHandlers();
+
+    // Set up oninitialized callback to detect sampling capability
+    this.server.oninitialized = () => {
+      this.engine.detectSamplingSupport(this.server);
+    };
   }
 
   private async initialize(): Promise<void> {
