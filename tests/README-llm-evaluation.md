@@ -1,14 +1,46 @@
 # LLM Evaluation Framework
 
-Dual-LLM testing framework for evaluating AI response quality using a judge LLM.
+Dual-LLM testing framework for evaluating AI response quality using a judge LLM with real API calls.
 
 ## Overview
 
 This framework enables behavioral quality testing where:
 
 1. **Subject LLM** generates a response (e.g., BMAD ranks workflows)
-2. **Judge LLM** evaluates the response quality against defined criteria
+2. **Judge LLM** evaluates the response quality against defined criteria via OpenAI API
 3. **Test passes/fails** based on judge's score
+
+## Setup
+
+### API Keys
+
+Set your OpenAI API key:
+
+```bash
+export OPENAI_API_KEY=sk-...
+```
+
+For other providers:
+
+```bash
+# Azure OpenAI
+export OPENAI_API_KEY=your-azure-key
+export OPENAI_BASE_URL=https://your-resource.openai.azure.com/
+
+# OpenAI-compatible endpoint (e.g., local model)
+export OPENAI_API_KEY=any-key
+export OPENAI_BASE_URL=http://localhost:8000/v1
+```
+
+### Cost Management
+
+Real LLM calls incur costs. The framework includes:
+
+- **Budget limits** by profile (CI: $0.50, Nightly: $5.00)
+- **Automatic cost tracking** per evaluation
+- **Cost summaries** after test runs
+
+Tests are skipped if `OPENAI_API_KEY` is not set.
 
 ## Quick Start
 
@@ -544,6 +576,51 @@ Adjust strategy or increase limit:
 costControl: {
   strategy: 'selective',  // vs 'all'
   budgetLimit: 1.00,      // Increase limit
+}
+```
+
+## Error Handling & Reliability
+
+### Automatic Retry with Exponential Backoff
+
+API calls automatically retry on transient failures:
+
+```typescript
+// Implemented in llm-judge.ts
+- Max retries: 3
+- Backoff: 1s, 2s, 4s (capped at 10s)
+- Retryable errors:
+  * Rate limits (429)
+  * Timeouts
+  * Server errors (500, 502, 503)
+  * Network/connection issues
+```
+
+### Error Recovery
+
+```typescript
+try {
+  const result = await evaluateTest(testName, response, criteria);
+} catch (error) {
+  // Framework handles:
+  // - Invalid API keys → Skip test gracefully
+  // - Rate limits → Retry with backoff
+  // - Malformed responses → Parse with fallback
+  // - Budget exceeded → Skip remaining tests
+}
+```
+
+### Graceful Degradation
+
+When judge LLM fails, tests fall back to deterministic validation:
+
+```typescript
+if (evaluation?.passed) {
+  // Real LLM evaluation succeeded
+  expect(evaluation.selectedSample.score).toBeGreaterThanOrEqual(80);
+} else {
+  // Fallback: Basic validation
+  expect(response.content.length).toBeGreaterThan(0);
 }
 ```
 

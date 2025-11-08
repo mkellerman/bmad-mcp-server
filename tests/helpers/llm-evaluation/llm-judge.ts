@@ -4,6 +4,7 @@
  * Executes judge LLM calls to evaluate test responses.
  */
 
+import OpenAI from 'openai';
 import type {
   MCPResponse,
   EvaluationCriteria,
@@ -34,6 +35,16 @@ interface JudgeResponse {
  */
 export class LLMJudge {
   private config = getEvaluationConfig();
+  private openai: OpenAI;
+
+  constructor() {
+    // Initialize OpenAI client
+    // Supports OpenAI and OpenAI-compatible endpoints (e.g., Azure, local models)
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || 'sk-dummy-key',
+      baseURL: process.env.OPENAI_BASE_URL, // Optional: for custom endpoints
+    });
+  }
 
   /**
    * Evaluate a response using judge LLM
@@ -117,7 +128,7 @@ export class LLMJudge {
   }
 
   /**
-   * Call judge LLM (placeholder - will use LiteLLM)
+   * Call judge LLM with retry logic
    */
   private async callJudgeLLM(
     prompt: string,
@@ -127,29 +138,85 @@ export class LLMJudge {
     inputTokens: number;
     outputTokens: number;
   }> {
-    // TODO: Integrate with LiteLLM
-    // Silence unused variable warnings - will be used when implemented
-    void prompt;
-    void config;
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-    // For now, throw to indicate not implemented
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Exponential backoff delay
+        if (attempt > 0) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+
+        const response = await this.openai.chat.completions.create({
+          model: config.model,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an expert evaluator. Respond with JSON only, no markdown formatting.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: config.temperature,
+          max_tokens: config.maxTokens,
+          response_format: { type: 'json_object' }, // Request JSON response
+        });
+
+        const text = response.choices[0]?.message?.content || '';
+        const inputTokens = response.usage?.prompt_tokens || 0;
+        const outputTokens = response.usage?.completion_tokens || 0;
+
+        if (!text) {
+          throw new Error('Empty response from judge LLM');
+        }
+
+        return {
+          text,
+          inputTokens,
+          outputTokens,
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if error is retryable
+        const isRetryable = this.isRetryableError(error);
+        if (!isRetryable || attempt === maxRetries - 1) {
+          break;
+        }
+
+        console.warn(
+          `Judge LLM call failed (attempt ${attempt + 1}/${maxRetries}): ${lastError.message}`,
+        );
+      }
+    }
+
     throw new Error(
-      'LLM judge not yet implemented - requires LiteLLM integration',
+      `Failed to call judge LLM after ${maxRetries} attempts: ${lastError?.message}`,
     );
+  }
 
-    // Future implementation:
-    // const response = await litellm.completion({
-    //   model: config.model,
-    //   messages: [{ role: 'user', content: prompt }],
-    //   temperature: config.temperature,
-    //   max_tokens: config.maxTokens,
-    // });
-    //
-    // return {
-    //   text: response.choices[0].message.content,
-    //   inputTokens: response.usage.prompt_tokens,
-    //   outputTokens: response.usage.completion_tokens,
-    // };
+  /**
+   * Check if an error is retryable
+   */
+  private isRetryableError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const message = error.message.toLowerCase();
+
+    // Retryable errors: rate limits, timeouts, temporary server issues
+    return (
+      message.includes('rate limit') ||
+      message.includes('timeout') ||
+      message.includes('503') ||
+      message.includes('502') ||
+      message.includes('500') ||
+      message.includes('connection') ||
+      message.includes('network')
+    );
   }
 
   /**
