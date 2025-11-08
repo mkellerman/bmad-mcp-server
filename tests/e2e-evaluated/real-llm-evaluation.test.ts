@@ -1,23 +1,55 @@
 /**
  * Real LLM Evaluation Test (Optional)
  *
- * Tests actual LLM-as-judge evaluation with real API calls.
- * Skipped if OPENAI_API_KEY is not set.
+ * Tests actual LLM-as-judge evaluation with real API calls via GitHub Copilot Proxy.
+ * Skipped if Copilot is not authenticated.
  *
- * To run: OPENAI_API_KEY=sk-... npm test -- real-llm-evaluation
+ * To authenticate: npx copilot-proxy --auth
+ * To run: npm test -- real-llm-evaluation
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { evaluateTest } from '../helpers/llm-evaluation';
 import { createRankingCriteria } from '../fixtures/evaluation-prompts';
 import type { MCPResponse } from '../helpers/llm-evaluation/types';
+import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check';
 
-// Skip if no API key
-const skipIfNoApiKey =
-  !process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'sk-dummy-key';
+// Check if Copilot Proxy is available
+async function checkCopilotAuth(): Promise<boolean> {
+  try {
+    const mod = await import('@hazeruno/copilot-proxy');
+    const { GitHubCopilotAuth } = mod as unknown as {
+      GitHubCopilotAuth: {
+        isAuthenticated: () => Promise<boolean>;
+      };
+    };
+    return await GitHubCopilotAuth.isAuthenticated();
+  } catch {
+    return false;
+  }
+}
 
-describe.skipIf(skipIfNoApiKey)('Real LLM Evaluation', () => {
+describe('Real LLM Evaluation', () => {
+  let shouldSkip = false;
+
+  beforeAll(async () => {
+    // Check both proxy availability and authentication
+    const available = await isCopilotProxyAvailable();
+    const authed = available ? await checkCopilotAuth() : false;
+
+    if (!available || !authed) {
+      shouldSkip = true;
+      console.log('\n⚠️  GitHub Copilot not available or not authenticated.');
+      console.log('   Skipping real LLM evaluation tests.');
+      console.log('   To enable: npx copilot-proxy --auth\n');
+    }
+  });
+
   it('🤖 Should evaluate response quality with real judge LLM', async () => {
+    if (shouldSkip) {
+      console.log('⏭️  Skipping test - Copilot not available');
+      return; // Skip test gracefully
+    }
     // Create a mock response that should score well
     const response: MCPResponse = {
       content: [
@@ -91,6 +123,10 @@ describe.skipIf(skipIfNoApiKey)('Real LLM Evaluation', () => {
   }, 30000); // 30 second timeout for API call
 
   it('🔍 Should handle malformed responses gracefully', async () => {
+    if (shouldSkip) {
+      console.log('⏭️  Skipping test - Copilot not available');
+      return; // Skip test gracefully
+    }
     // Create a response that's harder to evaluate
     const response: MCPResponse = {
       content: [
@@ -124,29 +160,4 @@ describe.skipIf(skipIfNoApiKey)('Real LLM Evaluation', () => {
       `   Result: ${result?.passed ? 'Passed' : 'Failed'} (${result?.selectedSample.score}/100)`,
     );
   }, 30000);
-});
-
-describe('Real LLM Evaluation (Skipped)', () => {
-  it.skipIf(!skipIfNoApiKey)('⚠️  Skipping - OPENAI_API_KEY not set', () => {
-    // This test runs only if API key IS set, to show the message
-    expect(true).toBe(true);
-  });
-
-  it.skipIf(skipIfNoApiKey)('ℹ️  Real LLM tests require API key', () => {
-    console.log('\n' + '═'.repeat(80));
-    console.log('⚠️  REAL LLM EVALUATION TESTS SKIPPED');
-    console.log('═'.repeat(80));
-    console.log('\nTo run these tests, set your OpenAI API key:');
-    console.log('   OPENAI_API_KEY=sk-... npm test -- real-llm-evaluation');
-    console.log('\nSupported providers:');
-    console.log('   • OpenAI (default)');
-    console.log('   • Azure OpenAI (set OPENAI_BASE_URL)');
-    console.log('   • OpenAI-compatible endpoints (set OPENAI_BASE_URL)');
-    console.log(
-      '\nNote: Real API calls will incur costs (~$0.01-0.05 per test)',
-    );
-    console.log('═'.repeat(80) + '\n');
-
-    expect(true).toBe(true);
-  });
 });

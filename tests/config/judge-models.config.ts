@@ -3,6 +3,19 @@
  *
  * Model definitions, costs, and budget limits for LLM-as-judge evaluation.
  * Used for cost tracking and budget enforcement.
+ *
+ * Uses GitHub Copilot Proxy for multi-provider support:
+ * - OpenAI (GPT-4o, GPT-5, O-series)
+ * - Anthropic (Claude Sonnet 4)
+ * - Google (Gemini 2.0, 2.5)
+ * - xAI (Grok)
+ *
+ * All models accessed through Copilot Plus subscription.
+ * No separate API keys required - authenticate with:
+ *   npx copilot-proxy --auth
+ *
+ * Note: Costs listed below are equivalent API costs for comparison.
+ * Actual usage is covered by Copilot subscription quota.
  */
 
 export interface ModelCost {
@@ -22,14 +35,106 @@ export interface BudgetLimits {
 /**
  * Judge model costs (as of November 2025)
  * Costs are per 1,000 tokens
+ *
+ * COPILOT PROXY MODELS (via GitHub Copilot Plus subscription)
  */
 export const JUDGE_MODEL_COSTS: Record<string, ModelCost> = {
+  // === OpenAI Models (via Copilot) ===
+
+  // GPT-4o - Latest GPT-4 optimized model
+  'gpt-4o': {
+    inputCost: 0.0025,
+    outputCost: 0.01,
+    displayName: 'GPT-4o (Copilot)',
+    recommended: true,
+  },
+
+  // GPT-4.1 - Newer GPT-4 variant
+  'gpt-4.1': {
+    inputCost: 0.003,
+    outputCost: 0.012,
+    displayName: 'GPT-4.1 (Copilot)',
+    recommended: true,
+  },
+
+  // GPT-5 - Next generation model
+  'gpt-5': {
+    inputCost: 0.005,
+    outputCost: 0.02,
+    displayName: 'GPT-5 (Copilot)',
+    recommended: true,
+  },
+
+  // GPT-5 Mini - Faster, cheaper GPT-5
+  'gpt-5-mini': {
+    inputCost: 0.001,
+    outputCost: 0.004,
+    displayName: 'GPT-5 Mini (Copilot)',
+    recommended: true,
+  },
+
+  // O4 Mini - Reasoning-optimized model
+  'o4-mini': {
+    inputCost: 0.002,
+    outputCost: 0.008,
+    displayName: 'O4 Mini (Copilot)',
+    recommended: false,
+  },
+
+  // O3 Mini - Earlier reasoning model
+  'o3-mini': {
+    inputCost: 0.0015,
+    outputCost: 0.006,
+    displayName: 'O3 Mini (Copilot)',
+    recommended: false,
+  },
+
+  // === Anthropic Models (via Copilot) ===
+
+  // Claude Sonnet 4 - Latest Claude model
+  'claude-sonnet-4': {
+    inputCost: 0.003,
+    outputCost: 0.015,
+    displayName: 'Claude Sonnet 4 (Copilot)',
+    recommended: true,
+  },
+
+  // === Google Models (via Copilot) ===
+
+  // Gemini 2.0 Flash - Fast Gemini model
+  'gemini-2.0-flash-001': {
+    inputCost: 0.0001,
+    outputCost: 0.0004,
+    displayName: 'Gemini 2.0 Flash (Copilot)',
+    recommended: true,
+  },
+
+  // Gemini 2.5 Pro - Advanced Gemini model
+  'gemini-2.5-pro': {
+    inputCost: 0.00125,
+    outputCost: 0.005,
+    displayName: 'Gemini 2.5 Pro (Copilot)',
+    recommended: true,
+  },
+
+  // === xAI Models (via Copilot) ===
+
+  // Grok Code Fast - Coding-optimized model
+  'grok-code-fast-1': {
+    inputCost: 0.0005,
+    outputCost: 0.002,
+    displayName: 'Grok Code Fast (Copilot)',
+    recommended: false,
+  },
+
+  // === Legacy Models (for reference/comparison) ===
+
   // GPT-4 Turbo - High quality, moderate cost
   'gpt-4-turbo-preview': {
     inputCost: 0.01,
     outputCost: 0.03,
     displayName: 'GPT-4 Turbo',
-    recommended: true,
+    recommended: false,
   },
 
   // GPT-4 - Highest quality, highest cost
@@ -53,7 +158,7 @@ export const JUDGE_MODEL_COSTS: Record<string, ModelCost> = {
     inputCost: 0.003,
     outputCost: 0.015,
     displayName: 'Claude 3.5 Sonnet',
-    recommended: true,
+    recommended: false,
   },
 
   // Claude 3 Opus - Highest quality, high cost
@@ -70,6 +175,22 @@ export const JUDGE_MODEL_COSTS: Record<string, ModelCost> = {
     outputCost: 0.00125,
     displayName: 'Claude 3 Haiku',
     recommended: false, // Use as fallback only
+  },
+
+  // Gemini Pro - Google's competitive offering
+  'gemini-pro': {
+    inputCost: 0.000125,
+    outputCost: 0.000375,
+    displayName: 'Gemini Pro',
+    recommended: false, // Cheaper but needs validation
+  },
+
+  // Gemini 1.5 Pro - Latest Google model
+  'gemini-1.5-pro': {
+    inputCost: 0.00125,
+    outputCost: 0.005,
+    displayName: 'Gemini 1.5 Pro',
+    recommended: false,
   },
 };
 

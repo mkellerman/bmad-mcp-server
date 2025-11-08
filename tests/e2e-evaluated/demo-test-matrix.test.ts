@@ -7,7 +7,7 @@
  * Run with: npm test -- demo-test-matrix
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import {
   TestMatrix,
   JUDGE_MODELS,
@@ -16,8 +16,18 @@ import {
 import type { MCPResponse } from '../helpers/llm-evaluation/types';
 import { createRankingCriteria } from '../fixtures/evaluation-prompts';
 import { LLMJudge } from '../helpers/llm-evaluation/llm-judge';
+import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check';
 
 describe('DEMO: Test Matrix - Multi-Judge Comparison', () => {
+  beforeAll(async () => {
+    const available = await isCopilotProxyAvailable();
+    if (!available) {
+      console.log(
+        '\n⚠️  Copilot Proxy not available - tests will use mocked responses',
+      );
+      console.log('   For real LLM evaluation: npx copilot-proxy --auth\n');
+    }
+  });
   it('📊 Should compare evaluation across GPT-4, Claude, and GPT-3.5', async () => {
     // Mock different judge responses to simulate model variation
     const mockResponses: Record<string, any> = {
@@ -25,43 +35,73 @@ describe('DEMO: Test Matrix - Multi-Judge Comparison', () => {
         score: 92,
         reasoning:
           'GPT-4: Excellent ranking with strong domain focus. UX workflows properly prioritized.',
-        checkpoints: {
-          'create-ux-design workflow appears in top 5': {
+        checkpoints: [
+          {
+            criterion: 'create-ux-design workflow appears in top 5',
             score: 100,
             evidence: 'Found at position 1',
           },
-          'product-brief workflow appears in top 5': {
+          {
+            criterion: 'product-brief workflow appears in top 5',
             score: 100,
             evidence: 'Found at position 2',
           },
-          'Response prioritizes UI/UX workflows': { score: 95 },
-          'No irrelevant workflows in top 3': { score: 100 },
-        },
+          {
+            criterion: 'Response prioritizes UI/UX workflows',
+            score: 95,
+          },
+          {
+            criterion: 'No irrelevant workflows in top 3',
+            score: 100,
+          },
+        ],
       },
       'claude-3-5-sonnet-20241022': {
         score: 88,
         reasoning:
           'Claude: Good ranking overall. Minor concern about position 4 workflow relevance.',
-        checkpoints: {
-          'create-ux-design workflow appears in top 5': {
+        checkpoints: [
+          {
+            criterion: 'create-ux-design workflow appears in top 5',
             score: 100,
             evidence: 'Present at top',
           },
-          'product-brief workflow appears in top 5': { score: 95 },
-          'Response prioritizes UI/UX workflows': { score: 85 },
-          'No irrelevant workflows in top 3': { score: 90 },
-        },
+          {
+            criterion: 'product-brief workflow appears in top 5',
+            score: 95,
+          },
+          {
+            criterion: 'Response prioritizes UI/UX workflows',
+            score: 85,
+          },
+          {
+            criterion: 'No irrelevant workflows in top 3',
+            score: 90,
+          },
+        ],
       },
       'gpt-3.5-turbo': {
         score: 78,
         reasoning:
           'GPT-3.5: Acceptable ranking but less nuanced analysis. Some workflows could be better ordered.',
-        checkpoints: {
-          'create-ux-design workflow appears in top 5': { score: 90 },
-          'product-brief workflow appears in top 5': { score: 85 },
-          'Response prioritizes UI/UX workflows': { score: 70 },
-          'No irrelevant workflows in top 3': { score: 75 },
-        },
+        checkpoints: [
+          {
+            criterion: 'create-ux-design workflow appears in top 5',
+            score: 90,
+          },
+          {
+            criterion: 'product-brief workflow appears in top 5',
+            score: 85,
+          },
+          {
+            criterion: 'Response prioritizes UI/UX workflows',
+            score: 70,
+          },
+          {
+            criterion: 'No irrelevant workflows in top 3',
+            score: 75,
+          },
+        ],
       },
     };
 
@@ -77,7 +117,11 @@ describe('DEMO: Test Matrix - Multi-Judge Comparison', () => {
       judgeCallHistory.push(model);
 
       const response = mockResponses[model] || mockResponses['gpt-3.5-turbo'];
-      return JSON.stringify(response);
+      return {
+        text: JSON.stringify(response),
+        inputTokens: 500,
+        outputTokens: 150,
+      };
     });
 
     try {

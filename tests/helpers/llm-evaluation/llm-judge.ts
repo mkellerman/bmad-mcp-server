@@ -1,7 +1,9 @@
 /**
  * LLM Judge - Core Evaluation Engine
  *
- * Executes judge LLM calls to evaluate test responses.
+ * Executes judge LLM calls to evaluate test responses using GitHub Copilot Proxy.
+ * Provides access to multiple models (OpenAI, Claude, Gemini, Grok) through
+ * a single Copilot Plus subscription via OpenAI-compatible API.
  */
 
 import OpenAI from 'openai';
@@ -35,14 +37,14 @@ interface JudgeResponse {
  */
 export class LLMJudge {
   private config = getEvaluationConfig();
-  private openai: OpenAI;
+  private client: OpenAI;
 
   constructor() {
-    // Initialize OpenAI client
-    // Supports OpenAI and OpenAI-compatible endpoints (e.g., Azure, local models)
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || 'sk-dummy-key',
-      baseURL: process.env.OPENAI_BASE_URL, // Optional: for custom endpoints
+    // Initialize OpenAI client pointing to Copilot Proxy
+    // Uses OpenAI-compatible API at localhost:8069
+    this.client = new OpenAI({
+      baseURL: process.env.COPILOT_PROXY_URL || 'http://127.0.0.1:8069/v1',
+      apiKey: 'copilot-proxy', // Dummy key - not used by proxy
     });
   }
 
@@ -128,7 +130,7 @@ export class LLMJudge {
   }
 
   /**
-   * Call judge LLM with retry logic
+   * Call judge LLM with retry logic using Copilot Proxy
    */
   private async callJudgeLLM(
     prompt: string,
@@ -138,6 +140,15 @@ export class LLMJudge {
     inputTokens: number;
     outputTokens: number;
   }> {
+    // First, check if Copilot Proxy is available
+    const proxyAvailable = await this.checkCopilotProxyAvailable();
+    if (!proxyAvailable) {
+      throw new Error(
+        'Copilot Proxy is not running or not authenticated. ' +
+          'Run: npx copilot-proxy --auth',
+      );
+    }
+
     const maxRetries = 3;
     let lastError: Error | null = null;
 
@@ -149,19 +160,19 @@ export class LLMJudge {
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
 
-        const response = await this.openai.chat.completions.create({
+        // Use OpenAI SDK to call Copilot Proxy
+        const response = await this.client.chat.completions.create({
           model: config.model,
           messages: [
             {
               role: 'system',
               content:
-                'You are an expert evaluator. Respond with JSON only, no markdown formatting.',
+                'You are an expert evaluator. Respond with ONLY valid JSON, no markdown code blocks or formatting.',
             },
             { role: 'user', content: prompt },
           ],
           temperature: config.temperature,
           max_tokens: config.maxTokens,
-          response_format: { type: 'json_object' }, // Request JSON response
         });
 
         const text = response.choices[0]?.message?.content || '';
@@ -195,6 +206,22 @@ export class LLMJudge {
     throw new Error(
       `Failed to call judge LLM after ${maxRetries} attempts: ${lastError?.message}`,
     );
+  }
+
+  /**
+   * Check if Copilot Proxy is available
+   */
+  private async checkCopilotProxyAvailable(): Promise<boolean> {
+    try {
+      const baseURL = process.env.COPILOT_PROXY_URL || 'http://127.0.0.1:8069';
+      const response = await fetch(`${baseURL}/v1/models`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   /**

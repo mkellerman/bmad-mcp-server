@@ -119,8 +119,8 @@ export interface MonitoringConfig {
 export const LLM_EVALUATION_CONFIG: LLMEvaluationConfig = {
   // Judge Configuration
   judge: {
-    defaultModel: 'gpt-4-turbo-preview',
-    fallbackModel: 'gpt-3.5-turbo',
+    defaultModel: 'gpt-4o', // Copilot Proxy default model
+    fallbackModel: 'gpt-5-mini', // Faster fallback via Copilot
     temperature: 0.0, // Consistent scoring
     maxTokens: 1000,
     timeout: 30000, // 30 seconds

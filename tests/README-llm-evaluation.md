@@ -1,36 +1,52 @@
 # LLM Evaluation Framework
 
-Dual-LLM testing framework for evaluating AI response quality using a judge LLM with real API calls.
+Dual-LLM testing framework for evaluating AI response quality using a judge LLM with real API calls via LiteLLM.
 
 ## Overview
 
 This framework enables behavioral quality testing where:
 
 1. **Subject LLM** generates a response (e.g., BMAD ranks workflows)
-2. **Judge LLM** evaluates the response quality against defined criteria via OpenAI API
+2. **Judge LLM** evaluates the response quality against defined criteria via LiteLLM
 3. **Test passes/fails** based on judge's score
+
+**Multi-Provider Support:** Uses [LiteLLM](https://github.com/BerriAI/litellm) for unified access to 100+ LLM providers including OpenAI, Anthropic, Google, Azure, and more.
 
 ## Setup
 
 ### API Keys
 
-Set your OpenAI API key:
+LiteLLM supports multiple providers. Set the appropriate API key for your chosen models:
 
 ```bash
+# OpenAI (GPT-4, GPT-3.5, ChatGPT)
 export OPENAI_API_KEY=sk-...
+
+# Anthropic (Claude)
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Google (Gemini)
+export GEMINI_API_KEY=...
+
+# Azure OpenAI
+export AZURE_API_KEY=...
+export AZURE_API_BASE=https://...
+export AZURE_API_VERSION=...
 ```
 
-For other providers:
+### Browser-Based Subscriptions
+
+LiteLLM can also use your existing ChatGPT Plus or Claude Pro subscriptions via browser cookies:
 
 ```bash
-# Azure OpenAI
-export OPENAI_API_KEY=your-azure-key
-export OPENAI_BASE_URL=https://your-resource.openai.azure.com/
+# Use ChatGPT Plus subscription
+export CHATGPT_COOKIE="your-cookie-here"
 
-# OpenAI-compatible endpoint (e.g., local model)
-export OPENAI_API_KEY=any-key
-export OPENAI_BASE_URL=http://localhost:8000/v1
+# Use Claude Pro subscription
+export CLAUDE_COOKIE="your-cookie-here"
 ```
+
+See [LiteLLM docs](https://docs.litellm.ai/) for cookie extraction instructions.
 
 ### Cost Management
 
@@ -40,7 +56,17 @@ Real LLM calls incur costs. The framework includes:
 - **Automatic cost tracking** per evaluation
 - **Cost summaries** after test runs
 
-Tests are skipped if `OPENAI_API_KEY` is not set.
+Tests are skipped if required API keys are not set.
+
+### Supported Models
+
+Via LiteLLM, you can use:
+
+- **OpenAI**: GPT-4 Turbo, GPT-3.5 Turbo, ChatGPT Plus (via cookies)
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku, Claude Pro (via cookies)
+- **Google**: Gemini Pro, Gemini 1.5 Pro
+- **Azure**: Azure OpenAI models
+- **100+ other providers**: See [LiteLLM providers](https://docs.litellm.ai/docs/providers)
 
 ## Quick Start
 

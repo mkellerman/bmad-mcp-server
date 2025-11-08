@@ -17,23 +17,39 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { BMADEngine } from '../../src/core/bmad-engine';
+import { BMADEngine } from '../../src/core/bmad-engine.js';
 import {
   evaluateTest,
   getEvaluationCostSummary,
-} from '../helpers/llm-evaluation';
-import { createRankingCriteria } from '../fixtures/evaluation-prompts';
+} from '../helpers/llm-evaluation/index.js';
+import { createRankingCriteria } from '../fixtures/evaluation-prompts/index.js';
+import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check.js';
 
 describe('LLM-Evaluated: Workflow Ranking Quality', () => {
   let engine: BMADEngine;
+  let shouldSkip = false;
 
   beforeAll(async () => {
+    // Check if Copilot Proxy is available
+    const available = await isCopilotProxyAvailable();
+    if (!available) {
+      shouldSkip = true;
+      console.log(
+        '\n⚠️  Copilot Proxy not available - skipping LLM evaluation tests',
+      );
+      console.log('   To enable: npx copilot-proxy --auth\n');
+    }
+
     engine = new BMADEngine();
     await engine.initialize();
   });
 
   describe('Mobile App Development Query', () => {
     it('should rank UX/UI workflows highly for mobile app query', async () => {
+      if (shouldSkip) {
+        console.log('⏭️  Skipping test - Copilot Proxy not available');
+        return;
+      }
       // Query that should prioritize UX/design workflows
       const query = 'Help me design a mobile app';
 
@@ -143,6 +159,10 @@ describe('LLM-Evaluated: Workflow Ranking Quality', () => {
     });
 
     it('should rank technical workflows highly for architecture query', async () => {
+      if (shouldSkip) {
+        console.log('⏭️  Skipping test - Copilot Proxy not available');
+        return;
+      }
       const query = 'Design system architecture for a web application';
 
       const result = await engine.listWorkflows();

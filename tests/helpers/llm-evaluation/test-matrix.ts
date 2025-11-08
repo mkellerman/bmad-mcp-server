@@ -302,4 +302,5 @@ export const JUDGE_MODELS = {
   CLAUDE_3_OPUS: { model: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
   CLAUDE_3_HAIKU: { model: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
   GEMINI_PRO: { model: 'gemini-pro', name: 'Gemini Pro' },
+  GEMINI_15_PRO: { model: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
 } as const;
