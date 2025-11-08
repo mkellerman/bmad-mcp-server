@@ -23,6 +23,7 @@ import {
   getAgentExecutionPrompt,
   getWorkflowExecutionPrompt,
 } from '../config.js';
+import { SessionTracker } from './session-tracker.js';
 
 // ============================================================================
 // Core Types (Transport-Agnostic)
@@ -184,6 +185,9 @@ export class BMADEngine {
   private cachedResources: Array<{ uri: string; relativePath: string }> = [];
   private initialized = false;
 
+  /** Session-based usage tracker for intelligent ranking */
+  private sessionTracker: SessionTracker;
+
   /**
    * Creates a new BMAD Engine instance
    *
@@ -197,6 +201,7 @@ export class BMADEngine {
     discoveryMode?: DiscoveryMode,
   ) {
     this.loader = new ResourceLoaderGit(projectRoot, gitRemotes, discoveryMode);
+    this.sessionTracker = new SessionTracker();
   }
 
   /**
@@ -231,6 +236,31 @@ export class BMADEngine {
   }
 
   // ============================================================================
+  // RANKING HELPERS (Session-based Intelligence)
+  // ============================================================================
+
+  /**
+   * Rank items by usage patterns, manifest priority, and module boost
+   *
+   * @param items Array of items to rank (agents, workflows, or matches)
+   * @param keyExtractor Function to extract composite key from item (e.g., "core:debug")
+   * @returns Ranked array (highest score first)
+   */
+  private rankByUsage<T>(items: T[], keyExtractor: (item: T) => string): T[] {
+    return items
+      .map((item, index) => ({
+        item,
+        score: this.sessionTracker.calculateScore(
+          keyExtractor(item),
+          index, // Manifest position
+          items.length,
+        ),
+      }))
+      .sort((a, b) => b.score - a.score) // Descending order
+      .map((ranked) => ranked.item);
+  }
+
+  // ============================================================================
   // LIST OPERATIONS (Discovery)
   // ============================================================================
 
@@ -247,7 +277,13 @@ export class BMADEngine {
       agents = agents.filter((a) => a.module === filter.module);
     }
 
-    const agentList = agents.map((a) => ({
+    // Rank agents by usage patterns
+    const rankedAgents = this.rankByUsage(
+      agents,
+      (a) => `${a.module}:${a.name}`,
+    );
+
+    const agentList = rankedAgents.map((a) => ({
       name: a.name,
       module: a.module,
       displayName: a.displayName,
@@ -316,13 +352,18 @@ export class BMADEngine {
       }
     }
 
-    const workflowList = Array.from(workflowMap.values());
+    // Convert to array and rank by usage
+    const workflows = Array.from(workflowMap.values());
+    const rankedWorkflows = this.rankByUsage(
+      workflows,
+      (w) => `${w.module || 'core'}:${w.name}`,
+    );
 
-    const text = this.formatWorkflowList(workflowList);
+    const text = this.formatWorkflowList(rankedWorkflows);
 
     return {
       success: true,
-      data: workflowList,
+      data: rankedWorkflows,
       text,
     };
   }
@@ -603,13 +644,16 @@ export class BMADEngine {
           };
         });
 
+        // Rank matches by usage patterns
+        const rankedMatches = this.rankByUsage(matches, (m) => m.key);
+
         // Return ambiguous result
         return {
           success: true,
           ambiguous: true,
           type: 'agent',
-          matches,
-          text: this.formatAmbiguousAgentResponse(matches),
+          matches: rankedMatches,
+          text: this.formatAmbiguousAgentResponse(rankedMatches),
         };
       }
 
@@ -629,6 +673,10 @@ export class BMADEngine {
         agent: params.agent,
         userContext: params.message,
       };
+
+      // Track agent usage for ranking
+      const module = selectedAgent.module || 'core';
+      this.sessionTracker.recordUsage(`${module}:${params.agent}`);
 
       // Build the prompt with just agent name and instructions
       const text = getAgentExecutionPrompt(executionContext);
@@ -692,6 +740,11 @@ export class BMADEngine {
           agentWorkflowHandler: undefined,
         };
 
+        // Track workflow usage for ranking
+        this.sessionTracker.recordUsage(
+          `${standaloneWorkflow.module}:${params.workflow}`,
+        );
+
         const text = getWorkflowExecutionPrompt(executionContext);
 
         return {
@@ -733,13 +786,16 @@ export class BMADEngine {
           };
         });
 
+        // Rank matches by usage patterns
+        const rankedMatches = this.rankByUsage(matches, (m) => m.key);
+
         // Return ambiguous result
         return {
           success: true,
           ambiguous: true,
           type: 'workflow',
-          matches,
-          text: this.formatAmbiguousWorkflowResponse(matches),
+          matches: rankedMatches,
+          text: this.formatAmbiguousWorkflowResponse(rankedMatches),
         };
       }
 
@@ -777,6 +833,13 @@ export class BMADEngine {
         agent: agentForWorkflow?.name,
         agentWorkflowHandler: agentForWorkflow?.workflowHandlerInstructions,
       };
+
+      // Track workflow and agent usage for ranking
+      const module = agentForWorkflow?.module || 'core';
+      this.sessionTracker.recordUsage(`${module}:${params.workflow}`);
+      if (agentForWorkflow) {
+        this.sessionTracker.recordUsage(`${module}:${agentForWorkflow.name}`);
+      }
 
       // Build the prompt with just agent metadata and handler
       const text = getWorkflowExecutionPrompt(executionContext);
