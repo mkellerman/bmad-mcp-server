@@ -6,10 +6,12 @@
  * - Recency: Most recently used items rank higher
  * - Frequency: Most frequently used items rank higher
  * - Manifest priority: Author-defined ordering
- * - Module boost: Core module gets initial advantage
+ * - Module/Agent boosts: Configurable priority for key modules and agents
  *
  * All data is in-memory and session-scoped (no persistence).
  */
+
+import { RANKING_CONFIG } from '../config.js';
 
 /**
  * Usage record for a single item (agent/workflow/module)
@@ -35,18 +37,36 @@ export interface RankingWeights {
   frequency: number;
   /** Weight for manifest priority (0-1) */
   manifestPriority: number;
-  /** Boost for core module on new sessions (added to final score) */
-  coreModuleBoost: number;
+}
+
+/**
+ * Module and agent boost configuration
+ */
+export interface BoostConfig {
+  /** Module-level boosts (e.g., { core: 0.1, bmm: 0.05 }) */
+  moduleBoosts: Record<string, number>;
+  /** Agent-level boosts (e.g., { 'bmm:analyst': 0.08 }) */
+  agentBoosts: Record<string, number>;
+}
+
+/**
+ * Complete ranking configuration
+ */
+export interface RankingConfig {
+  weights: RankingWeights;
+  boosts: BoostConfig;
+  recencyHalfLifeMs: number;
+  maxAccessCount: number;
 }
 
 /**
  * Default ranking weights (tuned for optimal UX)
+ * @deprecated Use RANKING_CONFIG from config.ts instead
  */
 export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
-  recency: 0.4, // Recent usage is strong signal
-  frequency: 0.3, // Frequency matters but less than recency
-  manifestPriority: 0.2, // Author intent counts
-  coreModuleBoost: 0.1, // Modest boost for core on fresh sessions
+  recency: RANKING_CONFIG.weights.recency,
+  frequency: RANKING_CONFIG.weights.frequency,
+  manifestPriority: RANKING_CONFIG.weights.manifestPriority,
 };
 
 /**
@@ -59,12 +79,24 @@ export class SessionTracker {
   /** Session start time (for recency decay) */
   private sessionStart: number;
 
-  /** Ranking weights configuration */
-  private weights: RankingWeights;
+  /** Ranking configuration */
+  private config: RankingConfig;
 
-  constructor(weights: RankingWeights = DEFAULT_RANKING_WEIGHTS) {
+  constructor(config?: Partial<RankingConfig>) {
     this.sessionStart = Date.now();
-    this.weights = weights;
+
+    // Merge with defaults from RANKING_CONFIG
+    this.config = {
+      weights: config?.weights || RANKING_CONFIG.weights,
+      boosts: config?.boosts || {
+        moduleBoosts: RANKING_CONFIG.moduleBoosts,
+        agentBoosts: RANKING_CONFIG.agentBoosts,
+      },
+      recencyHalfLifeMs:
+        config?.recencyHalfLifeMs || RANKING_CONFIG.recency.halfLifeMs,
+      maxAccessCount:
+        config?.maxAccessCount || RANKING_CONFIG.frequency.maxAccessCount,
+    };
   }
 
   /**
@@ -116,9 +148,9 @@ export class SessionTracker {
    * 1. Recency: Exponential decay from last access (0-1)
    * 2. Frequency: Log-scaled usage count (0-1)
    * 3. Manifest priority: Position in manifest (0-1, higher = earlier)
-   * 4. Module boost: +boost if module=core and no prior usage
+   * 4. Module/Agent boosts: Configurable priority for key items (no usage only)
    *
-   * @param key Composite key (e.g., "core:debug")
+   * @param key Composite key (e.g., "core:debug", "bmm:analyst")
    * @param manifestIndex Index in manifest (0 = first/highest priority)
    * @param totalManifestItems Total items in manifest
    * @returns Weighted ranking score (higher = better)
@@ -138,8 +170,9 @@ export class SessionTracker {
     let recencyScore = 0;
     if (usage) {
       const timeSinceLastAccess = now - usage.lastAccess;
-      const halfLifeMs = 15 * 60 * 1000; // 15 minutes
-      recencyScore = Math.exp(-timeSinceLastAccess / halfLifeMs);
+      recencyScore = Math.exp(
+        -timeSinceLastAccess / this.config.recencyHalfLifeMs,
+      );
     }
 
     // 2. Frequency score (log-scaled)
@@ -149,8 +182,9 @@ export class SessionTracker {
     // - 100+ accesses: ~1.0
     let frequencyScore = 0;
     if (usage) {
-      // Log scale: log2(count + 1) / log2(101) ≈ 0-1 for count 0-100
-      frequencyScore = Math.log2(usage.count + 1) / Math.log2(101);
+      // Log scale: log2(count + 1) / log2(maxAccessCount) ≈ 0-1
+      frequencyScore =
+        Math.log2(usage.count + 1) / Math.log2(this.config.maxAccessCount);
       frequencyScore = Math.min(frequencyScore, 1.0); // Cap at 1.0
     }
 
@@ -163,17 +197,27 @@ export class SessionTracker {
         ? 1 - manifestIndex / (totalManifestItems - 1)
         : 1.0;
 
-    // 4. Core module boost (only if module is 'core' and no usage)
-    const module = key.split(':')[0];
-    const coreBoost =
-      module === 'core' && !usage ? this.weights.coreModuleBoost : 0;
+    // 4. Module/Agent boosts (only if no prior usage)
+    let boost = 0;
+    if (!usage) {
+      // Check agent-level boost first (more specific)
+      if (this.config.boosts.agentBoosts[key] !== undefined) {
+        boost = this.config.boosts.agentBoosts[key];
+      } else {
+        // Fall back to module-level boost
+        const module = key.split(':')[0];
+        if (this.config.boosts.moduleBoosts[module] !== undefined) {
+          boost = this.config.boosts.moduleBoosts[module];
+        }
+      }
+    }
 
     // Weighted sum
     const score =
-      this.weights.recency * recencyScore +
-      this.weights.frequency * frequencyScore +
-      this.weights.manifestPriority * manifestPriorityScore +
-      coreBoost;
+      this.config.weights.recency * recencyScore +
+      this.config.weights.frequency * frequencyScore +
+      this.config.weights.manifestPriority * manifestPriorityScore +
+      boost;
 
     return score;
   }

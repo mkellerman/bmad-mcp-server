@@ -3,10 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  SessionTracker,
-  DEFAULT_RANKING_WEIGHTS,
-} from '../../../src/core/session-tracker.js';
+import { SessionTracker } from '../../../src/core/session-tracker.js';
 
 describe('SessionTracker', () => {
   let tracker: SessionTracker;
@@ -151,24 +148,35 @@ describe('SessionTracker', () => {
     });
   });
 
-  describe('Core Module Boost', () => {
+  describe('Module and Agent Boosts', () => {
     it('should boost core module items on fresh session', () => {
       const coreScore = tracker.calculateScore('core:debug', 0, 2);
-      const bmmScore = tracker.calculateScore('bmm:architect', 0, 2);
+      const cisScore = tracker.calculateScore('cis:innovator', 0, 2);
 
-      expect(coreScore).toBeGreaterThan(bmmScore);
+      // core:debug gets 0.05 agent boost, cis:innovator gets 0.0
+      expect(coreScore).toBeGreaterThan(cisScore);
     });
 
-    it('should NOT boost core after usage', () => {
-      // Access both items
+    it('should boost analyst and pm agents higher than core module', () => {
+      const analystScore = tracker.calculateScore('bmm:analyst', 0, 3);
+      const pmScore = tracker.calculateScore('bmm:pm', 0, 3);
+      const coreDebugScore = tracker.calculateScore('core:debug', 0, 3);
+
+      // analyst and pm get 0.08 boost, core:debug gets 0.05
+      expect(analystScore).toBeGreaterThan(coreDebugScore);
+      expect(pmScore).toBeGreaterThan(coreDebugScore);
+    });
+
+    it('should NOT boost after usage', () => {
+      // Access items
       tracker.recordUsage('core:debug');
-      tracker.recordUsage('bmm:architect');
+      tracker.recordUsage('cis:innovator');
 
       const coreScore = tracker.calculateScore('core:debug', 0, 2);
-      const bmmScore = tracker.calculateScore('bmm:architect', 0, 2);
+      const cisScore = tracker.calculateScore('cis:innovator', 0, 2);
 
       // No boost advantage anymore (scores driven by usage)
-      expect(Math.abs(coreScore - bmmScore)).toBeLessThan(0.2);
+      expect(Math.abs(coreScore - cisScore)).toBeLessThan(0.2);
     });
   });
 
@@ -176,10 +184,15 @@ describe('SessionTracker', () => {
     it('should balance all signals appropriately', async () => {
       // Use custom weights that favor recency+frequency over manifest
       const testTracker = new SessionTracker({
-        recency: 0.5,
-        frequency: 0.4,
-        manifestPriority: 0.05,
-        coreModuleBoost: 0.05,
+        weights: {
+          recency: 0.5,
+          frequency: 0.4,
+          manifestPriority: 0.05,
+        },
+        boosts: {
+          moduleBoosts: {},
+          agentBoosts: {},
+        },
       });
 
       // Setup:
@@ -217,10 +230,15 @@ describe('SessionTracker', () => {
     it('should respect custom weight configuration', () => {
       // Create tracker that heavily favors recency
       const customTracker = new SessionTracker({
-        recency: 0.8,
-        frequency: 0.1,
-        manifestPriority: 0.05,
-        coreModuleBoost: 0.05,
+        weights: {
+          recency: 0.8,
+          frequency: 0.1,
+          manifestPriority: 0.05,
+        },
+        boosts: {
+          moduleBoosts: {},
+          agentBoosts: {},
+        },
       });
 
       customTracker.recordUsage('recent-item');
@@ -296,17 +314,26 @@ describe('SessionTracker', () => {
   });
 
   describe('Default Weights', () => {
-    it('should use sensible default weights', () => {
-      expect(DEFAULT_RANKING_WEIGHTS.recency).toBe(0.4);
-      expect(DEFAULT_RANKING_WEIGHTS.frequency).toBe(0.3);
-      expect(DEFAULT_RANKING_WEIGHTS.manifestPriority).toBe(0.2);
-      expect(DEFAULT_RANKING_WEIGHTS.coreModuleBoost).toBe(0.1);
+    it('should use sensible default weights from config', async () => {
+      const { RANKING_CONFIG } = await import('../../../src/config.js');
 
-      // Weights should sum to 1.0 (excluding boost)
+      expect(RANKING_CONFIG.weights.recency).toBe(0.4);
+      expect(RANKING_CONFIG.weights.frequency).toBe(0.3);
+      expect(RANKING_CONFIG.weights.manifestPriority).toBe(0.2);
+
+      // Module boosts should exist
+      expect(RANKING_CONFIG.moduleBoosts.core).toBe(0.1);
+      expect(RANKING_CONFIG.moduleBoosts.bmm).toBe(0.05);
+
+      // Agent boosts should exist for key agents
+      expect(RANKING_CONFIG.agentBoosts['bmm:analyst']).toBe(0.08);
+      expect(RANKING_CONFIG.agentBoosts['bmm:pm']).toBe(0.08);
+
+      // Weights should sum to 0.9
       const sum =
-        DEFAULT_RANKING_WEIGHTS.recency +
-        DEFAULT_RANKING_WEIGHTS.frequency +
-        DEFAULT_RANKING_WEIGHTS.manifestPriority;
+        RANKING_CONFIG.weights.recency +
+        RANKING_CONFIG.weights.frequency +
+        RANKING_CONFIG.weights.manifestPriority;
       expect(sum).toBeCloseTo(0.9, 5);
     });
   });

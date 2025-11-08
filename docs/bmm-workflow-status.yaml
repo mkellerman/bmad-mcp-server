@@ -50,12 +50,15 @@ workflow_status:
   phase-1:
     tech-spec:
       status: 'in-progress'
-      note: 'Feature largely implemented (20 commits), need to formalize tech spec'
+      note: 'MCP optimizer feature implementation with session-based ranking complete, now adding LLM-powered sampling'
       artifacts:
         - 'bmad/agents/mcp-sdk-optimizer.md'
         - 'bmad/agents/mcp-sdk-optimizer-sidecar/'
         - 'docs/cli-testing-guide.md'
         - 'docs/bmad-system-diagnostic-report.md'
+        - 'docs/session-based-ranking.md'
+        - 'src/config.ts (RANKING_CONFIG)'
+        - 'src/core/session-tracker.ts'
       implemented:
         - 'Response shaping utility'
         - 'Metrics & instrumentation system'
@@ -63,6 +66,18 @@ workflow_status:
         - 'BMAD CLI tool with discovery modes'
         - 'Ambiguous response handling'
         - 'Performance tracking (p99 latency, adherence scoring)'
+        - 'Session-based intelligent ranking (4 signals: recency, frequency, manifest, boosts)'
+        - 'Centralized ranking configuration with agent/module priority boosts'
+        - 'Optimized ambiguous responses (52.3% token reduction)'
+      in-progress:
+        - 'MCP sampling API integration for LLM-powered ranking'
+      planned:
+        - 'Client capability detection (sampling support)'
+        - 'Hybrid ranking strategy (LLM when available, session-based fallback)'
+        - 'Tool description lazy loading (75-80% token reduction)'
+        - 'List operations format optimization'
+        - 'Read operations optimization'
+        - 'Error response optimization with fuzzy matching'
 
   # ============================================================================
   # PHASE 2: Implementation
@@ -77,19 +92,23 @@ workflow_status:
 # ============================================================================
 current_phase: 'phase-1'
 current_workflow: 'tech-spec'
+current_task: 'sampling-integration'
 next_action: |
-  Formalize the technical specification for MCP optimizer feature to document:
-  - Response shaping architecture and patterns
-  - Metrics collection and analysis approach
-  - Integration points with existing MCP server
-  - Testing strategy and acceptance criteria
-  - Remaining work items before merge to main
+  Implement MCP sampling API integration for LLM-powered ranking:
+  1. Detect client capability (sampling support varies: VS Code ✅, Claude Desktop ❌)
+  2. Design LLM ranking prompts (token-efficient, context-aware)
+  3. Implement hybrid ranking (LLM when available, session-based fallback)
+  4. Test with mock sampling responses
+  5. Update documentation
+
+  Session-based ranking (completed) provides solid fallback for all clients.
+  Sampling adds intelligent ranking for supported clients (VS Code Copilot, Cursor).
 
 # ============================================================================
 # BRANCH STATUS
 # ============================================================================
 branch: 'feature/mcp-optimizer'
-commits_ahead_of_main: 20
+commits_ahead_of_main: 22
 key_changes:
   - 'MCP SDK optimizer agent with sidecar knowledge base'
   - 'Response shaping utility for LLM payload optimization'
@@ -97,3 +116,13 @@ key_changes:
   - 'BMAD CLI tool enhancements'
   - 'Discovery modes and ambiguous response handling'
   - 'Performance tracking (p99, adherence scores)'
+  - 'Session-based intelligent ranking (recency, frequency, manifest, boosts)'
+  - 'Centralized ranking configuration (agent/module priority)'
+  - 'Optimized ambiguous responses (52.3% token savings)'
+
+recent_commits:
+  - '1d19e0e: feat(core): add session-based intelligent ranking system'
+  - '17af5b6: docs: add comprehensive session-based ranking documentation'
+  - 'latest: feat(config): centralize ranking config with agent priority boosts'
+
+test_status: '235/235 passing (100%)'

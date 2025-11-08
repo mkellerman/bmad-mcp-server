@@ -35,6 +35,71 @@ export const FEATURE_FLAGS = {
 } as const;
 
 /**
+ * Session-based ranking configuration
+ *
+ * Controls how agents, workflows, and modules are ranked based on usage patterns.
+ * Adjust these values to tune ranking behavior for your workflow.
+ */
+export const RANKING_CONFIG = {
+  /**
+   * Signal weights (should sum to ~0.9, with boosts making up remaining weight)
+   */
+  weights: {
+    /** Weight for recency score (0-1) - How much to favor recently-used items */
+    recency: 0.4,
+    /** Weight for frequency score (0-1) - How much to favor frequently-used items */
+    frequency: 0.3,
+    /** Weight for manifest priority (0-1) - How much to respect author-defined ordering */
+    manifestPriority: 0.2,
+  },
+
+  /**
+   * Module-level boosts (added to final score on fresh sessions)
+   * Applied when item hasn't been used yet in current session
+   */
+  moduleBoosts: {
+    /** Core module contains fundamental tools */
+    core: 0.1,
+    /** Business Method Module for project management */
+    bmm: 0.05,
+    /** Creative Innovation Suite */
+    cis: 0.0,
+  },
+
+  /**
+   * Agent-level boosts (added to final score on fresh sessions)
+   * Applied when agent hasn't been used yet in current session
+   * Useful for promoting key planning/decision agents
+   */
+  agentBoosts: {
+    /** Business Analyst - project planning */
+    'bmm:analyst': 0.08,
+    /** Product Manager - decision processing */
+    'bmm:pm': 0.08,
+    /** Debug specialist - common need */
+    'core:debug': 0.05,
+    /** Architect - common need */
+    'bmm:architect': 0.05,
+  },
+
+  /**
+   * Recency decay configuration
+   */
+  recency: {
+    /** Half-life for recency decay in milliseconds (15 minutes) */
+    halfLifeMs: 15 * 60 * 1000,
+  },
+
+  /**
+   * Frequency scoring configuration
+   */
+  frequency: {
+    /** Maximum access count for log scaling (scores cap at this value) */
+    maxAccessCount: 101,
+  },
+} as const;
+
+/**
  * Default BMAD configuration values
  * These are used when user hasn't customized their config.yaml
 ```
