@@ -20,6 +20,7 @@ import {
   shouldEvaluateTest,
   getTestThresholds,
 } from '../../config/critical-tests.config.js';
+import { getEvaluationStorage } from './storage.js';
 
 /**
  * Main evaluation runner
@@ -104,6 +105,12 @@ export class EvaluationRunner {
       // Log result
       if (options.logVerbose || result.passed === false) {
         this.logResult(testName, result, judgeConfig.model, response);
+      }
+
+      // Store result if enabled
+      if (options.enableStorage ?? this.config.reporting.storeResults) {
+        const storage = getEvaluationStorage();
+        storage.save(testName, response, criteria, result);
       }
 
       return result;

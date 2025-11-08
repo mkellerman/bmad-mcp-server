@@ -49,6 +49,36 @@ const comparison = matrix.analyze(results);
 matrix.printComparison(comparison);
 ```
 
+### Storage and Trend Analysis
+
+```typescript
+import { getEvaluationStorage } from './helpers/llm-evaluation';
+
+// Storage is automatic when enabled in config (CI/nightly profiles)
+// Or can be explicitly enabled:
+const result = await evaluateTest('test-name', response, criteria, {
+  enableStorage: true,
+});
+
+// Analyze trends over time
+const storage = getEvaluationStorage();
+const trends = storage.analyzeTrends('test-name');
+if (trends) {
+  storage.printTrends(trends);
+
+  // Check for regressions
+  if (trends.regressions.length > 0) {
+    console.warn('⚠️ Detected score regressions!');
+  }
+}
+
+// Generate cross-test summary
+const summary = storage.generateSummary();
+console.log(`Total tests: ${summary.totalTests}`);
+console.log(`Pass rate: ${(summary.overallPassRate * 100).toFixed(1)}%`);
+console.log(`Total cost: $${summary.totalCost.toFixed(4)}`);
+```
+
 ## What You Can See
 
 ### Individual Evaluation Output
@@ -142,6 +172,24 @@ Configured in `tests/config/judge-models.config.ts`:
 - **GPT-4 Turbo**: $0.01/$0.03 per 1K tokens (input/output)
 - **Claude 3.5 Sonnet**: $0.003/$0.015 per 1K tokens
 - **GPT-3.5 Turbo**: $0.0005/$0.0015 per 1K tokens
+
+### Storage Configuration
+
+Evaluation results are stored to disk for trend analysis:
+
+- **Development**: `storeResults: false` (don't store during development)
+- **CI**: `storeResults: true` (store for trend analysis)
+- **Nightly**: `storeResults: true` (store for historical data)
+
+Storage location: `test-results/evaluations/`
+File format: `{testName}-{timestamp}.json`
+
+Each evaluation record includes:
+
+- Test criteria and results
+- Subject and judge models used
+- Environment metadata (profile, CI flag, git branch/commit)
+- Timestamp and cost tracking
 
 ## Judge Prompt Templates
 
@@ -314,6 +362,63 @@ describe('Workflow Ranking', () => {
     }
   });
 });
+```
+
+## Trend Analysis Features
+
+The storage system provides powerful trend analysis capabilities:
+
+### Automatic Trend Detection
+
+```typescript
+const trends = storage.analyzeTrends('workflow-ranking-quality');
+
+// Trend classification based on recent vs historical pass rates:
+// 📈 IMPROVING: Recent pass rate higher than historical
+// 📉 DEGRADING: Recent pass rate lower than historical
+// ➡️ STABLE: No significant change
+console.log(`Trend: ${trends.trend.improving ? '📈' : '📉'}`);
+```
+
+### Regression Detection
+
+Automatically flags score drops > 10 points between consecutive runs:
+
+```typescript
+if (trends.regressions.length > 0) {
+  console.warn('⚠️ Quality regressions detected!');
+  for (const regression of trends.regressions) {
+    console.log(`Score dropped ${regression.drop} points`);
+    console.log(
+      `From ${regression.previousScore} to ${regression.currentScore}`,
+    );
+  }
+}
+```
+
+### Statistics Tracking
+
+```typescript
+console.log(`Pass rate: ${trends.statistics.passRate * 100}%`);
+console.log(`Average score: ${trends.statistics.averageScore}/100`);
+console.log(`Score std dev: ${trends.statistics.scoreStdDev.toFixed(1)}`);
+console.log(`Total cost: $${trends.statistics.totalCost.toFixed(4)}`);
+```
+
+### Cross-Test Summary
+
+```typescript
+const summary = storage.generateSummary();
+
+// Overall metrics
+console.log(`Total tests: ${summary.totalTests}`);
+console.log(`Total evaluations: ${summary.totalEvaluations}`);
+console.log(`Overall pass rate: ${summary.overallPassRate * 100}%`);
+
+// Per-test breakdown
+for (const [testName, stats] of summary.byTest) {
+  console.log(`${testName}: ${stats.count} runs, ${stats.avgScore}/100`);
+}
 ```
 
 ## Best Practices

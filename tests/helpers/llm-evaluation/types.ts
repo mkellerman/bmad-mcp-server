@@ -142,6 +142,7 @@ export interface EvaluationOptions {
   enableConsistencyCheck?: boolean;
   enableEvidenceValidation?: boolean;
   enableCostTracking?: boolean;
+  enableStorage?: boolean;
   skipOnError?: boolean;
   logVerbose?: boolean;
 }

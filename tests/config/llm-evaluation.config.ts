@@ -99,6 +99,7 @@ export interface ReportingConfig {
   verbose: boolean;
   showReasoningInTests: boolean;
   aggregateOnCompletion: boolean;
+  storeResults: boolean;
 }
 
 export interface MonitoringConfig {
@@ -215,6 +216,7 @@ export const LLM_EVALUATION_CONFIG: LLMEvaluationConfig = {
     verbose: false,
     showReasoningInTests: true,
     aggregateOnCompletion: true,
+    storeResults: true,
   },
 
   // Monitoring & Alerting
@@ -252,6 +254,7 @@ const PROFILES: Record<string, Partial<LLMEvaluationConfig>> = {
       verbose: true,
       showReasoningInTests: true,
       aggregateOnCompletion: false,
+      storeResults: false, // Don't store in development
     },
   },
 
@@ -273,6 +276,7 @@ const PROFILES: Record<string, Partial<LLMEvaluationConfig>> = {
       verbose: false,
       showReasoningInTests: false,
       aggregateOnCompletion: true,
+      storeResults: true, // Store in CI for trend analysis
     },
   },
 
@@ -294,6 +298,7 @@ const PROFILES: Record<string, Partial<LLMEvaluationConfig>> = {
       verbose: true,
       showReasoningInTests: true,
       aggregateOnCompletion: true,
+      storeResults: true, // Store in nightly for historical data
     },
   },
 };

@@ -21,6 +21,7 @@ export * from './llm-judge.js';
 export * from './consistency-checker.js';
 export * from './evaluation-runner.js';
 export * from './test-matrix.js';
+export * from './storage.js';
 
 import type {
   MCPResponse,
