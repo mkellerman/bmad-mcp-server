@@ -41,7 +41,9 @@
     "mcp:tools": "node build/cli-tester.js tools",
     "mcp:resources": "node build/cli-tester.js resources",
     "mcp:agents": "node build/cli-tester.js agents",
-    "mcp:workflows": "node build/cli-tester.js workflows"
+    "mcp:workflows": "node build/cli-tester.js workflows",
+    "optimize:sample": "node bmad/agents/mcp-sdk-optimizer-sidecar/scripts/optimize-sample-payload.mjs",
+    "metrics:summarize": "node scripts/metrics-summarize.mjs"
   },
   "files": [
     "build/"

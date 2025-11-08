@@ -18,6 +18,15 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { SERVER_CONFIG } from './config.js';
+import {
+  metricsEnabled,
+  initMetrics,
+  emit,
+  correlationId,
+  estimateTokens,
+  sizeBytes,
+  metricsVariant,
+} from './utils/metrics.js';
 import { BMADEngine } from './core/bmad-engine.js';
 import {
   createBMADTool,
@@ -68,10 +77,86 @@ export class BMADServerLiteMultiToolGit {
   }
 
   private setupHandlers(): void {
+    const wrap = <_TReq, _TResp>(
+      name: string,
+      fn: (req: _TReq) => Promise<_TResp>,
+    ) => {
+      return async (request: _TReq): Promise<_TResp> => {
+        const enabled = metricsEnabled();
+        const id = enabled ? correlationId() : '';
+        const variant = enabled ? metricsVariant() : undefined;
+        const t0 = Date.now();
+        if (enabled) {
+          await emit({ event: 'request_started', id, route: name, variant });
+        }
+        // Attach correlation id for nested metrics within handler
+        try {
+          (request as unknown as { _corrId?: string })._corrId = id;
+        } catch {
+          /* noop */
+        }
+        try {
+          const resp = await fn(request);
+          if (enabled) {
+            // Attempt lightweight structural metrics
+            let payloadSample: unknown = resp;
+            let sections = 0;
+            let affordances = 0;
+            try {
+              if (resp && typeof resp === 'object') {
+                const top = resp as Record<string, unknown>;
+                payloadSample = top;
+                sections = Object.keys(top).length;
+                // Heuristic: look for affordances arrays
+                for (const v of Object.values(top)) {
+                  if (Array.isArray(v)) {
+                    for (const x of v as unknown[]) {
+                      if (
+                        x &&
+                        typeof x === 'object' &&
+                        ('trigger' in x || 'action' in x)
+                      ) {
+                        affordances += 1;
+                      }
+                    }
+                  }
+                }
+              }
+            } catch {
+              /* ignore metric derivation errors */
+            }
+            await emit({
+              event: 'response_ready',
+              id,
+              route: name,
+              variant,
+              durationMs: Date.now() - t0,
+              tokenEstimate: estimateTokens(payloadSample),
+              sizeBytes: sizeBytes(payloadSample),
+              sections,
+              affordances,
+            });
+          }
+          return resp;
+        } catch (error) {
+          if (metricsEnabled()) {
+            await emit({
+              event: 'response_error',
+              id,
+              route: name,
+              variant,
+              durationMs: Date.now() - t0,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+          throw error;
+        }
+      };
+    };
     // List resource templates
     this.server.setRequestHandler(
       ListResourceTemplatesRequestSchema,
-      async () => {
+      wrap('ListResourceTemplates', async () => {
         await this.initialize();
 
         return {
@@ -121,38 +206,41 @@ export class BMADServerLiteMultiToolGit {
             },
           ],
         };
-      },
+      }),
     );
 
     // List available resources
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      await this.initialize();
+    this.server.setRequestHandler(
+      ListResourcesRequestSchema,
+      wrap('ListResources', async () => {
+        await this.initialize();
 
-      const cachedResources = this.engine.getCachedResources();
-      const resources = cachedResources.map((file) => ({
-        uri: `bmad://${file.relativePath}`,
-        name: file.relativePath,
-        description: `BMAD resource: ${file.relativePath}`,
-        mimeType: this.getMimeType(file.relativePath),
-      }));
+        const cachedResources = this.engine.getCachedResources();
+        const resources = cachedResources.map((file) => ({
+          uri: `bmad://${file.relativePath}`,
+          name: file.relativePath,
+          description: `BMAD resource: ${file.relativePath}`,
+          mimeType: this.getMimeType(file.relativePath),
+        }));
 
-      return { resources };
-    });
+        return { resources };
+      }),
+    );
 
     // Read a specific resource
     this.server.setRequestHandler(
       ReadResourceRequestSchema,
-      async (request) => {
+      wrap('ReadResource', async (request) => {
         await this.initialize();
 
-        const uri = request.params.uri;
+        const uri = (request as { params: { uri: string } }).params.uri;
         const pathMatch = uri.match(/^bmad:\/\/(.+)$/);
 
         if (!pathMatch) {
           throw new Error(`Invalid resource URI: ${uri}`);
         }
 
-        const relativePath = pathMatch[1];
+        const relativePath: string = pathMatch[1];
 
         // Handle virtual manifest generation for _cfg/*.csv files
         if (relativePath === '_cfg/agent-manifest.csv') {
@@ -226,180 +314,231 @@ export class BMADServerLiteMultiToolGit {
             `Resource not found: ${relativePath} (${error instanceof Error ? error.message : String(error)})`,
           );
         }
-      },
+      }),
     );
 
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      await this.initialize();
+    this.server.setRequestHandler(
+      ListToolsRequestSchema,
+      wrap('ListTools', async () => {
+        await this.initialize();
 
-      const tools: Tool[] = [];
+        const tools: Tool[] = [];
 
-      tools.push(
-        createBMADTool(
-          this.engine.getAgentMetadata(),
-          this.engine.getWorkflowMetadata(),
-        ),
-      );
+        tools.push(
+          createBMADTool(
+            this.engine.getAgentMetadata(),
+            this.engine.getWorkflowMetadata(),
+          ),
+        );
 
-      return { tools };
-    });
+        return { tools };
+      }),
+    );
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const toolName = request.params.name;
-      const args = request.params.arguments ?? {};
+    this.server.setRequestHandler(
+      CallToolRequestSchema,
+      wrap('CallTool', async (request) => {
+        const toolName = (
+          request as { params: { name: string; arguments?: unknown } }
+        ).params.name;
+        const args =
+          (request as { params: { name: string; arguments?: unknown } }).params
+            .arguments ?? {};
 
-      if (toolName === 'bmad') {
-        return await handleBMADTool(
-          args as unknown as BMADToolParams,
-          this.engine,
+        // Emit tool_invoked with correlation id
+        if (metricsEnabled()) {
+          const id =
+            (request as unknown as { _corrId?: string })._corrId ||
+            correlationId();
+          await emit({
+            event: 'tool_invoked',
+            id,
+            route: 'CallTool',
+            variant: metricsVariant(),
+            toolName,
+            hasArgs:
+              typeof args === 'object' &&
+              args !== null &&
+              Object.keys(args as Record<string, unknown>).length > 0,
+          });
+        }
+
+        if (toolName === 'bmad') {
+          return await handleBMADTool(
+            args as unknown as BMADToolParams,
+            this.engine,
+          );
+        }
+
+        throw new Error(
+          `Unknown tool: ${toolName}. Only 'bmad' tool is available.`,
         );
-      }
-
-      throw new Error(
-        `Unknown tool: ${toolName}. Only 'bmad' tool is available.`,
-      );
-    });
+      }),
+    );
 
     // List available prompts (agents)
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      await this.initialize();
+    this.server.setRequestHandler(
+      ListPromptsRequestSchema,
+      wrap('ListPrompts', async () => {
+        await this.initialize();
 
-      const agents = this.engine.getAgentMetadata();
-      const prompts = agents.map((agent) => {
-        const promptName = agent.module
-          ? `${agent.module}.${agent.name}`
-          : `bmad.${agent.name}`;
+        const agents = this.engine.getAgentMetadata();
+        const prompts = agents.map((agent) => {
+          const promptName = agent.module
+            ? `${agent.module}.${agent.name}`
+            : `bmad.${agent.name}`;
 
-        return {
-          name: promptName,
-          description: `Activate ${agent.displayName} (${agent.title}) - ${agent.description}`,
-          arguments: [
-            {
-              name: 'message',
-              description:
-                'Initial message or question for the agent (optional)',
-              required: false,
-            },
-          ],
-        };
-      });
+          return {
+            name: promptName,
+            description: `Activate ${agent.displayName} (${agent.title}) - ${agent.description}`,
+            arguments: [
+              {
+                name: 'message',
+                description:
+                  'Initial message or question for the agent (optional)',
+                required: false,
+              },
+            ],
+          };
+        });
 
-      return { prompts };
-    });
+        return { prompts };
+      }),
+    );
 
     // Get a specific prompt (agent activation)
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      await this.initialize();
+    this.server.setRequestHandler(
+      GetPromptRequestSchema,
+      wrap('GetPrompt', async (request) => {
+        await this.initialize();
 
-      const promptName = request.params.name;
-      const args = request.params.arguments ?? {};
+        const promptName = (
+          request as {
+            params: { name: string; arguments?: { message?: unknown } };
+          }
+        ).params.name;
+        const args =
+          (
+            request as {
+              params: { name: string; arguments?: { message?: unknown } };
+            }
+          ).params.arguments ?? {};
 
-      // Extract agent name from prompt name (e.g., "bmm.analyst" -> "analyst")
-      const parts = promptName.split('.');
-      const agentName = parts.length > 1 ? parts.slice(1).join('.') : parts[0];
-      const module = parts.length > 1 ? parts[0] : undefined;
+        // Extract agent name from prompt name (e.g., "bmm.analyst" -> "analyst")
+        const parts = promptName.split('.');
+        const agentName =
+          parts.length > 1 ? parts.slice(1).join('.') : parts[0];
+        const module = parts.length > 1 ? parts[0] : undefined;
 
-      // Use the execute operation to get agent activation instructions
-      const result = await handleBMADTool(
-        {
-          operation: 'execute',
-          agent: agentName,
-          message: args.message as string | undefined,
-          module,
-        },
-        this.engine,
-      );
-
-      return {
-        description: `Activate ${promptName} agent`,
-        messages: result.content.map((c) => ({
-          role: 'user' as const,
-          content: c,
-        })),
-      };
-    });
-
-    // Provide completions for prompts and resources
-    this.server.setRequestHandler(CompleteRequestSchema, async (request) => {
-      await this.initialize();
-
-      const { ref, argument } = request.params;
-
-      // Complete prompt names (agents)
-      if (ref.type === 'ref/prompt') {
-        const agents = this.engine.getAgentMetadata();
-        const partialValue = argument.value.toLowerCase();
-
-        const matches = agents
-          .filter((agent) => {
-            const promptName = agent.module
-              ? `${agent.module}.${agent.name}`
-              : `bmad.${agent.name}`;
-            return promptName.toLowerCase().includes(partialValue);
-          })
-          .map((agent) => {
-            const promptName = agent.module
-              ? `${agent.module}.${agent.name}`
-              : `bmad.${agent.name}`;
-            return promptName;
-          })
-          .slice(0, 20); // Limit to 20 results
+        // Use the execute operation to get agent activation instructions
+        const result = await handleBMADTool(
+          {
+            operation: 'execute',
+            agent: agentName,
+            message: args.message as string | undefined,
+            module,
+          },
+          this.engine,
+        );
 
         return {
-          completion: {
-            values: matches,
-            total: matches.length,
-            hasMore: false,
-          },
+          description: `Activate ${promptName} agent`,
+          messages: result.content.map((c) => ({
+            role: 'user' as const,
+            content: c,
+          })),
         };
-      }
+      }),
+    );
 
-      // Complete resource URIs
-      if (ref.type === 'ref/resource') {
-        const resources = this.engine.getCachedResources();
-        const partialValue = argument.value.toLowerCase();
+    // Provide completions for prompts and resources
+    this.server.setRequestHandler(
+      CompleteRequestSchema,
+      wrap('Complete', async (request) => {
+        await this.initialize();
 
-        // If completing a template URI, provide template-based suggestions
-        if (partialValue.includes('{') || partialValue.includes('}')) {
-          // Template completion - suggest parameter values
+        const { ref, argument } = (
+          request as {
+            params: { ref: { type: string }; argument: { value: string } };
+          }
+        ).params;
+
+        // Complete prompt names (agents)
+        if (ref.type === 'ref/prompt') {
+          const agents = this.engine.getAgentMetadata();
+          const partialValue = argument.value.toLowerCase();
+
+          const matches = agents
+            .filter((agent) => {
+              const promptName = agent.module
+                ? `${agent.module}.${agent.name}`
+                : `bmad.${agent.name}`;
+              return promptName.toLowerCase().includes(partialValue);
+            })
+            .map((agent) => {
+              const promptName = agent.module
+                ? `${agent.module}.${agent.name}`
+                : `bmad.${agent.name}`;
+              return promptName;
+            })
+            .slice(0, 20); // Limit to 20 results
+
           return {
             completion: {
-              values: [],
-              total: 0,
+              values: matches,
+              total: matches.length,
               hasMore: false,
             },
           };
         }
 
-        // Match against actual resource paths
-        const matches = resources
-          .filter((resource) => {
-            const uri = `bmad://${resource.relativePath}`;
-            return uri.toLowerCase().includes(partialValue);
-          })
-          .map((resource) => `bmad://${resource.relativePath}`)
-          .slice(0, 20);
+        // Complete resource URIs
+        if (ref.type === 'ref/resource') {
+          const resources = this.engine.getCachedResources();
+          const partialValue = argument.value.toLowerCase();
 
+          // If completing a template URI, provide template-based suggestions
+          if (partialValue.includes('{') || partialValue.includes('}')) {
+            // Template completion - suggest parameter values
+            return {
+              completion: {
+                values: [],
+                total: 0,
+                hasMore: false,
+              },
+            };
+          }
+
+          // Match against actual resource paths
+          const matches = resources
+            .filter((resource) => {
+              const uri = `bmad://${resource.relativePath}`;
+              return uri.toLowerCase().includes(partialValue);
+            })
+            .map((resource) => `bmad://${resource.relativePath}`)
+            .slice(0, 20);
+
+          return {
+            completion: {
+              values: matches,
+              total: matches.length,
+              hasMore: resources.length > matches.length,
+            },
+          };
+        }
+
+        // No completions available for other types
         return {
           completion: {
-            values: matches,
-            total: matches.length,
-            hasMore: resources.length > matches.length,
+            values: [],
+            total: 0,
+            hasMore: false,
           },
         };
-      }
-
-      // No completions available for other types
-      return {
-        completion: {
-          values: [],
-          total: 0,
-          hasMore: false,
-        },
-      };
-    });
+      }),
+    );
   }
 
   private getMimeType(relativePath: string): string {
@@ -417,6 +556,7 @@ export class BMADServerLiteMultiToolGit {
     await this.server.connect(transport);
 
     await this.initialize();
+    await initMetrics();
 
     const sourceCount = await this.engine.getLoader().getSourceCount();
     const moduleNames = await this.engine.getLoader().getModuleNames();
