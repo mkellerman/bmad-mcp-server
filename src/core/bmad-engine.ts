@@ -671,7 +671,37 @@ export class BMADEngine {
     await this.initialize();
 
     try {
-      // Find all agents that offer this workflow
+      // PRIORITY 1: Check if this is a standalone workflow FIRST
+      // Standalone workflows execute directly without agent selection
+      const standaloneWorkflow = this.workflows.find(
+        (w) =>
+          w.name === params.workflow &&
+          w.standalone &&
+          (!params.module || w.module === params.module),
+      );
+
+      if (standaloneWorkflow) {
+        // Execute standalone workflow without agent
+        const workflowPath = `{project-root}/bmad/${standaloneWorkflow.module}/workflows/${params.workflow}/workflow.yaml`;
+
+        const executionContext = {
+          workflow: params.workflow,
+          workflowPath,
+          userContext: params.message,
+          agent: undefined,
+          agentWorkflowHandler: undefined,
+        };
+
+        const text = getWorkflowExecutionPrompt(executionContext);
+
+        return {
+          success: true,
+          data: executionContext,
+          text,
+        };
+      }
+
+      // PRIORITY 2: Find all agents that offer this workflow
       const matchingAgents = this.agentMetadata.filter((a) =>
         a.workflows?.includes(params.workflow!),
       );
@@ -727,35 +757,6 @@ export class BMADEngine {
       }
 
       if (!agentForWorkflow) {
-        // Check if this is a standalone workflow
-        const standaloneWorkflow = this.workflows.find(
-          (w) =>
-            w.name === params.workflow &&
-            w.standalone &&
-            (!params.module || w.module === params.module),
-        );
-
-        if (standaloneWorkflow) {
-          // Execute standalone workflow without agent
-          const workflowPath = `{project-root}/bmad/${standaloneWorkflow.module}/workflows/${params.workflow}/workflow.yaml`;
-
-          const executionContext = {
-            workflow: params.workflow,
-            workflowPath,
-            userContext: params.message,
-            agent: undefined,
-            agentWorkflowHandler: undefined,
-          };
-
-          const text = getWorkflowExecutionPrompt(executionContext);
-
-          return {
-            success: true,
-            data: executionContext,
-            text,
-          };
-        }
-
         return {
           success: false,
           error: `No agent found offering workflow: ${params.workflow}${params.module ? ` in module: ${params.module}` : ''}`,
@@ -882,64 +883,111 @@ export class BMADEngine {
 
   /**
    * Format ambiguous workflow response when multiple workflows match
+   * Optimized for LLM comprehension and token efficiency
    */
   private formatAmbiguousWorkflowResponse(matches: WorkflowMatch[]): string {
+    const workflowName = matches[0].workflow;
+    const module = matches[0].module;
+
     const lines = [
-      `**Ambiguous Request:** Multiple Workflows Match`,
+      `**Multiple Agent Options Available**`,
       '',
-      `Found ${matches.length} workflows matching your request:`,
+      `intent: "Workflow '${workflowName}' offered by ${matches.length} agents in module '${module}'"`,
+      `action_required: "Select agent perspective"`,
       '',
+      '**Options** (ranked by relevance):',
     ];
 
     matches.forEach((match, index) => {
-      lines.push(`${index + 1}. **${match.key}**`);
-      lines.push(`   - module: ${match.module}`);
+      const star = index === 0 ? '⭐ ' : '';
+      const roleKeyword = match.agentTitle.split(' ')[0];
       lines.push(
-        `   - agent: ${match.agentName} (${match.agentDisplayName}) - ${match.agentTitle}`,
+        `${index + 1}. ${star}${match.agentName} (${match.agentDisplayName}) - ${roleKeyword} perspective`,
       );
-      lines.push(`   - workflow: ${match.workflow}`);
-      lines.push(`   - description: ${match.description}`);
-      lines.push(`   - action: ${match.action}`);
+      lines.push(`   • "${match.description}"`);
+      lines.push(
+        `   • Retry: bmad({ operation: "execute", workflow: "${workflowName}", module: "${module}", agent: "${match.agentName}" })`,
+      );
       lines.push('');
     });
 
-    lines.push('**LLM Decision Guidance:**');
-    lines.push('Proceed if you feel 95% confident in your selection.');
+    lines.push('**Decision Heuristics:**');
     lines.push(
-      'Or provide a numbered menu selection for the user to select from.',
+      '- Context with "analyze|review|business" → analyst (confidence: high)',
     );
+    lines.push(
+      '- Context with "design|architecture|technical" → architect (confidence: high)',
+    );
+    lines.push(
+      '- Context with "implement|code|develop" → dev (confidence: high)',
+    );
+    lines.push('- Context with "test|quality|qa" → tea (confidence: high)');
+    lines.push(
+      '- Context with "plan|manage|coordinate" → pm/sm (confidence: medium)',
+    );
+    lines.push(
+      '- No strong signal → Select ⭐ option or offer numbered menu to user',
+    );
+    lines.push('');
+    lines.push('**Metrics:**');
+    lines.push(`- options: ${matches.length}`);
+    lines.push(
+      `- token_estimate: ${Math.round(matches.length * 80)} (vs ${Math.round(matches.length * 280)} full load)`,
+    );
+    lines.push('- estimated_comprehension_cost: low');
 
     return lines.join('\n');
   }
 
   /**
    * Format ambiguous agent response when multiple agents match
+   * Optimized for LLM comprehension and token efficiency
    */
   private formatAmbiguousAgentResponse(matches: AgentMatch[]): string {
     const lines = [
-      `**Ambiguous Request:** Multiple Agents Match`,
+      `**Multiple Agent Matches**`,
       '',
-      `Found ${matches.length} agents matching your request:`,
+      `intent: "Found ${matches.length} agents matching your request"`,
+      `action_required: "Select most relevant agent"`,
       '',
+      '**Agents** (ranked by relevance):',
     ];
 
     matches.forEach((match, index) => {
-      lines.push(`${index + 1}. **${match.key}**`);
-      lines.push(`   - module: ${match.module}`);
+      const star = index === 0 ? '⭐ ' : '';
+      const roleKeyword = match.agentTitle.split(' ')[0];
       lines.push(
-        `   - agent: ${match.agentName} (${match.agentDisplayName}) - ${match.agentTitle}`,
+        `${index + 1}. ${star}${match.agentName} (${match.agentDisplayName}) - ${roleKeyword}`,
       );
-      lines.push(`   - role: ${match.role}`);
-      lines.push(`   - description: ${match.description}`);
-      lines.push(`   - action: ${match.action}`);
+      lines.push(`   • Role: ${match.role}`);
+      lines.push(`   • Module: ${match.module}`);
+      lines.push(
+        `   • Execute: bmad({ operation: "execute", agent: "${match.agentName}", module: "${match.module}", message: "your request" })`,
+      );
       lines.push('');
     });
 
-    lines.push('**LLM Decision Guidance:**');
-    lines.push('Proceed if you feel 95% confident in your selection.');
+    lines.push('**Decision Heuristics:**');
     lines.push(
-      'Or provide a numbered menu selection for the user to select from.',
+      '- Task involves requirements/business logic → analyst/pm (confidence: high)',
     );
+    lines.push(
+      '- Task involves system design/architecture → architect (confidence: high)',
+    );
+    lines.push(
+      '- Task involves implementation/coding → dev (confidence: high)',
+    );
+    lines.push('- Task involves testing/quality → tea (confidence: high)');
+    lines.push(
+      '- Task involves debugging/investigation → debug (confidence: high)',
+    );
+    lines.push(
+      '- No strong signal → Select ⭐ option or offer numbered menu to user',
+    );
+    lines.push('');
+    lines.push('**Metrics:**');
+    lines.push(`- matches: ${matches.length}`);
+    lines.push('- estimated_comprehension_cost: low');
 
     return lines.join('\n');
   }
