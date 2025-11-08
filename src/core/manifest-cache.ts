@@ -297,10 +297,26 @@ export class ManifestCache {
   private async generateManifests(bmadRoot: string): Promise<void> {
     const { mkdir, symlink, rm } = await import('node:fs/promises');
     const { existsSync } = await import('node:fs');
+    const pathModule = await import('node:path');
+    const { fileURLToPath, pathToFileURL } = await import('node:url');
 
-    // Import our LOCAL ManifestGenerator (not from bmad-method package!)
-    const { ManifestGenerator } = await import('./manifest-generator.js');
+    // Import ManifestGenerator from bmad-method package dynamically
+    // Resolve the package path and construct the correct generator path
+    const pkgPath = import.meta.resolve('bmad-method');
+    const pkgFile = fileURLToPath(pkgPath);
+    const pkgRoot = pathModule.dirname(
+      pathModule.dirname(pathModule.dirname(pkgFile)),
+    ); // up 3 levels from tools/cli/bmad-cli.js
+    const generatorPath = pathToFileURL(
+      join(pkgRoot, 'tools/cli/installers/lib/core/manifest-generator.js'),
+    ).href;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const module = await import(generatorPath);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
+    const ManifestGenerator = (module as any).ManifestGenerator;
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const generator = new ManifestGenerator();
 
     // Detect modules in the SOURCE
@@ -337,6 +353,7 @@ export class ManifestCache {
       // Generate manifests directly to CACHE directory
       // ManifestGenerator will write to {cacheDir}/_cfg/
       // But it will SCAN from scanDir (source or temp with symlink)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await generator.generateManifests(cacheDir, modules, files, {
         ides: [],
         preservedModules: [],

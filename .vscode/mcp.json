@@ -1,20 +1,20 @@
 {
   "servers": {
-    "bmad": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "git+https://github.com/mkellerman/bmad-mcp-server#main",
-        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad",
-        "--mode=strict"
-      ]
-    }
-    // "bmad-test": {
-    //   "command": "node",
+    // "bmad": {
+    //   "command": "npx",
     //   "args": [
-    //     "${workspaceFolder}/build/index.js",
-    //     "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad"
+    //     "-y",
+    //     "git+https://github.com/mkellerman/bmad-mcp-server#main",
+    //     "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad",
+    //     "--mode=strict"
     //   ]
     // }
+    "bmad": {
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/build/index.js",
+        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad"
+      ]
+    }
   }
 }

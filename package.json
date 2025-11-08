@@ -8,7 +8,7 @@
     "bmad": "./build/cli.js"
   },
   "scripts": {
-    "build": "tsc && cp src/core/manifest-generator.js build/core/ && chmod +x build/index.js && chmod +x build/cli.js",
+    "build": "tsc && chmod +x build/index.js && chmod +x build/cli.js",
     "clean": "rm -rf build/ coverage/ test-results/ .bmad/cache/",
     "clean:all": "npm run clean && rm -rf node_modules/ package-lock.json",
     "prepare": "npm run build || true",
