@@ -19,13 +19,14 @@ export default defineConfig({
     // Global setup runs before runner initialization
     globalSetup: ['./tests/framework/setup/global-setup.ts'],
     // Setup files run in test context for each test file
-    setupFiles: ['./tests/framework/setup/test-setup.ts'],
+    setupFiles: [
+      'allure-vitest/setup',
+      './tests/framework/setup/test-setup.ts',
+    ],
     reporters: [
       'default', // Console output
       ['junit', { outputFile: './test-results/junit.xml' }], // JUnit XML for CI/CD
-      // Note: allure-vitest@3.4.2 has compatibility issues with vitest@4.0.6
-      // Reporter and setup disabled until compatibility is resolved
-      // 'allure-vitest/reporter',
+      'allure-vitest/reporter', // Allure for beautiful reports
     ],
     coverage: {
       provider: 'v8',
