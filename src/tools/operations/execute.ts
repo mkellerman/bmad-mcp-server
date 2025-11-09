@@ -235,12 +235,22 @@ export function validateExecuteParams(params: unknown): string | undefined {
   }
 
   // Type-specific validation
-  if (p.type === 'agent' && !p.agent) {
-    return 'Missing required parameter: agent (when type=agent)';
+  if (p.type === 'agent') {
+    if (!p.agent) {
+      return 'Missing required parameter: agent (when type=agent)';
+    }
+    if (!p.module) {
+      return 'Missing required parameter: module (required for execute operations to ensure proper discovery)';
+    }
   }
 
-  if (p.type === 'workflow' && !p.workflow) {
-    return 'Missing required parameter: workflow (when type=workflow)';
+  if (p.type === 'workflow') {
+    if (!p.workflow) {
+      return 'Missing required parameter: workflow (when type=workflow)';
+    }
+    if (!p.module) {
+      return 'Missing required parameter: module (required for execute operations to ensure proper discovery)';
+    }
   }
 
   if (p.agent && typeof p.agent !== 'string') {
@@ -263,8 +273,8 @@ export function validateExecuteParams(params: unknown): string | undefined {
  */
 export function getExecuteExamples(): string[] {
   return [
-    'Execute agent with message: { operation: "execute", type: "agent", agent: "analyst", message: "Help me brainstorm a mobile app" }',
-    'Execute workflow without message: { operation: "execute", type: "workflow", workflow: "workflow-status" }',
-    'Execute with module hint: { operation: "execute", type: "agent", agent: "debug", module: "bmm", message: "Analyze this error" }',
+    'Execute agent: { operation: "execute", type: "agent", agent: "analyst", module: "bmm", message: "Help me brainstorm a mobile app" }',
+    'Execute workflow: { operation: "execute", type: "workflow", workflow: "prd", module: "bmm", message: "Create PRD for e-commerce platform" }',
+    'Execute agent without message: { operation: "execute", type: "agent", agent: "bmad-master", module: "core" }',
   ];
 }

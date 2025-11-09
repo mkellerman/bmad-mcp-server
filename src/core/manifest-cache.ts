@@ -555,6 +555,7 @@ export class ManifestCache {
       communicationStyle: record.communicationStyle,
       principles: record.principles,
       module: record.module,
+      standalone: record.standalone?.toLowerCase() !== 'false', // Default true
     }));
   }
 
@@ -585,7 +586,7 @@ export class ManifestCache {
       module: record.module || 'unknown',
       path: record.path || '',
       ...(record.trigger && { trigger: record.trigger }),
-      standalone: record.standalone?.toLowerCase() === 'true',
+      standalone: record.standalone?.toLowerCase() !== 'false', // Default true for backward compat
     }));
   }
 
@@ -646,7 +647,7 @@ export class ManifestCache {
       description: record.description || '',
       module: record.module || 'unknown',
       path: record.path || '',
-      standalone: record.standalone?.toLowerCase() === 'true',
+      standalone: record.standalone?.toLowerCase() !== 'false', // Default true for backward compat
     }));
   }
 
@@ -677,7 +678,7 @@ export class ManifestCache {
       description: record.description || '',
       module: record.module || 'unknown',
       path: record.path || '',
-      standalone: record.standalone?.toLowerCase() === 'true',
+      standalone: record.standalone?.toLowerCase() !== 'false', // Default true for backward compat
     }));
   }
 

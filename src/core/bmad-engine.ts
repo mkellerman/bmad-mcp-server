@@ -468,12 +468,19 @@ export class BMADEngine {
   // ============================================================================
 
   /**
-   * List all available agents
+   * List all available agents.
+   *
+   * Only shows agents with standalone=true (or undefined for backward compatibility).
+   * Non-standalone agents are hidden from discovery.
    */
   async listAgents(filter?: ListFilter): Promise<BMADResult> {
     await this.initialize();
 
     let agents = this.agentMetadata;
+
+    // Filter by standalone: only show standalone !== false
+    // (undefined/true are both allowed for backward compatibility)
+    agents = agents.filter((a) => a.standalone !== false);
 
     // Apply module filter if specified
     if (filter?.module) {
@@ -506,57 +513,28 @@ export class BMADEngine {
   }
 
   /**
-   * List all available workflows by extracting them from agent menu items.
+   * List all available workflows.
    *
-   * Only workflows linked to agents appear in this list.
-   * Workflows not linked to agents can still be executed via direct bmad:// URI.
+   * Only shows workflows with standalone=true (or undefined for backward compatibility).
+   * Non-standalone workflows are hidden from discovery but can still be executed
+   * if accessed via agent menus.
    */
   async listWorkflows(filter?: ListFilter): Promise<BMADResult> {
     await this.initialize();
 
-    // Build workflow list from agent metadata
-    const workflowMap = new Map<
-      string,
-      {
-        name: string;
-        description: string;
-        module?: string;
-        agents: string[];
-        standalone: boolean;
-      }
-    >();
+    // Start with all workflows from manifests
+    let workflows = this.workflows;
 
-    // Scan all agents for their workflow menu items
-    for (const agent of this.agentMetadata) {
-      if (!agent.workflows || agent.workflows.length === 0) continue;
+    // Filter by standalone: only show standalone !== false
+    // (undefined/true are both allowed for backward compatibility)
+    workflows = workflows.filter((w) => w.standalone !== false);
 
-      // Apply module filter if specified
-      if (filter?.module && agent.module !== filter.module) continue;
-
-      // Process each workflow this agent offers
-      for (let i = 0; i < agent.workflows.length; i++) {
-        const workflowName = agent.workflows[i];
-        const menuItemDesc = agent.workflowMenuItems?.[i] || workflowName;
-        // Use module:name as the unique key for deduplication
-        const workflowKey = `${agent.module || 'core'}:${workflowName}`;
-
-        if (!workflowMap.has(workflowKey)) {
-          workflowMap.set(workflowKey, {
-            name: workflowName,
-            description: menuItemDesc,
-            module: agent.module,
-            agents: [agent.name],
-            standalone: true, // Can be executed directly via bmad tool
-          });
-        } else {
-          // Workflow offered by multiple agents
-          workflowMap.get(workflowKey)!.agents.push(agent.name);
-        }
-      }
+    // Apply module filter if specified
+    if (filter?.module) {
+      workflows = workflows.filter((w) => w.module === filter.module);
     }
 
-    // Convert to array and rank by usage
-    const workflows = Array.from(workflowMap.values());
+    // Rank by usage
     const rankedWorkflows = this.rankByUsage(
       workflows,
       (w) => `${w.module || 'core'}:${w.name}`,

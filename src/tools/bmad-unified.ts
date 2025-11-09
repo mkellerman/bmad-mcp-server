@@ -198,12 +198,13 @@ export function createBMADTool(
  *
  * Description format:
  * - Overview of BMAD and operations
- * - Complete agent list (grouped by module) with personas
- * - Complete workflow list with descriptions
+ * - Complete agent list (grouped by module) with execute commands
  * - Usage examples for common patterns
  *
+ * Note: Workflows are NOT listed in description - LLM must use list operation to discover them
+ *
  * @param agents - Agent metadata
- * @param workflows - Workflow metadata
+ * @param workflows - Workflow metadata (not displayed, but kept for future use)
  * @param enableSearch - Whether to include search operation
  * @returns Formatted tool description
  */
@@ -232,7 +233,7 @@ function buildToolDescription(
   );
   parts.push('');
 
-  // Agents section (grouped by module)
+  // Agents section (grouped by module with execute commands)
   parts.push('**Available Agents:**');
   parts.push('');
 
@@ -240,128 +241,46 @@ function buildToolDescription(
   for (const [moduleName, moduleAgents] of Object.entries(agentsByModule)) {
     parts.push(`${moduleName.toUpperCase()} Module:`);
     for (const agent of moduleAgents) {
-      const line =
+      // Agent name and title
+      const agentLine =
         `  - ${agent.name}` +
         (agent.displayName ? ` (${agent.displayName})` : '') +
         (agent.title ? `: ${agent.title}` : '');
-      parts.push(line);
-    }
-    parts.push('');
-  }
+      parts.push(agentLine);
 
-  // Workflows section
-  parts.push('**Available Workflows:**');
-  parts.push('');
-
-  const workflowsByModule = groupWorkflowsByModule(workflows);
-  for (const [moduleName, moduleWorkflows] of Object.entries(
-    workflowsByModule,
-  )) {
-    parts.push(`${moduleName.toUpperCase()} Module:`);
-    for (const workflow of moduleWorkflows) {
-      const line =
-        `  - ${workflow.name}` +
-        (workflow.description ? `: ${workflow.description}` : '');
-      parts.push(line);
+      // Execute command with module pre-filled
+      const executeCmd = `    bmad({ operation: "execute", agent: "${agent.name}", module: "${moduleName}", message: "your task" })`;
+      parts.push(executeCmd);
     }
     parts.push('');
   }
 
   // Usage examples
-  parts.push('**Usage Guide:**');
+  parts.push('**Common Commands:**');
   parts.push('');
-  parts.push('**When to use each operation:**');
+  parts.push('List agents: bmad({ operation: "list", query: "agents" })');
+  parts.push('List workflows: bmad({ operation: "list", query: "workflows" })');
+  parts.push('List modules: bmad({ operation: "list", query: "modules" })');
   parts.push(
-    '- `list` - User asks "what agents/workflows are available?" or wants to browse options',
-  );
-  if (enableSearch) {
-    parts.push(
-      '- `search` - User asks "find agents related to X" or wants fuzzy search',
-    );
-  }
-  parts.push(
-    '- `read` - User asks "what does the analyst do?" or wants agent/workflow details',
+    'Read agent: bmad({ operation: "read", agent: "analyst", module: "bmm" })',
   );
   parts.push(
-    '- `execute` - User wants to actually run an agent or workflow to accomplish a task',
+    'Read workflow: bmad({ operation: "read", workflow: "prd", module: "bmm" })',
   );
-  parts.push('');
   parts.push(
-    '**Important:** Use agent/workflow names WITHOUT module prefix (e.g., "analyst" not "bmm-analyst")',
+    'Execute agent: bmad({ operation: "execute", agent: "analyst", module: "bmm", message: "your task" })',
+  );
+  parts.push(
+    'Execute workflow: bmad({ operation: "execute", workflow: "prd", module: "bmm", agent: "pm", message: "your task" })',
   );
   parts.push('');
-  parts.push('**Examples:**');
-  parts.push('');
-  parts.push('Discovery - List all agents:');
-  parts.push('  { operation: "list", query: "agents" }');
-  parts.push('');
-  parts.push('Discovery - List agents in specific module:');
-  parts.push('  { operation: "list", query: "agents", module: "bmm" }');
-  parts.push('');
-  parts.push('Capability Query - See what an agent can do:');
-  parts.push('  { operation: "read", agent: "analyst" }');
-  parts.push('');
-  parts.push('Direct Intent - Execute agent to accomplish task:');
+  parts.push('**Important:**');
   parts.push(
-    '  { operation: "execute", agent: "analyst", message: "Help me brainstorm a mobile app" }',
+    '- Execute operations require module parameter (and agent parameter for workflows)',
   );
-  parts.push('');
-  parts.push('Explicit Routing - User specifies which agent:');
+  parts.push('- This ensures proper discovery before execution');
   parts.push(
-    '  { operation: "execute", agent: "architect", message: "Design a scalable architecture" }',
-  );
-  parts.push('');
-  parts.push('Execute workflow:');
-  parts.push(
-    '  { operation: "execute", workflow: "prd", message: "Create PRD for e-commerce platform" }',
-  );
-  parts.push('');
-  if (enableSearch) {
-    parts.push('Search for agents:');
-    parts.push('  { operation: "search", query: "debug" }');
-    parts.push('');
-  }
-  parts.push('Disambiguate with module (if name collision):');
-  parts.push(
-    '  { operation: "execute", agent: "debug", module: "bmm", message: "Fix this bug" }',
-  );
-  parts.push('');
-  parts.push('**Resource Access Instructions:**');
-  parts.push('');
-  parts.push(
-    '**CRITICAL:** ALL BMAD files MUST be accessed through the `bmad` tool:',
-  );
-  parts.push('- ✅ USE: `bmad` tool with appropriate operation');
-  parts.push(
-    '- ❌ DO NOT: Use MCP Resources API (not supported in all clients)',
-  );
-  parts.push("- ❌ DO NOT: Search the user's workspace for BMAD files");
-  parts.push(
-    '- ❌ DO NOT: Use filesystem paths like ./bmad/ or {project-root}/bmad/',
-  );
-  parts.push('');
-  parts.push('**Workflow Handling Behavior:**');
-  parts.push(
-    '- ⚡ **BE SILENT**: When loading workflow instructions, configurations, or internal BMAD files',
-  );
-  parts.push(
-    "- ⚡ **NO COMMENTARY**: Don't explain what you're doing when accessing bmad:// resources",
-  );
-  parts.push(
-    '- ⚡ **DIRECT EXECUTION**: Load required files quietly and proceed directly to workflow execution',
-  );
-  parts.push(
-    '- ⚡ **USER FOCUS**: Only communicate with user for workflow outputs, questions, or results',
-  );
-  parts.push('');
-  parts.push('**File Locations (for reference only):**');
-  parts.push('  - Configuration: {project-root}/bmad/core/config.yaml');
-  parts.push('  - Core tasks: {project-root}/bmad/core/tasks/workflow.xml');
-  parts.push(
-    '  - Agent definitions: {project-root}/bmad/{module}/agents/{agent-name}.md',
-  );
-  parts.push(
-    '  - Workflow definitions: {project-root}/bmad/{module}/workflows/{workflow-name}/workflow.yaml',
+    '- Use list operation to discover available agents/workflows first',
   );
 
   return parts.join('\n');
@@ -381,25 +300,6 @@ function groupByModule(
       grouped[module] = [];
     }
     grouped[module].push(agent);
-  }
-
-  return grouped;
-}
-
-/**
- * Groups workflows by module for organized display
- */
-function groupWorkflowsByModule(
-  workflows: Workflow[],
-): Record<string, Workflow[]> {
-  const grouped: Record<string, Workflow[]> = {};
-
-  for (const workflow of workflows) {
-    const module = workflow.module || 'core';
-    if (!grouped[module]) {
-      grouped[module] = [];
-    }
-    grouped[module].push(workflow);
   }
 
   return grouped;

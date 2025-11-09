@@ -132,6 +132,7 @@ export interface AgentMetadata {
   icon?: string; // Agent icon emoji (e.g., "📊")
   communicationStyle?: string; // How the agent communicates
   principles?: string; // Agent's decision-making philosophy
+  standalone?: boolean; // Whether this agent can be executed independently (default: true)
 }
 
 /**
