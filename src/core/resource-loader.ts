@@ -1233,18 +1233,18 @@ export class ResourceLoaderGit {
             // Extract workflow attribute if present
             const workflowPath = item['@_workflow'];
             if (workflowPath) {
-              // Extract workflow name from path like "{project-root}/bmad/bmm/workflows/debug/inspect/workflow.yaml"
-              // Pattern: .../workflows/{...path...}/workflow.yaml
-              // Capture everything between last '/workflows/' and '/workflow.yaml'
+              // Extract workflow name from path - use last path segment as fallback
               const nameMatch = String(workflowPath).match(
                 /\/workflows\/(.+)\/workflow\.yaml$/,
               );
               if (nameMatch) {
-                // Take the last segment as the workflow name (e.g., "debug/inspect" -> "inspect")
                 const fullPath = nameMatch[1];
-                const workflowName = fullPath.split('/').pop() || fullPath;
-                workflows.push(workflowName);
-                workflowPaths[workflowName] = String(workflowPath); // Store full path
+                // Use the last segment as workflow name (e.g., "debug/quick-debug" -> "quick-debug")
+                const folderName = fullPath.split('/').pop() || fullPath;
+
+                // Store using folder name - will be resolved to manifest name during initialization
+                workflows.push(folderName);
+                workflowPaths[folderName] = String(workflowPath); // Store full path
                 workflowMenuItems.push(trimmedText); // Track menu items with workflows
               }
             }

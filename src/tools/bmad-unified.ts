@@ -325,6 +325,44 @@ function buildToolDescription(
   parts.push(
     '  { operation: "execute", agent: "debug", module: "bmm", message: "Fix this bug" }',
   );
+  parts.push('');
+  parts.push('**Resource Access Instructions:**');
+  parts.push('');
+  parts.push(
+    '**CRITICAL:** ALL BMAD files MUST be accessed through the `bmad` tool:',
+  );
+  parts.push('- ✅ USE: `bmad` tool with appropriate operation');
+  parts.push(
+    '- ❌ DO NOT: Use MCP Resources API (not supported in all clients)',
+  );
+  parts.push("- ❌ DO NOT: Search the user's workspace for BMAD files");
+  parts.push(
+    '- ❌ DO NOT: Use filesystem paths like ./bmad/ or {project-root}/bmad/',
+  );
+  parts.push('');
+  parts.push('**Workflow Handling Behavior:**');
+  parts.push(
+    '- ⚡ **BE SILENT**: When loading workflow instructions, configurations, or internal BMAD files',
+  );
+  parts.push(
+    "- ⚡ **NO COMMENTARY**: Don't explain what you're doing when accessing bmad:// resources",
+  );
+  parts.push(
+    '- ⚡ **DIRECT EXECUTION**: Load required files quietly and proceed directly to workflow execution',
+  );
+  parts.push(
+    '- ⚡ **USER FOCUS**: Only communicate with user for workflow outputs, questions, or results',
+  );
+  parts.push('');
+  parts.push('**File Locations (for reference only):**');
+  parts.push('  - Configuration: {project-root}/bmad/core/config.yaml');
+  parts.push('  - Core tasks: {project-root}/bmad/core/tasks/workflow.xml');
+  parts.push(
+    '  - Agent definitions: {project-root}/bmad/{module}/agents/{agent-name}.md',
+  );
+  parts.push(
+    '  - Workflow definitions: {project-root}/bmad/{module}/workflows/{workflow-name}/workflow.yaml',
+  );
 
   return parts.join('\n');
 }

@@ -957,7 +957,111 @@ export class BMADEngine {
         };
       }
 
-      // PRIORITY 2: Find all agents that offer this workflow
+      // PRIORITY 2: Check if this workflow exists but is NOT standalone
+      // These must be executed through an agent
+      const nonStandaloneWorkflow = this.workflows.find(
+        (w) =>
+          w.name === params.workflow &&
+          !w.standalone &&
+          (!params.module || w.module === params.module),
+      );
+
+      if (nonStandaloneWorkflow) {
+        // This workflow requires an agent - find agents offering it
+        // Need to match by workflow path since agent metadata uses folder names
+        // which may differ from manifest names
+        const workflowPathPattern = nonStandaloneWorkflow.path;
+
+        const matchingAgents = this.agentMetadata.filter((a) => {
+          if (!a.workflowPaths) return false;
+
+          // Check if any of the agent's workflow paths match this workflow's path
+          return Object.values(a.workflowPaths).some((agentPath) => {
+            // Normalize paths for comparison (remove {project-root}/bmad/ prefix)
+            const normalizedAgentPath = agentPath.replace(
+              /^{project-root}\/bmad\//,
+              '',
+            );
+            const normalizedWorkflowPath = workflowPathPattern.replace(
+              /^bmad\//,
+              '',
+            );
+            return normalizedAgentPath === normalizedWorkflowPath;
+          });
+        });
+
+        if (matchingAgents.length === 0) {
+          return {
+            success: false,
+            error: `Workflow "${params.workflow}" is not standalone and no agent offers it`,
+            text: `❌ Workflow "${params.workflow}" requires an agent but no agent offers it.\n\nThis is a non-standalone workflow that must be executed through an agent menu.`,
+          };
+        }
+
+        // Filter by module if specified
+        const filteredAgents = params.module
+          ? matchingAgents.filter((a) => a.module === params.module)
+          : matchingAgents;
+
+        // Check for ambiguity
+        if (!params.module && filteredAgents.length > 1) {
+          const matches: WorkflowMatch[] = filteredAgents.map((agent) => {
+            const module = agent.module || 'core';
+            const key = `${module}:${agent.name}:${params.workflow}`;
+
+            return {
+              key,
+              module,
+              agentName: agent.name,
+              agentDisplayName: agent.displayName,
+              agentTitle: agent.title,
+              workflow: params.workflow!,
+              description: `Execute ${params.workflow} via ${agent.displayName}`,
+              action: `bmad({ operation: "execute", workflow: "${params.workflow}", module: "${module}" })`,
+            };
+          });
+
+          const rankedMatches = this.rankByUsage(matches, (m) => m.key);
+
+          return {
+            success: true,
+            ambiguous: true,
+            type: 'workflow',
+            matches: rankedMatches,
+            text: this.formatAmbiguousWorkflowResponse(rankedMatches),
+          };
+        }
+
+        // Use the agent (first match or module-filtered)
+        const agentForWorkflow = filteredAgents[0];
+        const workflowPath =
+          nonStandaloneWorkflow.path ||
+          `{project-root}/bmad/${nonStandaloneWorkflow.module}/workflows/${params.workflow}/workflow.yaml`;
+
+        const executionContext = {
+          workflow: params.workflow,
+          workflowPath,
+          userContext: params.message,
+          agent: agentForWorkflow.name,
+          agentWorkflowHandler: agentForWorkflow.workflowHandlerInstructions,
+        };
+
+        // Track usage
+        const module = agentForWorkflow.module || 'core';
+        this.sessionTracker.recordUsage(`${module}:${params.workflow}`);
+        this.sessionTracker.recordUsage(`${module}:${agentForWorkflow.name}`);
+
+        const text = getWorkflowExecutionPrompt(executionContext);
+
+        return {
+          success: true,
+          data: executionContext,
+          text,
+        };
+      }
+
+      // PRIORITY 3: Find all agents that offer this workflow (legacy/fallback)
+      // This handles cases where workflow isn't in manifest but agents reference it
       const matchingAgents = this.agentMetadata.filter((a) =>
         a.workflows?.includes(params.workflow!),
       );

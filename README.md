@@ -347,9 +347,23 @@ The server searches for BMAD content in this order:
 
 ## Documentation
 
-- **[Architecture](./docs/architecture.md)** - System design and components
-- **[API Contracts](./docs/api-contracts.md)** - MCP tools and TypeScript APIs
-- **[Development Guide](./docs/development-guide.md)** - Contributing and testing
+**Core Documentation:**
+
+- **[Product Overview](./docs/README.md)** - Vision, principles, and value proposition
+- **[Architecture](./docs/architecture.md)** - Pure Delivery Proxy design
+- **[API Reference](./docs/api.md)** - MCP tool interface and contracts
+- **[Development Guide](./docs/development.md)** - Setup, testing, contributing
+
+**Architecture Decisions:**
+
+- **[ADR-001: Pure Delivery Proxy](./docs/adr/001-pure-delivery-proxy.md)** - Core architecture pattern
+- **[ADR-002: Session-Based Ranking](./docs/adr/002-session-based-ranking.md)** - Intelligent recommendations
+- **[ADR-003: LLM Sampling](./docs/adr/003-llm-sampling.md)** - Hybrid ranking strategy
+- **[All ADRs](./docs/adr/)** - Complete architecture decision records
+
+**Reference Materials:**
+
+- **[BMAD Dynamic Prompts](./docs/research/bmad-dynamic-prompts.md)** - Understanding BMAD's prompt engineering
 - **[Release Process](./.github/RELEASE_PROCESS.md)** - Release workflow for maintainers
 
 ---
