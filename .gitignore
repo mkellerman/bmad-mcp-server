@@ -26,6 +26,8 @@ coverage/
 .nyc_output/
 *.lcov
 test-results/
+allure-results/
+allure-report/
 playwright-report/
 test-output.log
 

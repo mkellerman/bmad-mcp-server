@@ -17,6 +17,8 @@ on:
 
 permissions:
   contents: read
+  checks: write
+  pull-requests: write
 
 env:
   NODE_ENV: test
@@ -94,6 +96,22 @@ jobs:
           CI: true
         run: TEST_TYPE=unit npm run test:coverage
 
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: junit-unit-tests
+          path: test-results/junit.xml
+          if-no-files-found: ignore
+
+      - name: Publish test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: test-results/junit.xml
+          check_name: 'Unit Test Results'
+          comment_mode: off
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v5
@@ -139,6 +157,22 @@ jobs:
           CI: true
           BMAD_GIT_AUTO_UPDATE: 'false'
         run: npm run test:integration
+
+      - name: Upload JUnit test results
+        if: always() && steps.check_tests.outputs.exists == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: junit-integration-tests
+          path: test-results/junit.xml
+          if-no-files-found: ignore
+
+      - name: Publish test results
+        if: always() && steps.check_tests.outputs.exists == 'true'
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: test-results/junit.xml
+          check_name: 'Integration Test Results'
+          comment_mode: off
 
   build:
     name: Build

@@ -1,20 +1,40 @@
 /**
- * Real LLM Evaluation Test (Optional)
+ * E2E Test: Real LLM Evaluation with Judge
  *
- * Tests actual LLM-as-judge evaluation with real API calls via GitHub Copilot Proxy.
- * Skipped if Copilot is not authenticated.
+ * INTENT:
+ * Test the dual-LLM evaluation framework where one LLM generates responses
+ * and another LLM (judge) evaluates the quality of those responses.
  *
- * To authenticate: npx copilot-proxy --auth
- * To run: npm test -- real-llm-evaluation
+ * EXPECTED STEPS:
+ * 1. Verify copilot-proxy connection (prerequisite)
+ * 2. Create a mock BMAD MCP response with workflow rankings
+ * 3. Define evaluation criteria with checkpoints
+ * 4. Call evaluateTest() which sends response to judge LLM via copilot-proxy
+ * 5. Judge LLM returns scored evaluation with reasoning
+ * 6. Validate evaluation result structure and scoring
+ *
+ * EXPECTED RESULTS:
+ * - Judge LLM successfully evaluates response quality
+ * - Evaluation includes: score, reasoning, checkpoint scores, evidence
+ * - Cost tracking records tokens and estimated cost
+ * - Malformed responses are handled gracefully with error messages
+ *
+ * FAILURE CONDITIONS:
+ * - Copilot-proxy not available → FAIL test suite (beforeAll)
+ * - Judge LLM doesn't return valid JSON → FAIL
+ * - Evaluation score not in valid range → FAIL
+ * - Cost tracking missing or incorrect → FAIL
+ *
+ * NOTE: This is an E2E test because it uses copilot-proxy to call real LLM APIs.
+ *       No mocks are used - all LLM calls are real API calls with actual cost.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { evaluateTest } from '../../helpers/llm-evaluation';
-import { createRankingCriteria } from '../../fixtures/evaluation-prompts';
-import type { MCPResponse } from '../../helpers/llm-evaluation/types';
-import { isCopilotProxyAvailable } from '../../helpers/llm-evaluation/copilot-check';
+import { evaluateTest } from '../helpers/llm-evaluation';
+import { createRankingCriteria } from '../fixtures/evaluation-prompts';
+import type { MCPResponse } from '../helpers/llm-evaluation/types';
+import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check';
 
-// Check if Copilot Proxy is available
 async function checkCopilotAuth(): Promise<boolean> {
   try {
     const mod = await import('@hazeruno/copilot-proxy');
@@ -29,26 +49,34 @@ async function checkCopilotAuth(): Promise<boolean> {
   }
 }
 
-describe('Real LLM Evaluation', () => {
+describe('E2E: Real LLM Evaluation', () => {
   let shouldSkip = false;
+  let skipReason = '';
 
   beforeAll(async () => {
-    // Check both proxy availability and authentication
+    // Test connection to copilot-proxy - fail suite if unavailable
     const available = await isCopilotProxyAvailable();
-    const authed = available ? await checkCopilotAuth() : false;
-
-    if (!available || !authed) {
+    if (!available) {
       shouldSkip = true;
-      console.log('\n⚠️  GitHub Copilot not available or not authenticated.');
-      console.log('   Skipping real LLM evaluation tests.');
-      console.log('   To enable: npx copilot-proxy --auth\n');
+      skipReason = 'Copilot Proxy not available';
+      return;
+    }
+
+    const authed = await checkCopilotAuth();
+    if (!authed) {
+      shouldSkip = true;
+      skipReason = 'GitHub Copilot not authenticated';
     }
   });
 
-  it('🤖 Should evaluate response quality with real judge LLM', async () => {
+  it('should evaluate response quality with real judge LLM', async () => {
+    // FAIL if copilot-proxy is unavailable (per testing rules)
     if (shouldSkip) {
-      console.log('⏭️  Skipping test - Copilot not available');
-      return; // Skip test gracefully
+      throw new Error(
+        `❌ E2E Test Suite Failed: ${skipReason}\n` +
+          `   Action: Authenticate with GitHub Copilot\n` +
+          `   Command: npx copilot-proxy --auth\n`,
+      );
     }
     // Create a mock response that should score well
     const response: MCPResponse = {
@@ -57,7 +85,7 @@ describe('Real LLM Evaluation', () => {
           type: 'text',
           text: JSON.stringify({
             model: 'gpt-4-turbo',
-            workflows: [
+            rankedWorkflows: [
               {
                 name: 'create-ux-design',
                 score: 0.95,
@@ -122,11 +150,16 @@ describe('Real LLM Evaluation', () => {
     console.log(`\n💭 Reasoning: ${result?.selectedSample.reasoning}`);
   }, 30000); // 30 second timeout for API call
 
-  it('🔍 Should handle malformed responses gracefully', async () => {
+  it('should handle malformed responses gracefully', async () => {
+    // FAIL if copilot-proxy is unavailable (per testing rules)
     if (shouldSkip) {
-      console.log('⏭️  Skipping test - Copilot not available');
-      return; // Skip test gracefully
+      throw new Error(
+        `❌ E2E Test Suite Failed: ${skipReason}\n` +
+          `   Action: Authenticate with GitHub Copilot\n` +
+          `   Command: npx copilot-proxy --auth\n`,
+      );
     }
+
     // Create a response that's harder to evaluate
     const response: MCPResponse = {
       content: [
