@@ -1,0 +1,12 @@
+name: batch-optimize-payloads
+description: 'Batch optimization workflow for multiple MCP response payloads using MCP SDK Optimizer heuristics'
+author: 'Custom'
+standalone: true
+instructions: '{project-root}/src/workflows/batch-optimize-payloads.instructions.md'
+validation: '{project-root}/src/workflows/batch-optimize-payloads.checklist.md'
+installed_path: '{project-root}/src/workflows'
+inputs:
+  payload_files: 'Glob or list of file paths containing raw MCP responses'
+  max_items: 'Optional cap on number of payloads to process'
+outputs:
+  summary_report: '{project-root}/docs/payload-optimization-report-{{date}}.md'

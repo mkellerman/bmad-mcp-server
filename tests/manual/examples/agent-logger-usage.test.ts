@@ -11,7 +11,7 @@ import {
   captureAgentExecution,
   logAndCapture,
   measureAction,
-} from '../framework/helpers/agent-logger.js';
+} from '../../framework/helpers/agent-logger.js';
 
 describe('Agent Logger Usage Examples', () => {
   describe('Basic Logging', () => {

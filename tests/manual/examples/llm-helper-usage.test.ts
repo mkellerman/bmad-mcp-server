@@ -16,11 +16,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { LLMHelper } from '../framework/helpers/llm-helper.js';
+import { LLMHelper } from '../../framework/helpers/llm-helper.js';
 import {
   validateXML,
   extractTagContent,
-} from '../framework/helpers/xml-validator.js';
+} from '../../framework/helpers/xml-validator.js';
 
 describe('LLM Helper Example', () => {
   it('should test LLM chat interaction with automatic metadata capture', async () => {

@@ -4,11 +4,16 @@
  * This setup cleans up old test result fragments before tests run
  * and generates the final report after all tests complete.
  *
- * For E2E tests, it also ensures LiteLLM proxy is running.
+ * For E2E tests, it ensures LiteLLM proxy is running.
+ * For Manual LLM-Evaluated tests, it ensures Copilot Proxy is running.
  */
 
 import { reporter } from '../core/reporter.js';
 import { startLiteLLMProxy } from '../../support/litellm-helper.mjs';
+import {
+  startCopilotProxy,
+  stopCopilotProxy,
+} from '../../support/copilot-helper.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -28,6 +33,12 @@ export async function setup() {
     'test-results/.results',
     testType,
   );
+
+  // Detect if we're running manual/llm-evaluated tests from command line args
+  // Only auto-start Copilot Proxy if explicitly requested
+  const isRunningEvaluatedTests =
+    process.env.RUN_LLM_EVALUATION === 'true' ||
+    process.env.AUTO_START_COPILOT === 'true';
 
   try {
     // Remove old fragments and contexts for this test type only
@@ -66,6 +77,25 @@ export async function setup() {
       );
     }
   }
+
+  // For Manual LLM-Evaluated tests, ensure Copilot Proxy is running
+  // Only if explicitly requested via environment variable
+  if (isRunningEvaluatedTests) {
+    console.log('\n🔍 Checking Copilot Proxy for LLM evaluation tests...');
+    console.log('   Set AUTO_START_COPILOT=true to auto-start proxy\n');
+
+    try {
+      // This will throw if authentication fails or server can't start
+      await startCopilotProxy();
+    } catch (err) {
+      const error = err as Error;
+      // Warn but don't fail - manual tests should handle unavailability
+      console.warn('\n⚠️  WARNING: Copilot Proxy startup failed');
+      console.warn('   Error:', error.message);
+      console.warn('\n   Manual LLM evaluation tests may be skipped.');
+      console.warn('   To enable: npx copilot-proxy --auth\n');
+    }
+  }
 }
 
 /**
@@ -74,6 +104,14 @@ export async function setup() {
  * The report aggregates results from all test types (unit, integration, e2e)
  */
 export async function teardown() {
+  // Stop Copilot Proxy if it was started
+  try {
+    await stopCopilotProxy();
+  } catch (err) {
+    const error = err as Error;
+    console.warn('⚠️  Error stopping Copilot Proxy:', error.message);
+  }
+
   // Small delay to ensure custom reporter finishes writing fragments
   console.log('\n⏳ Waiting for test reporters to finish...');
   await new Promise((resolve) => setTimeout(resolve, 500));

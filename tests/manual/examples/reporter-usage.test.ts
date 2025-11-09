@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { reporter } from '../framework/core/reporter.js';
+import { reporter } from '../../framework/core/reporter.js';
 
 describe('BMAD Unified Reporter Example', () => {
   // Example 1: Simple unit test

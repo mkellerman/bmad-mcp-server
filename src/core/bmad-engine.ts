@@ -18,15 +18,39 @@
  */
 
 import { ResourceLoaderGit, AgentMetadata } from './resource-loader.js';
-import type { Workflow } from '../types/index.js';
+import type { Workflow, Tool, Task, DiscoveryMode } from '../types/index.js';
 import {
   getAgentExecutionPrompt,
   getWorkflowExecutionPrompt,
 } from '../config.js';
+import { SessionTracker } from './session-tracker.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import {
+  buildRankingPrompt,
+  parseRankingResponse,
+  shouldUseLLMRanking,
+  type RankingCandidate,
+  type UsageInfo,
+} from './llm-ranker.js';
 
 // ============================================================================
 // Core Types (Transport-Agnostic)
 // ============================================================================
+
+/**
+ * MCP Sampling capability detection
+ */
+export interface SamplingCapability {
+  /** Whether the connected client supports sampling/createMessage */
+  supported: boolean;
+  /** When capability was detected */
+  detected: Date;
+  /** Client information if available */
+  clientInfo?: {
+    name?: string;
+    version?: string;
+  };
+}
 
 /**
  * Result of a BMAD operation
@@ -40,6 +64,76 @@ export interface BMADResult {
   error?: string;
   /** Human-readable text output */
   text: string;
+}
+
+/**
+ * Workflow match for ambiguous results
+ */
+export interface WorkflowMatch {
+  /** Composite key: module:agent:workflow */
+  key: string;
+  /** Module name */
+  module: string;
+  /** Agent name */
+  agentName: string;
+  /** Agent display name */
+  agentDisplayName: string;
+  /** Agent title */
+  agentTitle: string;
+  /** Workflow name */
+  workflow: string;
+  /** Workflow description */
+  description: string;
+  /** Example action for retry */
+  action: string;
+}
+
+/**
+ * Agent match for ambiguous results
+ */
+export interface AgentMatch {
+  /** Composite key: module:agent */
+  key: string;
+  /** Module name */
+  module: string;
+  /** Agent name */
+  agentName: string;
+  /** Agent display name */
+  agentDisplayName: string;
+  /** Agent title */
+  agentTitle: string;
+  /** Agent role */
+  role: string;
+  /** Agent description/identity */
+  description: string;
+  /** Example action for retry */
+  action: string;
+}
+
+/**
+ * Ambiguous workflow result when multiple workflows match
+ */
+export interface AmbiguousWorkflowResult extends BMADResult {
+  success: true;
+  /** Indicates this is an ambiguous result requiring user/LLM choice */
+  ambiguous: true;
+  /** Type discriminator */
+  type: 'workflow';
+  /** Array of matching workflows */
+  matches: WorkflowMatch[];
+}
+
+/**
+ * Ambiguous agent result when multiple agents match
+ */
+export interface AmbiguousAgentResult extends BMADResult {
+  success: true;
+  /** Indicates this is an ambiguous result requiring user/LLM choice */
+  ambiguous: true;
+  /** Type discriminator */
+  type: 'agent';
+  /** Array of matching agents */
+  matches: AgentMatch[];
 }
 
 /**
@@ -109,17 +203,37 @@ export class BMADEngine {
   private loader: ResourceLoaderGit;
   private agentMetadata: AgentMetadata[] = [];
   private workflows: Workflow[] = [];
+  private tools: Tool[] = [];
+  private tasks: Task[] = [];
   private cachedResources: Array<{ uri: string; relativePath: string }> = [];
   private initialized = false;
+
+  /** Session-based usage tracker for intelligent ranking */
+  private sessionTracker: SessionTracker;
+
+  /** MCP sampling capability (LLM-powered ranking when supported) */
+  private samplingCapability: SamplingCapability = {
+    supported: false,
+    detected: new Date(),
+  };
+
+  /** Reference to MCP server for sampling API access */
+  private mcpServer?: Server;
 
   /**
    * Creates a new BMAD Engine instance
    *
    * @param projectRoot - Optional project root directory
    * @param gitRemotes - Optional array of Git remote URLs
+   * @param discoveryMode - Discovery mode for source filtering (strict/local/user/auto)
    */
-  constructor(projectRoot?: string, gitRemotes?: string[]) {
-    this.loader = new ResourceLoaderGit(projectRoot, gitRemotes);
+  constructor(
+    projectRoot?: string,
+    gitRemotes?: string[],
+    discoveryMode?: DiscoveryMode,
+  ) {
+    this.loader = new ResourceLoaderGit(projectRoot, gitRemotes, discoveryMode);
+    this.sessionTracker = new SessionTracker();
   }
 
   /**
@@ -134,6 +248,12 @@ export class BMADEngine {
     // Load all workflows with metadata
     this.workflows = await this.loader.listWorkflowsWithMetadata();
 
+    // Load all tools with metadata
+    this.tools = await this.loader.listToolsWithMetadata();
+
+    // Load all tasks with metadata
+    this.tasks = await this.loader.listTasksWithMetadata();
+
     // Pre-build resource list
     this.cachedResources = [];
     const allFiles = await this.loader.listAllFiles();
@@ -145,6 +265,202 @@ export class BMADEngine {
     }
 
     this.initialized = true;
+  }
+
+  /**
+   * Detect and store MCP sampling capability
+   *
+   * Should be called after MCP server initialization (oninitialized callback)
+   * to check if the connected client supports sampling/createMessage for LLM-powered ranking.
+   *
+   * @param server - MCP Server instance
+   */
+  detectSamplingSupport(server: Server): void {
+    this.mcpServer = server;
+    const capabilities = server.getClientCapabilities();
+
+    this.samplingCapability = {
+      supported: !!capabilities?.sampling,
+      detected: new Date(),
+      clientInfo:
+        capabilities &&
+        (capabilities as { clientInfo?: { name?: string; version?: string } })
+          .clientInfo
+          ? {
+              name: (capabilities as { clientInfo?: { name?: string } })
+                .clientInfo?.name,
+              version: (capabilities as { clientInfo?: { version?: string } })
+                .clientInfo?.version,
+            }
+          : undefined,
+    };
+
+    // Log detection results for debugging
+    if (this.samplingCapability.supported) {
+      console.error('✓ MCP Sampling capability detected', {
+        client: this.samplingCapability.clientInfo?.name || 'unknown',
+        version: this.samplingCapability.clientInfo?.version || 'unknown',
+      });
+    } else {
+      console.error(
+        '✗ MCP Sampling not supported by client, using session-based ranking fallback',
+      );
+    }
+  }
+
+  /**
+   * Check if sampling is currently available
+   */
+  isSamplingAvailable(): boolean {
+    return this.samplingCapability.supported && !!this.mcpServer;
+  }
+
+  /**
+   * Get sampling capability status (for debugging/diagnostics)
+   */
+  getSamplingCapability(): SamplingCapability {
+    return { ...this.samplingCapability };
+  }
+
+  // ============================================================================
+  // RANKING HELPERS (Session-based + LLM Intelligence)
+  // ============================================================================
+
+  /**
+   * Rank items by usage patterns, manifest priority, and module boost
+   *
+   * @param items Array of items to rank (agents, workflows, or matches)
+   * @param keyExtractor Function to extract composite key from item (e.g., "core:debug")
+   * @returns Ranked array (highest score first)
+   */
+  private rankByUsage<T>(items: T[], keyExtractor: (item: T) => string): T[] {
+    return items
+      .map((item, index) => ({
+        item,
+        score: this.sessionTracker.calculateScore(
+          keyExtractor(item),
+          index, // Manifest position
+          items.length,
+        ),
+      }))
+      .sort((a, b) => b.score - a.score) // Descending order
+      .map((ranked) => ranked.item);
+  }
+
+  /**
+   * Rank items using LLM-based intelligent ranking via MCP sampling
+   *
+   * Hybrid strategy:
+   * 1. Decides whether to use LLM or session-based ranking
+   * 2. If LLM: calls createMessage for ranking, parses response
+   * 3. On error/timeout: falls back to session-based ranking
+   *
+   * @param items Array of items to rank
+   * @param keyExtractor Function to extract composite key from item
+   * @param descExtractor Function to extract description from item
+   * @param userQuery Optional user query for context
+   * @returns Ranked array (highest relevance first)
+   */
+  private async rankWithHybridStrategy<T>(
+    items: T[],
+    keyExtractor: (item: T) => string,
+    descExtractor: (item: T) => string,
+    userQuery?: string,
+  ): Promise<T[]> {
+    // Decision: should we use LLM ranking?
+    const decision = shouldUseLLMRanking(
+      this.isSamplingAvailable(),
+      items.length,
+      !!userQuery,
+    );
+
+    // Fast path: use session-based ranking
+    if (!decision.useLLM) {
+      console.warn(`⚡ Using session-based ranking: ${decision.reason}`);
+      return this.rankByUsage(items, keyExtractor);
+    }
+
+    // Try LLM ranking
+    try {
+      console.log(
+        '🎯 Using LLM-based ranking for better context understanding',
+      );
+
+      // Build ranking context
+      const candidates: RankingCandidate[] = items.map((item) => {
+        const key = keyExtractor(item);
+        const parts = key.split(':');
+        return {
+          key,
+          name: parts[1] || parts[0],
+          module: parts[0],
+          description: descExtractor(item),
+        };
+      });
+
+      // Get usage history for context
+      const usageHistory: UsageInfo[] = candidates
+        .map((c) => {
+          const usage = this.sessionTracker.getUsageRecord(c.key);
+          if (!usage) return null;
+          return {
+            key: c.key,
+            lastUsed: new Date(usage.lastAccess),
+            useCount: usage.count,
+          };
+        })
+        .filter((u): u is UsageInfo => u !== null);
+
+      // Build prompt
+      const prompt = buildRankingPrompt({
+        userQuery: userQuery || 'general ranking',
+        candidates,
+        usageHistory,
+      });
+
+      // Call LLM via MCP sampling
+      const startTime = Date.now();
+      const response = await this.mcpServer!.createMessage({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: prompt,
+            },
+          },
+        ],
+        maxTokens: 100,
+      });
+
+      const latency = Date.now() - startTime;
+      console.log(`✅ LLM ranking completed in ${latency}ms`);
+
+      // Parse response
+      const validKeys = new Set(candidates.map((c) => c.key));
+      const llmText =
+        response.content.type === 'text' ? response.content.text : '';
+      const rankedKeys = parseRankingResponse(llmText, validKeys);
+
+      // Reorder items according to LLM ranking
+      const itemMap = new Map(items.map((item) => [keyExtractor(item), item]));
+      const rankedItems = rankedKeys
+        .map((key) => itemMap.get(key))
+        .filter((item): item is T => item !== undefined);
+
+      return rankedItems;
+    } catch (error) {
+      // Fallback to session-based ranking on any error
+      console.warn(
+        '⚠️  LLM ranking failed, falling back to session-based ranking',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          userQuery,
+          candidateCount: items.length,
+        },
+      );
+      return this.rankByUsage(items, keyExtractor);
+    }
   }
 
   // ============================================================================
@@ -164,7 +480,13 @@ export class BMADEngine {
       agents = agents.filter((a) => a.module === filter.module);
     }
 
-    const agentList = agents.map((a) => ({
+    // Rank agents by usage patterns
+    const rankedAgents = this.rankByUsage(
+      agents,
+      (a) => `${a.module}:${a.name}`,
+    );
+
+    const agentList = rankedAgents.map((a) => ({
       name: a.name,
       module: a.module,
       displayName: a.displayName,
@@ -215,9 +537,11 @@ export class BMADEngine {
       for (let i = 0; i < agent.workflows.length; i++) {
         const workflowName = agent.workflows[i];
         const menuItemDesc = agent.workflowMenuItems?.[i] || workflowName;
+        // Use module:name as the unique key for deduplication
+        const workflowKey = `${agent.module || 'core'}:${workflowName}`;
 
-        if (!workflowMap.has(workflowName)) {
-          workflowMap.set(workflowName, {
+        if (!workflowMap.has(workflowKey)) {
+          workflowMap.set(workflowKey, {
             name: workflowName,
             description: menuItemDesc,
             module: agent.module,
@@ -226,18 +550,23 @@ export class BMADEngine {
           });
         } else {
           // Workflow offered by multiple agents
-          workflowMap.get(workflowName)!.agents.push(agent.name);
+          workflowMap.get(workflowKey)!.agents.push(agent.name);
         }
       }
     }
 
-    const workflowList = Array.from(workflowMap.values());
+    // Convert to array and rank by usage
+    const workflows = Array.from(workflowMap.values());
+    const rankedWorkflows = this.rankByUsage(
+      workflows,
+      (w) => `${w.module || 'core'}:${w.name}`,
+    );
 
-    const text = this.formatWorkflowList(workflowList);
+    const text = this.formatWorkflowList(rankedWorkflows);
 
     return {
       success: true,
-      data: workflowList,
+      data: rankedWorkflows,
       text,
     };
   }
@@ -429,13 +758,9 @@ export class BMADEngine {
       } else if (relativePath === '_cfg/workflow-manifest.csv') {
         content = this.generateWorkflowManifest();
       } else if (relativePath === '_cfg/tool-manifest.csv') {
-        throw new Error(
-          'Tool manifest generation not yet implemented - coming soon! This will provide virtual tool metadata from loaded BMAD modules.',
-        );
+        content = this.generateToolManifest();
       } else if (relativePath === '_cfg/task-manifest.csv') {
-        throw new Error(
-          'Task manifest generation not yet implemented - coming soon! This will provide virtual task metadata from loaded BMAD modules.',
-        );
+        content = this.generateTaskManifest();
       } else {
         // Default: Load file from filesystem
         content = await this.loader.loadFile(relativePath);
@@ -478,7 +803,9 @@ export class BMADEngine {
   /**
    * Execute an agent with user message
    */
-  async executeAgent(params: ExecuteParams): Promise<BMADResult> {
+  async executeAgent(
+    params: ExecuteParams,
+  ): Promise<BMADResult | AmbiguousAgentResult> {
     if (!params.agent) {
       return {
         success: false,
@@ -490,11 +817,69 @@ export class BMADEngine {
     await this.initialize();
 
     try {
+      // Find all agents matching the name
+      const matchingAgents = this.agentMetadata.filter(
+        (a) => a.name === params.agent,
+      );
+
+      // Filter by module if specified
+      const filteredAgents = params.module
+        ? matchingAgents.filter((a) => a.module === params.module)
+        : matchingAgents;
+
+      // Check for ambiguity: multiple matches without module filter
+      if (!params.module && filteredAgents.length > 1) {
+        // Build matches array
+        const matches: AgentMatch[] = filteredAgents.map((agent) => {
+          const module = agent.module || 'core';
+          const key = `${module}:${agent.name}`;
+
+          return {
+            key,
+            module,
+            agentName: agent.name,
+            agentDisplayName: agent.displayName,
+            agentTitle: agent.title,
+            role: agent.role || 'Agent',
+            description:
+              agent.description || agent.persona || 'No description available',
+            action: `bmad({ operation: "execute", agent: "${agent.name}", module: "${module}" })`,
+          };
+        });
+
+        // Rank matches by usage patterns
+        const rankedMatches = this.rankByUsage(matches, (m) => m.key);
+
+        // Return ambiguous result
+        return {
+          success: true,
+          ambiguous: true,
+          type: 'agent',
+          matches: rankedMatches,
+          text: this.formatAmbiguousAgentResponse(rankedMatches),
+        };
+      }
+
+      // Single match or module-filtered result
+      const selectedAgent = filteredAgents[0];
+
+      if (!selectedAgent) {
+        return {
+          success: false,
+          error: `Agent not found: ${params.agent}${params.module ? ` in module: ${params.module}` : ''}`,
+          text: this.formatAgentNotFound(params.agent),
+        };
+      }
+
       // Build minimal execution context (NO agent content loading!)
       const executionContext = {
         agent: params.agent,
         userContext: params.message,
       };
+
+      // Track agent usage for ranking
+      const module = selectedAgent.module || 'core';
+      this.sessionTracker.recordUsage(`${module}:${params.agent}`);
 
       // Build the prompt with just agent name and instructions
       const text = getAgentExecutionPrompt(executionContext);
@@ -523,7 +908,9 @@ export class BMADEngine {
    * The agent's workflow handler will instruct the LLM to load workflow.xml
    * and any other files needed.
    */
-  async executeWorkflow(params: ExecuteParams): Promise<BMADResult> {
+  async executeWorkflow(
+    params: ExecuteParams,
+  ): Promise<BMADResult | AmbiguousWorkflowResult> {
     if (!params.workflow) {
       return {
         success: false,
@@ -535,7 +922,87 @@ export class BMADEngine {
     await this.initialize();
 
     try {
-      // Find which agent(s) offer this workflow
+      // PRIORITY 1: Check if this is a standalone workflow FIRST
+      // Standalone workflows execute directly without agent selection
+      const standaloneWorkflow = this.workflows.find(
+        (w) =>
+          w.name === params.workflow &&
+          w.standalone &&
+          (!params.module || w.module === params.module),
+      );
+
+      if (standaloneWorkflow) {
+        // Execute standalone workflow without agent
+        const workflowPath = `{project-root}/bmad/${standaloneWorkflow.module}/workflows/${params.workflow}/workflow.yaml`;
+
+        const executionContext = {
+          workflow: params.workflow,
+          workflowPath,
+          userContext: params.message,
+          agent: undefined,
+          agentWorkflowHandler: undefined,
+        };
+
+        // Track workflow usage for ranking
+        this.sessionTracker.recordUsage(
+          `${standaloneWorkflow.module}:${params.workflow}`,
+        );
+
+        const text = getWorkflowExecutionPrompt(executionContext);
+
+        return {
+          success: true,
+          data: executionContext,
+          text,
+        };
+      }
+
+      // PRIORITY 2: Find all agents that offer this workflow
+      const matchingAgents = this.agentMetadata.filter((a) =>
+        a.workflows?.includes(params.workflow!),
+      );
+
+      // Filter by module if specified
+      const filteredAgents = params.module
+        ? matchingAgents.filter((a) => a.module === params.module)
+        : matchingAgents;
+
+      // Check for ambiguity: multiple matches without module filter
+      if (!params.module && filteredAgents.length > 1) {
+        // Build matches array
+        const matches: WorkflowMatch[] = filteredAgents.map((agent) => {
+          const module = agent.module || 'core';
+          const key = `${module}:${agent.name}:${params.workflow}`;
+          const workflowIndex = agent.workflows!.indexOf(params.workflow!);
+          const description =
+            agent.workflowMenuItems?.[workflowIndex] || params.workflow!;
+
+          return {
+            key,
+            module,
+            agentName: agent.name,
+            agentDisplayName: agent.displayName,
+            agentTitle: agent.title,
+            workflow: params.workflow!,
+            description,
+            action: `bmad({ operation: "execute", workflow: "${params.workflow}", module: "${module}" })`,
+          };
+        });
+
+        // Rank matches by usage patterns
+        const rankedMatches = this.rankByUsage(matches, (m) => m.key);
+
+        // Return ambiguous result
+        return {
+          success: true,
+          ambiguous: true,
+          type: 'workflow',
+          matches: rankedMatches,
+          text: this.formatAmbiguousWorkflowResponse(rankedMatches),
+        };
+      }
+
+      // Single match or module-filtered result
       let agentForWorkflow: AgentMetadata | undefined;
 
       if (params.agent) {
@@ -544,10 +1011,16 @@ export class BMADEngine {
           (a) => a.name === params.agent,
         );
       } else {
-        // Find first agent that offers this workflow
-        agentForWorkflow = this.agentMetadata.find((a) =>
-          a.workflows?.includes(params.workflow!),
-        );
+        // Use first filtered match
+        agentForWorkflow = filteredAgents[0];
+      }
+
+      if (!agentForWorkflow) {
+        return {
+          success: false,
+          error: `No agent found offering workflow: ${params.workflow}${params.module ? ` in module: ${params.module}` : ''}`,
+          text: this.formatWorkflowNotFound(params.workflow),
+        };
       }
 
       // Get workflow path from agent metadata
@@ -563,6 +1036,13 @@ export class BMADEngine {
         agent: agentForWorkflow?.name,
         agentWorkflowHandler: agentForWorkflow?.workflowHandlerInstructions,
       };
+
+      // Track workflow and agent usage for ranking
+      const module = agentForWorkflow?.module || 'core';
+      this.sessionTracker.recordUsage(`${module}:${params.workflow}`);
+      if (agentForWorkflow) {
+        this.sessionTracker.recordUsage(`${module}:${agentForWorkflow.name}`);
+      }
 
       // Build the prompt with just agent metadata and handler
       const text = getWorkflowExecutionPrompt(executionContext);
@@ -666,6 +1146,117 @@ export class BMADEngine {
   // ============================================================================
   // FORMATTING HELPERS (Private)
   // ============================================================================
+
+  /**
+   * Format ambiguous workflow response when multiple workflows match
+   * Optimized for LLM comprehension and token efficiency
+   */
+  private formatAmbiguousWorkflowResponse(matches: WorkflowMatch[]): string {
+    const workflowName = matches[0].workflow;
+    const module = matches[0].module;
+
+    const lines = [
+      `**Multiple Agent Options Available**`,
+      '',
+      `intent: "Workflow '${workflowName}' offered by ${matches.length} agents in module '${module}'"`,
+      `action_required: "Select agent perspective"`,
+      '',
+      '**Options** (ranked by relevance):',
+    ];
+
+    matches.forEach((match, index) => {
+      const star = index === 0 ? '⭐ ' : '';
+      const roleKeyword = match.agentTitle.split(' ')[0];
+      lines.push(
+        `${index + 1}. ${star}${match.agentName} (${match.agentDisplayName}) - ${roleKeyword} perspective`,
+      );
+      lines.push(`   • "${match.description}"`);
+      lines.push(
+        `   • Retry: bmad({ operation: "execute", workflow: "${workflowName}", module: "${module}", agent: "${match.agentName}" })`,
+      );
+      lines.push('');
+    });
+
+    lines.push('**Decision Heuristics:**');
+    lines.push(
+      '- Context with "analyze|review|business" → analyst (confidence: high)',
+    );
+    lines.push(
+      '- Context with "design|architecture|technical" → architect (confidence: high)',
+    );
+    lines.push(
+      '- Context with "implement|code|develop" → dev (confidence: high)',
+    );
+    lines.push('- Context with "test|quality|qa" → tea (confidence: high)');
+    lines.push(
+      '- Context with "plan|manage|coordinate" → pm/sm (confidence: medium)',
+    );
+    lines.push(
+      '- No strong signal → Select ⭐ option or offer numbered menu to user',
+    );
+    lines.push('');
+    lines.push('**Metrics:**');
+    lines.push(`- options: ${matches.length}`);
+    lines.push(
+      `- token_estimate: ${Math.round(matches.length * 80)} (vs ${Math.round(matches.length * 280)} full load)`,
+    );
+    lines.push('- estimated_comprehension_cost: low');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Format ambiguous agent response when multiple agents match
+   * Optimized for LLM comprehension and token efficiency
+   */
+  private formatAmbiguousAgentResponse(matches: AgentMatch[]): string {
+    const lines = [
+      `**Multiple Agent Matches**`,
+      '',
+      `intent: "Found ${matches.length} agents matching your request"`,
+      `action_required: "Select most relevant agent"`,
+      '',
+      '**Agents** (ranked by relevance):',
+    ];
+
+    matches.forEach((match, index) => {
+      const star = index === 0 ? '⭐ ' : '';
+      const roleKeyword = match.agentTitle.split(' ')[0];
+      lines.push(
+        `${index + 1}. ${star}${match.agentName} (${match.agentDisplayName}) - ${roleKeyword}`,
+      );
+      lines.push(`   • Role: ${match.role}`);
+      lines.push(`   • Module: ${match.module}`);
+      lines.push(
+        `   • Execute: bmad({ operation: "execute", agent: "${match.agentName}", module: "${match.module}", message: "your request" })`,
+      );
+      lines.push('');
+    });
+
+    lines.push('**Decision Heuristics:**');
+    lines.push(
+      '- Task involves requirements/business logic → analyst/pm (confidence: high)',
+    );
+    lines.push(
+      '- Task involves system design/architecture → architect (confidence: high)',
+    );
+    lines.push(
+      '- Task involves implementation/coding → dev (confidence: high)',
+    );
+    lines.push('- Task involves testing/quality → tea (confidence: high)');
+    lines.push(
+      '- Task involves debugging/investigation → debug (confidence: high)',
+    );
+    lines.push(
+      '- No strong signal → Select ⭐ option or offer numbered menu to user',
+    );
+    lines.push('');
+    lines.push('**Metrics:**');
+    lines.push(`- matches: ${matches.length}`);
+    lines.push('- estimated_comprehension_cost: low');
+
+    return lines.join('\n');
+  }
 
   private formatAgentList(
     agents: Array<{
@@ -912,6 +1503,74 @@ export class BMADEngine {
       );
 
       rows.push(`${name},${description},${module},${path},${standalone}`);
+    }
+
+    return rows.join('\n');
+  }
+
+  /**
+   * Generate virtual tool-manifest.csv from loaded tool metadata
+   *
+   * @returns CSV-formatted string matching BMAD tool-manifest.csv schema
+   *
+   * @remarks
+   * Maps Tool fields to CSV columns:
+   * - name, displayName, description, module, path, standalone: direct mapping
+   */
+  generateToolManifest(): string {
+    const rows: string[] = [];
+
+    // CSV header matching BMAD schema
+    rows.push('name,displayName,description,module,path,standalone');
+
+    // Generate row for each tool
+    for (const tool of this.tools) {
+      const name = this.escapeCsvField(tool.name || '');
+      const displayName = this.escapeCsvField(tool.displayName || '');
+      const description = this.escapeCsvField(tool.description || '');
+      const module = this.escapeCsvField(tool.module || 'core');
+      const path = this.escapeCsvField(tool.path || '');
+      const standalone = this.escapeCsvField(
+        tool.standalone ? 'true' : 'false',
+      );
+
+      rows.push(
+        `${name},${displayName},${description},${module},${path},${standalone}`,
+      );
+    }
+
+    return rows.join('\n');
+  }
+
+  /**
+   * Generate virtual task-manifest.csv from loaded task metadata
+   *
+   * @returns CSV-formatted string matching BMAD task-manifest.csv schema
+   *
+   * @remarks
+   * Maps Task fields to CSV columns:
+   * - name, displayName, description, module, path, standalone: direct mapping
+   */
+  generateTaskManifest(): string {
+    const rows: string[] = [];
+
+    // CSV header matching BMAD schema
+    rows.push('name,displayName,description,module,path,standalone');
+
+    // Generate row for each task
+    for (const task of this.tasks) {
+      const name = this.escapeCsvField(task.name || '');
+      const displayName = this.escapeCsvField(task.displayName || '');
+      const description = this.escapeCsvField(task.description || '');
+      const module = this.escapeCsvField(task.module || 'core');
+      const path = this.escapeCsvField(task.path || '');
+      const standalone = this.escapeCsvField(
+        task.standalone ? 'true' : 'false',
+      );
+
+      rows.push(
+        `${name},${displayName},${description},${module},${path},${standalone}`,
+      );
     }
 
     return rows.join('\n');
