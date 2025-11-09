@@ -21,9 +21,9 @@ import { BMADEngine } from '../../src/core/bmad-engine.js';
 import {
   evaluateTest,
   getEvaluationCostSummary,
-} from '../helpers/llm-evaluation/index.js';
-import { createRankingCriteria } from '../fixtures/evaluation-prompts/index.js';
-import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check.js';
+} from '../../helpers/llm-evaluation/index.js';
+import { createRankingCriteria } from '../../fixtures/evaluation-prompts/index.js';
+import { isCopilotProxyAvailable } from '../../helpers/llm-evaluation/copilot-check.js';
 
 describe('LLM-Evaluated: Workflow Ranking Quality', () => {
   let engine: BMADEngine;

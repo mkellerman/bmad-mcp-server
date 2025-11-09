@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addLLMInteraction,
   setBehavior,
-} from '../framework/core/test-context.js';
+} from '../../framework/core/test-context.js';
 
 describe('LLM Test Context Example', () => {
   it('should capture LLM interaction data', () => {

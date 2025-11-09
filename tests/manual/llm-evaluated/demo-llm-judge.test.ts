@@ -17,15 +17,15 @@ import {
   afterEach,
   beforeAll,
 } from 'vitest';
-import { LLMJudge } from '../helpers/llm-evaluation/llm-judge';
-import { ConsistencyChecker } from '../helpers/llm-evaluation/consistency-checker';
-import { getEvaluationRunner } from '../helpers/llm-evaluation/evaluation-runner';
+import { LLMJudge } from '../../helpers/llm-evaluation/llm-judge';
+import { ConsistencyChecker } from '../../helpers/llm-evaluation/consistency-checker';
+import { getEvaluationRunner } from '../../helpers/llm-evaluation/evaluation-runner';
 import type {
   MCPResponse,
   EvaluationCriteria,
-} from '../helpers/llm-evaluation/types';
-import { createRankingCriteria } from '../fixtures/evaluation-prompts';
-import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check';
+} from '../../helpers/llm-evaluation/types';
+import { createRankingCriteria } from '../../fixtures/evaluation-prompts';
+import { isCopilotProxyAvailable } from '../../helpers/llm-evaluation/copilot-check';
 
 describe('DEMO: LLM Judge Framework Visualization', () => {
   let originalCallJudgeLLM: any;

@@ -35,10 +35,10 @@ export async function setup() {
   );
 
   // Detect if we're running manual/llm-evaluated tests from command line args
+  // Only auto-start Copilot Proxy if explicitly requested
   const isRunningEvaluatedTests =
-    testType === 'manual' ||
     process.env.RUN_LLM_EVALUATION === 'true' ||
-    process.argv.some((arg) => arg.includes('manual/llm-evaluated'));
+    process.env.AUTO_START_COPILOT === 'true';
 
   try {
     // Remove old fragments and contexts for this test type only
@@ -79,24 +79,21 @@ export async function setup() {
   }
 
   // For Manual LLM-Evaluated tests, ensure Copilot Proxy is running
+  // Only if explicitly requested via environment variable
   if (isRunningEvaluatedTests) {
     console.log('\n🔍 Checking Copilot Proxy for LLM evaluation tests...');
+    console.log('   Set AUTO_START_COPILOT=true to auto-start proxy\n');
 
     try {
       // This will throw if authentication fails or server can't start
       await startCopilotProxy();
     } catch (err) {
       const error = err as Error;
-      // FAIL-FAST: Don't skip, fail the entire test suite
-      console.error('\n❌ FATAL: Copilot Proxy startup failed');
-      console.error('   Error:', error.message);
-      console.error('\n   All manual/llm-evaluated tests will FAIL.');
-      console.error('   Fix the issue and retry.\n');
-
-      // Throw to fail the global setup, which fails all tests
-      throw new Error(
-        `Copilot Proxy required for manual/llm-evaluated tests but failed to start: ${error.message}`,
-      );
+      // Warn but don't fail - manual tests should handle unavailability
+      console.warn('\n⚠️  WARNING: Copilot Proxy startup failed');
+      console.warn('   Error:', error.message);
+      console.warn('\n   Manual LLM evaluation tests may be skipped.');
+      console.warn('   To enable: npx copilot-proxy --auth\n');
     }
   }
 }

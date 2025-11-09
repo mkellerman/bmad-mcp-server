@@ -9,10 +9,10 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { evaluateTest } from '../helpers/llm-evaluation';
-import { createRankingCriteria } from '../fixtures/evaluation-prompts';
-import type { MCPResponse } from '../helpers/llm-evaluation/types';
-import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check';
+import { evaluateTest } from '../../helpers/llm-evaluation';
+import { createRankingCriteria } from '../../fixtures/evaluation-prompts';
+import type { MCPResponse } from '../../helpers/llm-evaluation/types';
+import { isCopilotProxyAvailable } from '../../helpers/llm-evaluation/copilot-check';
 
 // Check if Copilot Proxy is available
 async function checkCopilotAuth(): Promise<boolean> {

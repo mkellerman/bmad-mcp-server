@@ -9,11 +9,11 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { rmSync, existsSync } from 'fs';
-import { EvaluationStorage } from '../helpers/llm-evaluation/storage';
+import { EvaluationStorage } from '../../helpers/llm-evaluation/storage';
 import type {
   MCPResponse,
   ConsistencyResult,
-} from '../helpers/llm-evaluation/types';
+} from '../../helpers/llm-evaluation/types';
 
 describe('DEMO: Evaluation Storage and Trend Analysis', () => {
   const testStorageDir = 'test-results/evaluations-demo';

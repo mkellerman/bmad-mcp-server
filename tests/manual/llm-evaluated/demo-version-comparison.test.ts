@@ -13,11 +13,11 @@ import { join } from 'path';
 import {
   EvaluationStorage,
   type VersionInfo,
-} from '../helpers/llm-evaluation/storage';
+} from '../../helpers/llm-evaluation/storage.js';
 import type {
   MCPResponse,
   ConsistencyResult,
-} from '../helpers/llm-evaluation/types';
+} from '../../helpers/llm-evaluation/types.js';
 
 describe('DEMO: Version Comparison', () => {
   const testStorageDir = 'test-results/evaluations-version-demo';

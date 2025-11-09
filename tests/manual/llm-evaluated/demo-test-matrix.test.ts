@@ -12,11 +12,11 @@ import {
   TestMatrix,
   JUDGE_MODELS,
   type MatrixJudgeModel,
-} from '../helpers/llm-evaluation/test-matrix';
-import type { MCPResponse } from '../helpers/llm-evaluation/types';
-import { createRankingCriteria } from '../fixtures/evaluation-prompts';
-import { LLMJudge } from '../helpers/llm-evaluation/llm-judge';
-import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check';
+} from '../../helpers/llm-evaluation/test-matrix';
+import type { MCPResponse } from '../../helpers/llm-evaluation/types';
+import { createRankingCriteria } from '../../fixtures/evaluation-prompts';
+import { LLMJudge } from '../../helpers/llm-evaluation/llm-judge';
+import { isCopilotProxyAvailable } from '../../helpers/llm-evaluation/copilot-check';
 
 describe('DEMO: Test Matrix - Multi-Judge Comparison', () => {
   beforeAll(async () => {
