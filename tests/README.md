@@ -803,3 +803,503 @@ docker logs litellm-proxy
 docker rm -f litellm-proxy
 npm run test:litellm-start
 ```
+
+---
+
+## 📋 Testing Coding Rules
+
+### Mandatory Rules (Enforced by ESLint/CI)
+
+#### 1. **Test File Naming & Categorization**
+
+- **Unit/Integration tests**: `*.test.ts`
+- **E2E tests**: `*.test.ts` in `tests/e2e/` directory
+- **LLM Evaluation tests**: `*.eval.test.ts` (uses LLM Judge for quality assessment)
+- Must match the file being tested: `foo.ts` → `foo.test.ts`
+
+**Examples:**
+
+```typescript
+// Unit test
+tests / unit / core / session - tracker.test.ts;
+
+// E2E test (uses copilot-proxy)
+tests / e2e / copilot - proxy.smoke.test.ts;
+tests / e2e / real - llm - evaluation.test.ts;
+
+// LLM Evaluation test (uses LLM Judge)
+tests / e2e / ranking - quality.eval.test.ts;
+```
+
+#### 2. **LLM Service Requirements**
+
+**❌ DO NOT: Use LiteLLM**
+
+- LiteLLM support has been removed from this project
+- All LLM integration must use GitHub Copilot Proxy
+
+**✅ DO: Use Copilot Proxy for E2E tests**
+
+```typescript
+// Mark as E2E if copilot-proxy is used
+describe('E2E: My Feature', () => {
+  beforeAll(async () => {
+    const available = await isCopilotProxyAvailable();
+    if (!available) {
+      throw new Error('Copilot Proxy required');
+    }
+  });
+});
+```
+
+**✅ DO: Mark tests as LLM Evaluation if LLM Judge is used**
+
+```typescript
+// File: tests/e2e/ranking-quality.eval.test.ts
+// Uses LLM Judge to evaluate response quality
+import { evaluateTest } from '../helpers/llm-evaluation';
+
+describe('E2E: Workflow Ranking Quality', () => {
+  it('should rank workflows correctly', async () => {
+    const evaluation = await evaluateTest('test-id', response, criteria);
+    expect(evaluation.passed).toBe(true);
+  });
+});
+```
+
+#### 3. **Test Documentation (Required)**
+
+Every test file MUST include clear documentation at the top:
+
+```typescript
+/**
+ * Unit Test: Session Tracker
+ *
+ * INTENT:
+ * Validate session tracking logic for workflow/agent usage patterns.
+ *
+ * EXPECTED STEPS:
+ * 1. Track usage events (access, frequency)
+ * 2. Calculate recency scores
+ * 3. Retrieve usage records
+ *
+ * EXPECTED RESULTS:
+ * - Usage counts increment correctly
+ * - Recency scores decay over time
+ * - Records persist in memory correctly
+ *
+ * FAILURE CONDITIONS:
+ * - Invalid input throws appropriate errors
+ * - Concurrent access doesn't corrupt state
+ */
+
+import { describe, it, expect } from 'vitest';
+import { SessionTracker } from '../../../src/core/session-tracker';
+```
+
+**E2E Test Documentation Template:**
+
+```typescript
+/**
+ * E2E Test: Copilot Proxy Connection
+ *
+ * INTENT:
+ * Verify that GitHub Copilot Proxy server is running and accessible.
+ * This is a prerequisite for all E2E LLM evaluation tests.
+ *
+ * EXPECTED STEPS:
+ * 1. Check if @hazeruno/copilot-proxy package is installed
+ * 2. Verify GitHub Copilot authentication status
+ * 3. Verify the Copilot Proxy server is running on localhost:8069
+ * 4. Probe server endpoints to confirm it's listening
+ *
+ * EXPECTED RESULTS:
+ * - Server is running and responds to HTTP requests
+ * - Both root (/) and /v1/models endpoints are accessible
+ * - GitHub Copilot is authenticated
+ *
+ * FAILURE CONDITIONS:
+ * - Package not installed → FAIL test suite
+ * - Not authenticated → FAIL test suite
+ * - Server not running → FAIL test suite
+ * - Endpoints not accessible → FAIL test suite
+ *
+ * NOTE: This is an E2E test because it uses copilot-proxy (external LLM service).
+ */
+```
+
+#### 4. **Test Structure (AAA Pattern)**
+
+```typescript
+it('should do X when Y', () => {
+  // Arrange - Setup test data
+  const input = 'test';
+
+  // Act - Execute the function
+  const result = myFunction(input);
+
+  // Assert - Verify the result
+  expect(result).toBe('expected');
+});
+```
+
+#### 5. **No Focused/Skipped Tests in Main Branch**
+
+- ❌ `it.only()` - Blocks CI
+- ❌ `describe.only()` - Blocks CI
+- ⚠️ `it.skip()` / `it.todo()` - Warning only
+- ✅ Use conditional skipping for E2E tests:
+
+```typescript
+// ✅ Good - conditional skip with clear reason
+beforeAll(async () => {
+  const available = await isCopilotProxyAvailable();
+  if (!available) {
+    throw new Error(
+      '❌ E2E Test Suite Failed: Copilot Proxy not available\n' +
+        '   Action: Authenticate with GitHub Copilot\n' +
+        '   Command: npx copilot-proxy --auth\n',
+    );
+  }
+});
+```
+
+#### 6. **Test Independence**
+
+- Each test must be runnable in isolation
+- No shared mutable state between tests
+- Use `beforeEach` for test-specific setup
+
+```typescript
+// ✅ Good - isolated tests
+describe('MyModule', () => {
+  let instance;
+
+  beforeEach(() => {
+    instance = new MyModule(); // Fresh instance per test
+  });
+
+  it('test 1', () => {
+    /* uses instance */
+  });
+  it('test 2', () => {
+    /* uses instance */
+  });
+});
+
+// ❌ Bad - shared state
+describe('MyModule', () => {
+  let sharedState = { count: 0 };
+
+  it('test 1', () => {
+    sharedState.count++;
+  });
+  it('test 2', () => {
+    expect(sharedState.count).toBe(1);
+  }); // FAILS if test 1 skipped
+});
+```
+
+#### 7. **Async/Await Usage**
+
+```typescript
+// ✅ Good
+it('should fetch data', async () => {
+  const result = await fetchData();
+  expect(result).toBeDefined();
+});
+
+// ❌ Bad - missing await
+it('should fetch data', async () => {
+  const result = fetchData(); // Returns promise!
+  expect(result).toBeDefined(); // Tests the promise, not the result
+});
+```
+
+#### 8. **Error Testing**
+
+```typescript
+// ✅ Good - use toThrow()
+expect(() => myFunction(null)).toThrow('Invalid input');
+
+// ✅ Good - async errors
+await expect(asyncFunction()).rejects.toThrow('Error message');
+
+// ❌ Bad - doesn't catch error
+myFunction(null); // Test passes even if it throws
+```
+
+---
+
+### Recommended Guidelines
+
+#### 1. **Test Description Format**
+
+- Start with "should"
+- Be specific about behavior: `should return null when input is empty`
+- Avoid vague descriptions: ❌ `test works`, ❌ `handles edge cases`
+
+```typescript
+// ✅ Good
+it('should return null when user ID is not found', () => {
+  expect(getUser('invalid-id')).toBeNull();
+});
+
+// ❌ Bad
+it('works', () => {
+  expect(getUser('invalid-id')).toBeNull();
+});
+```
+
+#### 2. **One Assertion Per Test (Usually)**
+
+```typescript
+// ✅ Good - focused test
+it('should return user name', () => {
+  expect(getUser().name).toBe('John');
+});
+
+it('should return user age', () => {
+  expect(getUser().age).toBe(30);
+});
+
+// ⚠️ Acceptable - related assertions
+it('should return complete user object', () => {
+  const user = getUser();
+  expect(user.name).toBe('John');
+  expect(user.age).toBe(30);
+  expect(user.email).toBe('john@example.com');
+});
+```
+
+#### 3. **Test Data Management**
+
+- Use fixtures for complex data: `tests/fixtures/`
+- Keep inline data minimal and readable
+- Use factories for repeated test objects
+
+```typescript
+// ✅ Good - fixture
+import { mockWorkflow } from '../../fixtures/workflows';
+
+it('should process workflow', () => {
+  const result = processWorkflow(mockWorkflow);
+  expect(result.success).toBe(true);
+});
+
+// ⚠️ OK for simple data
+it('should parse name', () => {
+  expect(parseName('John Doe')).toEqual({ first: 'John', last: 'Doe' });
+});
+```
+
+#### 4. **Mock Minimally**
+
+```typescript
+// ✅ Good - only mock external dependencies
+const mockFetch = vi.fn().mockResolvedValue({ data: 'test' });
+
+// ❌ Bad - mocking internal logic defeats testing purpose
+const mockBusinessLogic = vi.fn().mockReturnValue(true);
+```
+
+#### 5. **Test Coverage Targets**
+
+- Unit tests: 80%+ coverage
+- Integration tests: Cover critical paths
+- E2E tests: Cover user workflows
+- Don't obsess over 100% - test behavior, not lines
+
+#### 6. **Performance**
+
+- Unit tests: < 100ms each
+- Integration tests: < 5s each
+- E2E tests: < 30s each
+- Use `vi.useFakeTimers()` to avoid real delays
+
+```typescript
+// ✅ Good - fast test with fake timers
+it('should timeout after 1 second', () => {
+  vi.useFakeTimers();
+  const callback = vi.fn();
+  setTimeout(callback, 1000);
+  vi.advanceTimersByTime(1000);
+  expect(callback).toHaveBeenCalled();
+  vi.useRealTimers();
+});
+```
+
+---
+
+### E2E Specific Rules
+
+#### 1. **Copilot Proxy Prerequisites**
+
+```typescript
+/**
+ * E2E Test: Real LLM Evaluation
+ *
+ * NOTE: This is an E2E test because it uses copilot-proxy to call real LLM APIs.
+ */
+
+describe('E2E: Real LLM Evaluation', () => {
+  let shouldSkip = false;
+  let skipReason = '';
+
+  beforeAll(async () => {
+    // Test connection to copilot-proxy - fail suite if unavailable
+    const available = await isCopilotProxyAvailable();
+    if (!available) {
+      shouldSkip = true;
+      skipReason = 'Copilot Proxy not available';
+      return;
+    }
+  });
+
+  it('should evaluate with LLM', async () => {
+    // FAIL if copilot-proxy is unavailable (per testing rules)
+    if (shouldSkip) {
+      throw new Error(
+        `❌ E2E Test Suite Failed: ${skipReason}\n` +
+          `   Action: Authenticate with GitHub Copilot\n` +
+          `   Command: npx copilot-proxy --auth\n`,
+      );
+    }
+
+    // Test implementation...
+  });
+});
+```
+
+#### 2. **Graceful Degradation**
+
+- E2E tests must handle unavailable services
+- Fail fast with clear error messages
+- Never silently skip critical validations
+
+```typescript
+// ✅ Good - clear failure message
+if (!copilotAvailable) {
+  throw new Error('❌ Copilot Proxy required - run: npx copilot-proxy --auth');
+}
+
+// ❌ Bad - silent skip
+if (!copilotAvailable) return; // Test appears to pass
+```
+
+#### 3. **Cost Awareness**
+
+- Minimize LLM API calls
+- Use mocks for development
+- Real LLM tests only for critical paths
+
+```typescript
+// ✅ Good - single LLM call per test
+it('should evaluate response', async () => {
+  const evaluation = await evaluateTest('test-id', response, criteria);
+  expect(evaluation.passed).toBe(true);
+});
+
+// ❌ Bad - multiple unnecessary LLM calls
+it('should evaluate multiple times', async () => {
+  await evaluateTest('test-1', response, criteria); // $$
+  await evaluateTest('test-2', response, criteria); // $$
+  await evaluateTest('test-3', response, criteria); // $$
+});
+```
+
+---
+
+### Anti-Patterns to Avoid
+
+#### ❌ **Test Interdependence**
+
+```typescript
+// Bad - test2 depends on test1
+describe('bad', () => {
+  let sharedState;
+  it('test1', () => {
+    sharedState = 'value';
+  });
+  it('test2', () => {
+    expect(sharedState).toBe('value');
+  }); // Fails if test1 skipped
+});
+```
+
+#### ❌ **Testing Implementation Details**
+
+```typescript
+// Bad - tests how, not what
+expect(myFunction.callCount).toBe(1);
+
+// Good - tests behavior
+expect(result).toBe('expected output');
+```
+
+#### ❌ **Overly Complex Test Setup**
+
+```typescript
+// Bad - hard to understand
+beforeEach(() => {
+  const data = JSON.parse(fs.readFileSync('complex.json'));
+  const transformed = transform(data);
+  const filtered = filter(transformed);
+  return setupTest(filtered);
+});
+
+// Good - clear and simple
+beforeEach(() => {
+  testData = createTestFixture(); // Helper function
+});
+```
+
+#### ❌ **Using LiteLLM (Deprecated)**
+
+```typescript
+// ❌ FORBIDDEN - LiteLLM is no longer supported
+import { LLMClient } from '../support/llm-client';
+const llm = new LLMClient('http://localhost:4000');
+
+// ✅ CORRECT - Use Copilot Proxy
+import { isCopilotProxyAvailable } from '../helpers/llm-evaluation/copilot-check';
+const available = await isCopilotProxyAvailable();
+```
+
+---
+
+### Enforcement
+
+- **ESLint**: Catches syntax and patterns
+- **Pre-commit hooks**: Runs lint before commit
+- **CI/CD**: Fails build on test failures
+- **Code review**: Manual review of test quality
+- **Testing rules**: Documented here, enforced by team
+
+---
+
+### Quick Reference: Test Type Decision
+
+```
+❓ Does this test use copilot-proxy?
+   ├─ YES → E2E test (tests/e2e/*.test.ts)
+   └─ NO → Continue...
+
+❓ Does this test use LLM Judge for evaluation?
+   ├─ YES → LLM Eval test (tests/e2e/*.eval.test.ts)
+   └─ NO → Continue...
+
+❓ Does this test make real I/O (file system, network)?
+   ├─ YES → Integration test (tests/integration/*.test.ts)
+   └─ NO → Unit test (tests/unit/*.test.ts)
+```
+
+---
+
+**Remember:**
+
+- 📝 Always document test intent and expected behavior
+- 🚫 Never use LiteLLM (use Copilot Proxy instead)
+- 🏷️ Properly categorize tests (unit/integration/e2e/eval)
+- ✅ Write tests that fail for the right reasons
+- 🎯 Test behavior, not implementation
