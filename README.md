@@ -432,7 +432,26 @@ npm run test:e2e
 
 # Watch mode
 npm run test:watch
+
+# Interactive UI
+npm run test:ui
+
+# Generate Allure reports (requires Java)
+npm run test:allure        # Run tests + generate + open report
+npm run test:allure:serve  # Serve existing results
+npm run test:report        # Generate report from existing results
 ```
+
+**📊 View Test Reports:**
+
+- **JUnit XML:** `test-results/junit.xml` (for CI/CD)
+- **Coverage:** `coverage/index.html` (line coverage)
+- **Allure:** `allure-report/index.html` (interactive reports)
+
+**Requirements:**
+
+- Java 17+ required for Allure reports (one-time install)
+- Install: `brew install openjdk@17` (macOS)
 
 ---
 
