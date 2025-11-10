@@ -81,6 +81,7 @@ export interface CopilotExecuteOptions {
   prompt: string;
   allowAllTools?: boolean;
   timeout?: number;
+  testName?: string; // Optional test name for tracking
 }
 
 /**
@@ -107,7 +108,7 @@ export class CopilotSessionHelper {
    * Execute a Copilot CLI command with BMAD MCP server and capture session
    */
   async execute(options: CopilotExecuteOptions): Promise<SessionAnalysis> {
-    const { prompt, allowAllTools = true, timeout = 60000 } = options;
+    const { prompt, allowAllTools = true, timeout = 60000, testName } = options;
 
     try {
       // Create temporary MCP config with unique server ID
@@ -134,7 +135,14 @@ export class CopilotSessionHelper {
       const events = await this.parseSessionFile(this.sessionFilePath);
 
       // Analyze session and return results
-      return this.analyzeSession(events);
+      const analysis = this.analyzeSession(events);
+
+      // Save session metadata for reporting
+      if (testName) {
+        await this.saveSessionMetadata(analysis.sessionId, testName, prompt);
+      }
+
+      return analysis;
     } finally {
       // Always cleanup temp config
       await this.cleanup();
@@ -340,6 +348,36 @@ export class CopilotSessionHelper {
 
     // Note: We intentionally leave session files for debugging
     // They can be cleaned up manually if needed
+  }
+
+  /**
+   * Save session metadata for reporting
+   */
+  private async saveSessionMetadata(
+    sessionId: string,
+    testName: string,
+    prompt: string,
+  ): Promise<void> {
+    try {
+      const metadataPath = join(
+        process.cwd(),
+        'test-results',
+        'session-metadata.jsonl',
+      );
+
+      const metadata = {
+        sessionId,
+        testName,
+        prompt,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Append to JSONL file
+      const line = JSON.stringify(metadata) + '\n';
+      await writeFile(metadataPath, line, { flag: 'a' });
+    } catch {
+      // Ignore metadata save errors
+    }
   }
 
   /**

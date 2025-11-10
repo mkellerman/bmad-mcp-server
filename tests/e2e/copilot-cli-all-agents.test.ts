@@ -32,14 +32,15 @@ describe('E2E: All BMM Agents', () => {
         prompt: 'I need Mary the business analyst to help analyze requirements',
         allowAllTools: true,
         timeout: 60000,
+        testName: 'E2E: Load analyst agent (Mary)',
       });
 
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const analystCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'analyst'
+        (call) => call.arguments.agent === 'analyst',
       );
 
       if (analystCall) {
@@ -53,7 +54,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ Analyst test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -63,7 +64,8 @@ describe('E2E: All BMM Agents', () => {
 
       const helper = new CopilotSessionHelper();
       const analysis: SessionAnalysis = await helper.execute({
-        prompt: 'I need Winston the architect to help design system architecture',
+        prompt:
+          'I need Winston the architect to help design system architecture',
         allowAllTools: true,
         timeout: 60000,
       });
@@ -71,9 +73,9 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const architectCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'architect'
+        (call) => call.arguments.agent === 'architect',
       );
 
       if (architectCall) {
@@ -86,7 +88,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ Architect test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -104,9 +106,9 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const devCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'dev'
+        (call) => call.arguments.agent === 'dev',
       );
 
       if (devCall) {
@@ -119,7 +121,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ Developer test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -129,7 +131,8 @@ describe('E2E: All BMM Agents', () => {
 
       const helper = new CopilotSessionHelper();
       const analysis: SessionAnalysis = await helper.execute({
-        prompt: 'I need John the product manager to help define product strategy',
+        prompt:
+          'I need John the product manager to help define product strategy',
         allowAllTools: true,
         timeout: 60000,
       });
@@ -137,9 +140,9 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const pmCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'pm'
+        (call) => call.arguments.agent === 'pm',
       );
 
       if (pmCall) {
@@ -152,7 +155,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ Product Manager test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -170,9 +173,9 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const smCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'sm'
+        (call) => call.arguments.agent === 'sm',
       );
 
       if (smCall) {
@@ -185,7 +188,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ Scrum Master test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -203,9 +206,9 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const teaCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'tea'
+        (call) => call.arguments.agent === 'tea',
       );
 
       if (teaCall) {
@@ -218,7 +221,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ Test Architect test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -228,7 +231,8 @@ describe('E2E: All BMM Agents', () => {
 
       const helper = new CopilotSessionHelper();
       const analysis: SessionAnalysis = await helper.execute({
-        prompt: 'I need Paige the technical writer to help create documentation',
+        prompt:
+          'I need Paige the technical writer to help create documentation',
         allowAllTools: true,
         timeout: 60000,
       });
@@ -236,9 +240,9 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const writerCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'tech-writer'
+        (call) => call.arguments.agent === 'tech-writer',
       );
 
       if (writerCall) {
@@ -251,7 +255,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ Technical Writer test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -269,9 +273,9 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const uxCall = analysis.bmadCalls.find(
-        (call) => call.arguments.agent === 'ux-designer'
+        (call) => call.arguments.agent === 'ux-designer',
       );
 
       if (uxCall) {
@@ -284,7 +288,7 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ UX Designer test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 
   it(
@@ -302,10 +306,11 @@ describe('E2E: All BMM Agents', () => {
       console.log(CopilotSessionHelper.formatAnalysis(analysis));
 
       expect(analysis.bmadCalls.length).toBeGreaterThan(0);
-      
+
       const listCall = analysis.bmadCalls.find(
-        (call) => call.arguments.operation === 'list' &&
-                 call.arguments.query === 'agents'
+        (call) =>
+          call.arguments.operation === 'list' &&
+          call.arguments.query === 'agents',
       );
 
       if (listCall) {
@@ -318,6 +323,6 @@ describe('E2E: All BMM Agents', () => {
       expect(analysis.allToolsSucceeded).toBe(true);
       console.log('\n✅ List agents test complete\n');
     },
-    { timeout: 90000 }
+    { timeout: 90000 },
   );
 });
