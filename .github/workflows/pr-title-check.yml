@@ -101,7 +101,7 @@ jobs:
           fi
 
       - name: Comment version info
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const bump = '${{ steps.version.outputs.bump }}';
