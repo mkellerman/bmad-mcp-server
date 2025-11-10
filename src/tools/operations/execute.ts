@@ -54,8 +54,8 @@ function withTimeout<T>(
  * Parameters for execute operation
  */
 export interface ExecuteOperationParams {
-  /** What to execute (agent, workflow) */
-  type: 'agent' | 'workflow';
+  /** What to execute (agent, workflow) - OPTIONAL, inferred from other params */
+  type?: 'agent' | 'workflow';
   /** Agent name (for type=agent) */
   agent?: string;
   /** Workflow name (for type=workflow) */
@@ -82,6 +82,17 @@ export async function executeExecuteOperation(
     Number(process.env.BMAD_EXECUTE_TIMEOUT_MS || 60000),
   );
   const corr = correlationId();
+
+  // Infer type from parameters if not explicitly provided
+  let type = params.type;
+  if (!type) {
+    if (params.agent) {
+      type = 'agent';
+    } else if (params.workflow) {
+      type = 'workflow';
+    }
+  }
+
   // Build ExecuteParams for engine
   const execParams: ExecuteParams = {
     agent: params.agent,
@@ -90,7 +101,7 @@ export async function executeExecuteOperation(
     module: params.module,
   };
 
-  switch (params.type) {
+  switch (type) {
     case 'agent':
       if (!params.agent) {
         return {
@@ -198,7 +209,7 @@ export async function executeExecuteOperation(
     default:
       return {
         success: false,
-        error: `Invalid execute type: ${String(params.type)}. Must be one of: agent, workflow`,
+        error: `Cannot determine execute type. Provide either 'agent' or 'workflow' parameter`,
         text: '',
       };
   }
@@ -217,13 +228,19 @@ export function validateExecuteParams(params: unknown): string | undefined {
 
   const p = params as Partial<ExecuteOperationParams>;
 
-  if (!p.type) {
-    return 'Missing required parameter: type';
+  // Type is now optional - we'll infer it from other params
+  // But if provided, it must be valid
+  if (p.type) {
+    const validTypes = ['agent', 'workflow'];
+    if (!validTypes.includes(p.type)) {
+      return `Invalid type: ${p.type}. Must be one of: ${validTypes.join(', ')}`;
+    }
   }
 
-  const validTypes = ['agent', 'workflow'];
-  if (!validTypes.includes(p.type)) {
-    return `Invalid type: ${p.type}. Must be one of: ${validTypes.join(', ')}`;
+  // Check that at least one identifying parameter is provided
+  const hasIdentifier = !!(p.agent || p.workflow);
+  if (!hasIdentifier) {
+    return 'Must provide either agent or workflow parameter';
   }
 
   // Message is optional, but if provided must be valid
@@ -234,25 +251,7 @@ export function validateExecuteParams(params: unknown): string | undefined {
     // Allow empty string - some agents/workflows might accept it
   }
 
-  // Type-specific validation
-  if (p.type === 'agent') {
-    if (!p.agent) {
-      return 'Missing required parameter: agent (when type=agent)';
-    }
-    if (!p.module) {
-      return 'Missing required parameter: module (required for execute operations to ensure proper discovery)';
-    }
-  }
-
-  if (p.type === 'workflow') {
-    if (!p.workflow) {
-      return 'Missing required parameter: workflow (when type=workflow)';
-    }
-    if (!p.module) {
-      return 'Missing required parameter: module (required for execute operations to ensure proper discovery)';
-    }
-  }
-
+  // Validate parameter types
   if (p.agent && typeof p.agent !== 'string') {
     return 'Parameter "agent" must be a string';
   }
@@ -265,6 +264,11 @@ export function validateExecuteParams(params: unknown): string | undefined {
     return 'Parameter "module" must be a string';
   }
 
+  // Module is required for execute operations
+  if (!p.module) {
+    return 'Missing required parameter: module (required for execute operations to ensure proper discovery)';
+  }
+
   return undefined;
 }
 
@@ -273,8 +277,8 @@ export function validateExecuteParams(params: unknown): string | undefined {
  */
 export function getExecuteExamples(): string[] {
   return [
-    'Execute agent: { operation: "execute", type: "agent", agent: "analyst", module: "bmm", message: "Help me brainstorm a mobile app" }',
-    'Execute workflow: { operation: "execute", type: "workflow", workflow: "prd", module: "bmm", message: "Create PRD for e-commerce platform" }',
-    'Execute agent without message: { operation: "execute", type: "agent", agent: "bmad-master", module: "core" }',
+    'Execute agent: { operation: "execute", agent: "analyst", module: "bmm", message: "Help me brainstorm a mobile app" }',
+    'Execute workflow: { operation: "execute", workflow: "prd", module: "bmm", message: "Create PRD for e-commerce platform" }',
+    'Execute agent without message: { operation: "execute", agent: "bmad-master", module: "core" }',
   ];
 }

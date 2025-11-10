@@ -31,6 +31,9 @@ allure-report/
 playwright-report/
 test-output.log
 
+# Temporary MCP config files from E2E tests
+.copilot-mcp-bmad-test-*.json
+
 # Git source cache (BMAD MCP Server)
 .bmad/cache/
 

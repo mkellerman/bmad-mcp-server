@@ -147,11 +147,14 @@ export class CopilotSessionHelper {
   private async createTempMcpConfig(): Promise<string> {
     const configPath = join(
       process.cwd(),
-      `.copilot-mcp-${this.serverID}.json`
+      `.copilot-mcp-${this.serverID}.json`,
     );
 
     // Read template config
-    const templatePath = join(process.cwd(), '.copilot-mcp-test.json');
+    const templatePath = join(
+      process.cwd(),
+      'tests/fixtures/copilot-mcp-test.json',
+    );
     const templateContent = await readFile(templatePath, 'utf-8');
     const template = JSON.parse(templateContent);
 
@@ -216,7 +219,7 @@ export class CopilotSessionHelper {
       try {
         const event = JSON.parse(line) as SessionEvent;
         events.push(event);
-      } catch (error) {
+      } catch {
         console.warn(`Failed to parse JSONL line: ${line.substring(0, 50)}...`);
       }
     }
@@ -230,30 +233,33 @@ export class CopilotSessionHelper {
   private analyzeSession(events: SessionEvent[]): SessionAnalysis {
     // Find session metadata
     const sessionStart = events.find((e) => e.type === 'session.start');
-    const sessionId = sessionStart?.data.sessionId as string || 'unknown';
+    const sessionId = (sessionStart?.data.sessionId as string) || 'unknown';
 
     const modelChange = events.find((e) => e.type === 'session.model_change');
-    const model = modelChange?.data.model as string || 'unknown';
+    const model = (modelChange?.data.model as string) || 'unknown';
 
     // Extract timestamps
     const firstEvent = events[0];
     const lastEvent = events[events.length - 1];
     const startTime = new Date(firstEvent.timestamp || Date.now());
     const endTime = new Date(lastEvent.timestamp || Date.now());
-    const durationSeconds =
-      (endTime.getTime() - startTime.getTime()) / 1000;
+    const durationSeconds = (endTime.getTime() - startTime.getTime()) / 1000;
 
     // Count messages
     const userMessages = events.filter((e) => e.type === 'user.message').length;
     const assistantMessages = events.filter(
-      (e) => e.type === 'assistant.message'
+      (e) => e.type === 'assistant.message',
     ).length;
 
     // Extract tool calls
     const toolCalls: ToolCall[] = [];
     for (const event of events) {
       if (event.type === 'tool.execution_start') {
-        const { toolCallId, toolName, arguments: args } = event.data as {
+        const {
+          toolCallId,
+          toolName,
+          arguments: args,
+        } = event.data as {
           toolCallId: string;
           toolName: string;
           arguments: Record<string, unknown>;
@@ -291,9 +297,7 @@ export class CopilotSessionHelper {
     }
 
     // Filter BMAD tool calls
-    const bmadCalls = toolCalls.filter((tc) =>
-      tc.toolName.includes('bmad')
-    );
+    const bmadCalls = toolCalls.filter((tc) => tc.toolName.includes('bmad'));
 
     // Check if all tools succeeded
     const allToolsSucceeded = toolExecutions.every((te) => te.success);
@@ -344,9 +348,13 @@ export class CopilotSessionHelper {
   static formatAnalysis(analysis: SessionAnalysis): string {
     const lines: string[] = [];
 
-    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push(
+      '═══════════════════════════════════════════════════════════════',
+    );
     lines.push('📊 Session Analysis');
-    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push(
+      '═══════════════════════════════════════════════════════════════',
+    );
     lines.push('');
 
     lines.push('📋 Session Info:');
@@ -388,11 +396,15 @@ export class CopilotSessionHelper {
     lines.push(`   ${passedChecks}/4 checks passed`);
     lines.push(`   ${checks.toolCallsMade ? '✅' : '❌'} Tool calls made`);
     lines.push(`   ${checks.bmadToolCalled ? '✅' : '❌'} BMAD tool called`);
-    lines.push(`   ${checks.allToolsExecuted ? '✅' : '❌'} All tools executed`);
+    lines.push(
+      `   ${checks.allToolsExecuted ? '✅' : '❌'} All tools executed`,
+    );
     lines.push(`   ${checks.atLeastOneSuccess ? '✅' : '❌'} Tool succeeded`);
     lines.push('');
 
-    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push(
+      '═══════════════════════════════════════════════════════════════',
+    );
 
     return lines.join('\n');
   }

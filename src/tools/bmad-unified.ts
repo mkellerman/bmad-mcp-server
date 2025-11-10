@@ -440,9 +440,9 @@ async function handleRead(
   params: BMADToolParams,
   engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
-  // Map BMADToolParams to ReadParams
+  // Map BMADToolParams to ReadParams (type is now optional and will be inferred)
   const readParams: ReadParams = {
-    type: params.type as 'agent' | 'workflow' | 'resource',
+    type: params.type as 'agent' | 'workflow' | 'resource' | undefined,
     agent: params.agent,
     workflow: params.workflow,
     uri: params.uri,
@@ -494,8 +494,8 @@ async function handleExecute(
   params: BMADToolParams,
   engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
-  // Infer type from parameters
-  let type: 'agent' | 'workflow';
+  // Infer type from parameters (now optional in ExecuteOperationParams)
+  let type: 'agent' | 'workflow' | undefined;
   if (params.agent) {
     type = 'agent';
   } else if (params.workflow) {
@@ -511,7 +511,7 @@ async function handleExecute(
     };
   }
 
-  // Map BMADToolParams to ExecuteOperationParams
+  // Map BMADToolParams to ExecuteOperationParams (type is optional, will be inferred)
   const execParams: ExecuteOperationParams = {
     type,
     agent: params.agent,
