@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "bmad-test-local": {
+      "type": "local",
+      "command": "node",
+      "tools": ["*"],
+      "args": [
+        "/Users/mkellerman/GitHub/bmad-mcp-server/build/index.js",
+        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad",
+        "--mode=strict"
+      ]
+    }
+  }
+}

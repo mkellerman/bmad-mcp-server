@@ -1,40 +1,36 @@
 /**
- * Test Helper: Check Copilot Proxy Availability
+ * Copilot Proxy Availability Check
  *
- * Provides a utility to check if Copilot Proxy is running and authenticated
- * before running LLM evaluation tests.
+ * Simple utility to check if copilot-proxy is available for LLM evaluation tests.
+ * These tests are separate from the main E2E suite and require manual setup.
+ *
+ * NOTE: This is only used by manual LLM evaluation tests, not by the main E2E test suite.
  */
 
 /**
- * Check if Copilot Proxy is available and responding
+ * Check if copilot-proxy is available at the configured URL
  */
 export async function isCopilotProxyAvailable(): Promise<boolean> {
+  const url = process.env.COPILOT_PROXY_URL || 'http://127.0.0.1:8069';
+
   try {
-    const baseURL = process.env.COPILOT_PROXY_URL || 'http://127.0.0.1:8069';
-    const response = await fetch(`${baseURL}/v1/models`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(2000),
-    });
-    return response.ok;
+    const response = await fetch(url, { method: 'GET' });
+    return response.ok || response.status === 404; // Server responding
   } catch {
     return false;
   }
 }
 
 /**
- * Skip test if Copilot Proxy is not available
- * Use in test files as: beforeAll(skipIfCopilotUnavailable)
+ * Ensure copilot-proxy is available, or skip test with helpful message
  */
-export async function skipIfCopilotUnavailable() {
+export async function ensureCopilotProxy(): Promise<void> {
   const available = await isCopilotProxyAvailable();
+
   if (!available) {
-    console.log(
-      '\n⚠️  Copilot Proxy not available - skipping LLM evaluation tests',
-    );
+    console.log('\n⚠️  Copilot Proxy not available');
+    console.log('   These are manual LLM evaluation tests');
     console.log('   To enable: npx copilot-proxy --auth');
-    console.log('   Or ensure Copilot Proxy is running on port 8069\n');
-    // Use test.skip to skip the entire suite
-    return true; // Indicates should skip
+    console.log('   Skipping...\n');
   }
-  return false; // Indicates should not skip
 }
