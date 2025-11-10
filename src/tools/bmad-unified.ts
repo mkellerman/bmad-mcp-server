@@ -28,6 +28,12 @@ import { Tool, TextContent } from '@modelcontextprotocol/sdk/types.js';
 import type { BMADEngine } from '../core/bmad-engine.js';
 import type { AgentMetadata } from '../core/resource-loader.js';
 import type { Workflow } from '../types/index.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Import operation handlers
 import {
@@ -60,7 +66,7 @@ import {
  */
 export interface BMADToolParams {
   /** Operation to perform */
-  operation: 'list' | 'search' | 'read' | 'execute';
+  operation: 'list' | 'search' | 'read' | 'execute' | 'test';
 
   // List operation params
   /** Query for list operation (agents, workflows, modules, resources) */
@@ -80,9 +86,9 @@ export interface BMADToolParams {
   /** Resource URI for read operation */
   uri?: string;
 
-  // Execute operation params
-  /** User message/context (for execute operation) */
-  message?: string;
+  // Test operation params
+  /** Test scenario to return */
+  testScenario?: string;
 
   // Common params
   /** Optional module filter (core, bmm, cis) */
@@ -118,8 +124,8 @@ export function createBMADTool(
 
   // Build operation enum based on config
   const operations = enableSearch
-    ? ['list', 'search', 'read', 'execute']
-    : ['list', 'read', 'execute'];
+    ? ['list', 'search', 'read', 'execute', 'test']
+    : ['list', 'read', 'execute', 'test'];
 
   // Build operation description
   const operationDesc = enableSearch
@@ -127,11 +133,13 @@ export function createBMADTool(
       '- list: Get available agents/workflows/modules\n' +
       '- search: Find agents/workflows by fuzzy search\n' +
       '- read: Inspect agent or workflow details (read-only)\n' +
-      '- execute: Run agent or workflow with user context (action)'
+      '- execute: Activate agent or workflow (uses conversation history for context)\n' +
+      '- test: Return hardcoded test response for development'
     : 'Operation type:\n' +
       '- list: Get available agents/workflows/modules\n' +
       '- read: Inspect agent or workflow details (read-only)\n' +
-      '- execute: Run agent or workflow with user context (action)';
+      '- execute: Activate agent or workflow (uses conversation history for context)\n' +
+      '- test: Return hardcoded test response for development';
 
   return {
     name: 'bmad',
@@ -165,13 +173,14 @@ export function createBMADTool(
           description:
             'For list operation: "agents", "workflows", "modules". Optionally filtered by module parameter.',
         },
-        message: {
+        testScenario: {
           type: 'string',
           description:
-            "For execute operation: User's message, question, or context. Optional - some agents/workflows may work without an initial message.",
+            'For test operation: Scenario to test (e.g., "new-response-v1", "workflow-response"). Returns hardcoded response for development/testing.',
         },
       },
       required: ['operation'],
+      additionalProperties: false,
     },
   };
 }
@@ -181,12 +190,13 @@ export function createBMADTool(
  *
  * Description format:
  * - Overview of BMAD and operations
- * - Complete agent list (grouped by module) with personas
- * - Complete workflow list with descriptions
+ * - Complete agent list (grouped by module) with execute commands
  * - Usage examples for common patterns
  *
+ * Note: Workflows are NOT listed in description - LLM must use list operation to discover them
+ *
  * @param agents - Agent metadata
- * @param workflows - Workflow metadata
+ * @param workflows - Workflow metadata (not displayed, but kept for future use)
  * @param enableSearch - Whether to include search operation
  * @returns Formatted tool description
  */
@@ -215,7 +225,7 @@ function buildToolDescription(
   );
   parts.push('');
 
-  // Agents section (grouped by module)
+  // Agents section (grouped by module with execute commands)
   parts.push('**Available Agents:**');
   parts.push('');
 
@@ -223,90 +233,54 @@ function buildToolDescription(
   for (const [moduleName, moduleAgents] of Object.entries(agentsByModule)) {
     parts.push(`${moduleName.toUpperCase()} Module:`);
     for (const agent of moduleAgents) {
-      const line =
+      // Agent name and title
+      const agentLine =
         `  - ${agent.name}` +
         (agent.displayName ? ` (${agent.displayName})` : '') +
         (agent.title ? `: ${agent.title}` : '');
-      parts.push(line);
-    }
-    parts.push('');
-  }
+      parts.push(agentLine);
 
-  // Workflows section
-  parts.push('**Available Workflows:**');
-  parts.push('');
-
-  const workflowsByModule = groupWorkflowsByModule(workflows);
-  for (const [moduleName, moduleWorkflows] of Object.entries(
-    workflowsByModule,
-  )) {
-    parts.push(`${moduleName.toUpperCase()} Module:`);
-    for (const workflow of moduleWorkflows) {
-      const line =
-        `  - ${workflow.name}` +
-        (workflow.description ? `: ${workflow.description}` : '');
-      parts.push(line);
+      // Execute command with module pre-filled
+      const executeCmd = `    bmad({ operation: "execute", agent: "${agent.name}", module: "${moduleName}" })`;
+      parts.push(executeCmd);
     }
     parts.push('');
   }
 
   // Usage examples
-  parts.push('**Usage Guide:**');
+  parts.push('**Common Commands:**');
   parts.push('');
-  parts.push('**When to use each operation:**');
+  parts.push('List agents: bmad({ operation: "list", query: "agents" })');
+  parts.push('List workflows: bmad({ operation: "list", query: "workflows" })');
+  parts.push('List modules: bmad({ operation: "list", query: "modules" })');
   parts.push(
-    '- `list` - User asks "what agents/workflows are available?" or wants to browse options',
-  );
-  if (enableSearch) {
-    parts.push(
-      '- `search` - User asks "find agents related to X" or wants fuzzy search',
-    );
-  }
-  parts.push(
-    '- `read` - User asks "what does the analyst do?" or wants agent/workflow details',
+    'Read agent: bmad({ operation: "read", agent: "analyst", module: "bmm" })',
   );
   parts.push(
-    '- `execute` - User wants to actually run an agent or workflow to accomplish a task',
+    'Read workflow: bmad({ operation: "read", workflow: "prd", module: "bmm" })',
+  );
+  parts.push(
+    'Execute agent: bmad({ operation: "execute", agent: "analyst", module: "bmm" })',
+  );
+  parts.push(
+    'Execute workflow (auto-discover): bmad({ operation: "execute", workflow: "party-mode" })',
+  );
+  parts.push(
+    'Execute workflow (explicit module): bmad({ operation: "execute", workflow: "prd", module: "bmm" })',
   );
   parts.push('');
+  parts.push('**Important:**');
   parts.push(
-    '**Important:** Use agent/workflow names WITHOUT module prefix (e.g., "analyst" not "bmm-analyst")',
+    '- Execute operations DO NOT accept a "message" parameter - use conversation history instead',
   );
-  parts.push('');
-  parts.push('**Examples:**');
-  parts.push('');
-  parts.push('Discovery - List all agents:');
-  parts.push('  { operation: "list", query: "agents" }');
-  parts.push('');
-  parts.push('Discovery - List agents in specific module:');
-  parts.push('  { operation: "list", query: "agents", module: "bmm" }');
-  parts.push('');
-  parts.push('Capability Query - See what an agent can do:');
-  parts.push('  { operation: "read", agent: "analyst" }');
-  parts.push('');
-  parts.push('Direct Intent - Execute agent to accomplish task:');
   parts.push(
-    '  { operation: "execute", agent: "analyst", message: "Help me brainstorm a mobile app" }',
+    '- Specify ONLY ONE: either "agent" OR "workflow" parameter (not both)',
   );
-  parts.push('');
-  parts.push('Explicit Routing - User specifies which agent:');
   parts.push(
-    '  { operation: "execute", agent: "architect", message: "Design a scalable architecture" }',
+    '- Module parameter is optional - server auto-discovers if not specified',
   );
-  parts.push('');
-  parts.push('Execute workflow:');
   parts.push(
-    '  { operation: "execute", workflow: "prd", message: "Create PRD for e-commerce platform" }',
-  );
-  parts.push('');
-  if (enableSearch) {
-    parts.push('Search for agents:');
-    parts.push('  { operation: "search", query: "debug" }');
-    parts.push('');
-  }
-  parts.push('Disambiguate with module (if name collision):');
-  parts.push(
-    '  { operation: "execute", agent: "debug", module: "bmm", message: "Fix this bug" }',
+    '- Use list operation to discover available agents/workflows first',
   );
 
   return parts.join('\n');
@@ -332,25 +306,6 @@ function groupByModule(
 }
 
 /**
- * Groups workflows by module for organized display
- */
-function groupWorkflowsByModule(
-  workflows: Workflow[],
-): Record<string, Workflow[]> {
-  const grouped: Record<string, Workflow[]> = {};
-
-  for (const workflow of workflows) {
-    const module = workflow.module || 'core';
-    if (!grouped[module]) {
-      grouped[module] = [];
-    }
-    grouped[module].push(workflow);
-  }
-
-  return grouped;
-}
-
-/**
  * Handles execution of the unified BMAD tool
  *
  * Routes operation to appropriate handler:
@@ -369,6 +324,26 @@ export async function handleBMADTool(
 ): Promise<{ content: TextContent[] }> {
   const { operation } = params;
 
+  // DIAGNOSTIC: Log incoming parameters to detect schema violations
+  const hasMessageParam = 'message' in params;
+  const hasBothAgentAndWorkflow = params.agent && params.workflow;
+
+  if (hasMessageParam || hasBothAgentAndWorkflow) {
+    console.error('⚠️  SCHEMA VIOLATION DETECTED:');
+    console.error('   Received params:', JSON.stringify(params, null, 2));
+    if (hasMessageParam) {
+      console.error(
+        '   ❌ Contains "message" parameter (should be rejected by schema)',
+      );
+    }
+    if (hasBothAgentAndWorkflow) {
+      console.error('   ❌ Contains both "agent" and "workflow" parameters');
+    }
+    console.error(
+      '   This suggests MCP client is not respecting additionalProperties: false',
+    );
+  }
+
   switch (operation) {
     case 'list':
       return await handleList(params, engine);
@@ -378,6 +353,8 @@ export async function handleBMADTool(
       return await handleRead(params, engine);
     case 'execute':
       return await handleExecute(params, engine);
+    case 'test':
+      return handleTest(params);
     default:
       return {
         content: [
@@ -483,9 +460,9 @@ async function handleRead(
   params: BMADToolParams,
   engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
-  // Map BMADToolParams to ReadParams
+  // Map BMADToolParams to ReadParams (type is now optional and will be inferred)
   const readParams: ReadParams = {
-    type: params.type as 'agent' | 'workflow' | 'resource',
+    type: params.type as 'agent' | 'workflow' | 'resource' | undefined,
     agent: params.agent,
     workflow: params.workflow,
     uri: params.uri,
@@ -507,13 +484,24 @@ async function handleRead(
 
   // Execute operation
   const result = await executeReadOperation(engine, readParams);
-
-  // Return JSON data for discovery operations
+  // Always return some text (even on failure) so downstream parsers don't choke on undefined
+  const payloadText = result.success
+    ? JSON.stringify(result.data, null, 2)
+    : JSON.stringify(
+        {
+          success: false,
+          error: result.error || 'Unknown read error',
+          remediation:
+            'Verify the agent/workflow exists and (if needed) supply module. Example: {"operation":"read","type":"agent","agent":"analyst"}',
+        },
+        null,
+        2,
+      );
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(result.data, null, 2),
+        text: payloadText,
       },
     ],
   };
@@ -526,8 +514,8 @@ async function handleExecute(
   params: BMADToolParams,
   engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
-  // Infer type from parameters
-  let type: 'agent' | 'workflow';
+  // Infer type from parameters (now optional in ExecuteOperationParams)
+  let type: 'agent' | 'workflow' | undefined;
   if (params.agent) {
     type = 'agent';
   } else if (params.workflow) {
@@ -543,12 +531,11 @@ async function handleExecute(
     };
   }
 
-  // Map BMADToolParams to ExecuteOperationParams
+  // Map BMADToolParams to ExecuteOperationParams (type is optional, will be inferred)
   const execParams: ExecuteOperationParams = {
     type,
     agent: params.agent,
     workflow: params.workflow,
-    message: params.message || '',
     module: params.module,
   };
 
@@ -576,4 +563,57 @@ async function handleExecute(
       },
     ],
   };
+}
+
+/**
+ * Handles test operation - returns hardcoded responses for development/testing
+ */
+function handleTest(params: BMADToolParams): { content: TextContent[] } {
+  const scenario = params.testScenario || 'new-response-v1';
+
+  // Construct path to test response file (in source tree, not build/)
+  // __dirname points to build/tools/, so go up to project root then into tests/
+  const projectRoot = join(__dirname, '..', '..');
+  const responsePath = join(
+    projectRoot,
+    'tests',
+    'fixtures',
+    'test-responses',
+    `${scenario}.txt`,
+  );
+
+  try {
+    // Check if file exists
+    if (!existsSync(responsePath)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Test scenario "${scenario}" not found.\n\nLooking for: ${responsePath}\n\nTo add a new test scenario, create:\ntests/fixtures/test-responses/${scenario}.txt`,
+          },
+        ],
+      };
+    }
+
+    // Read and return file contents
+    const response = readFileSync(responsePath, 'utf-8');
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: response,
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error loading test scenario "${scenario}":\n${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
 }

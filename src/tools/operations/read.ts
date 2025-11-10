@@ -18,8 +18,8 @@ import type { BMADEngine, BMADResult } from '../../core/bmad-engine.js';
  * Parameters for read operation
  */
 export interface ReadParams {
-  /** What to read (agent, workflow, resource) */
-  type: 'agent' | 'workflow' | 'resource';
+  /** What to read (agent, workflow, resource) - OPTIONAL, inferred from other params */
+  type?: 'agent' | 'workflow' | 'resource';
   /** Agent name (for type=agent) */
   agent?: string;
   /** Workflow name (for type=workflow) */
@@ -41,7 +41,19 @@ export async function executeReadOperation(
   engine: BMADEngine,
   params: ReadParams,
 ): Promise<BMADResult> {
-  switch (params.type) {
+  // Infer type from parameters if not explicitly provided
+  let type = params.type;
+  if (!type) {
+    if (params.agent) {
+      type = 'agent';
+    } else if (params.workflow) {
+      type = 'workflow';
+    } else if (params.uri) {
+      type = 'resource';
+    }
+  }
+
+  switch (type) {
     case 'agent':
       if (!params.agent) {
         return {
@@ -75,7 +87,7 @@ export async function executeReadOperation(
     default:
       return {
         success: false,
-        error: `Invalid read type: ${String(params.type)}. Must be one of: agent, workflow, resource`,
+        error: `Cannot determine read type. Provide one of: agent, workflow, or uri`,
         text: '',
       };
   }
@@ -94,28 +106,22 @@ export function validateReadParams(params: unknown): string | undefined {
 
   const p = params as Partial<ReadParams>;
 
-  if (!p.type) {
-    return 'Missing required parameter: type';
+  // Type is now optional - we'll infer it from other params
+  // But if provided, it must be valid
+  if (p.type) {
+    const validTypes = ['agent', 'workflow', 'resource'];
+    if (!validTypes.includes(p.type)) {
+      return `Invalid type: ${p.type}. Must be one of: ${validTypes.join(', ')}`;
+    }
   }
 
-  const validTypes = ['agent', 'workflow', 'resource'];
-  if (!validTypes.includes(p.type)) {
-    return `Invalid type: ${p.type}. Must be one of: ${validTypes.join(', ')}`;
+  // Check that at least one identifying parameter is provided
+  const hasIdentifier = !!(p.agent || p.workflow || p.uri);
+  if (!hasIdentifier) {
+    return 'Must provide one of: agent, workflow, or uri';
   }
 
-  // Type-specific validation
-  if (p.type === 'agent' && !p.agent) {
-    return 'Missing required parameter: agent (when type=agent)';
-  }
-
-  if (p.type === 'workflow' && !p.workflow) {
-    return 'Missing required parameter: workflow (when type=workflow)';
-  }
-
-  if (p.type === 'resource' && !p.uri) {
-    return 'Missing required parameter: uri (when type=resource)';
-  }
-
+  // Validate parameter types
   if (p.agent && typeof p.agent !== 'string') {
     return 'Parameter "agent" must be a string';
   }
@@ -140,10 +146,10 @@ export function validateReadParams(params: unknown): string | undefined {
  */
 export function getReadExamples(): string[] {
   return [
-    'Read agent: { operation: "read", type: "agent", agent: "analyst" }',
-    'Read agent with module: { operation: "read", type: "agent", agent: "analyst", module: "bmm" }',
-    'Read workflow: { operation: "read", type: "workflow", workflow: "prd" }',
-    'Read workflow with module: { operation: "read", type: "workflow", workflow: "prd", module: "bmm" }',
-    'Read resource: { operation: "read", type: "resource", uri: "bmad://core/config.yaml" }',
+    'Read agent: { operation: "read", agent: "analyst" }',
+    'Read agent with module: { operation: "read", agent: "analyst", module: "bmm" }',
+    'Read workflow: { operation: "read", workflow: "prd" }',
+    'Read workflow with module: { operation: "read", workflow: "prd", module: "bmm" }',
+    'Read resource: { operation: "read", uri: "bmad://core/config.yaml" }',
   ];
 }

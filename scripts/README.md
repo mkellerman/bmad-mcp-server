@@ -35,98 +35,59 @@ node scripts/bmad-cli.mjs tools/list
 # Get raw tool schema
 node scripts/bmad-cli.mjs tools/list --raw
 
-# Call bmad-resources to list agents
-node scripts/bmad-cli.mjs tools/call '{"name":"bmad-resources","arguments":{"operation":"agents"}}'
+# Call bmad tool to list agents
+node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"list","query":"agents"}}'
 
-# Call bmad-resources to list workflows
-node scripts/bmad-cli.mjs tools/call '{"name":"bmad-resources","arguments":{"operation":"workflows"}}'
+# Call bmad tool to list workflows
+node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"list","query":"workflows"}}'
+
+# Call bmad tool to execute an agent (uses conversation history for context)
+node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"execute","agent":"debug"}}'
+
+# Call bmad tool to execute a workflow
+node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"execute","workflow":"prd"}}'
 
 # List all available resources
 node scripts/bmad-cli.mjs resources/list
 
 # Read a specific BMAD file
 node scripts/bmad-cli.mjs resources/read '{"uri":"bmad://core/config.yaml"}'
-
-# Call an agent
-node scripts/bmad-cli.mjs tools/call '{"name":"bmm-debug","arguments":{"message":"Hello"}}'
 ```
 
-## Quick Test Scripts
+## Testing Scripts
 
-### show-tool-description.mjs
+### Test Discovery & Loading
 
-Display the raw tool description (schema) for any MCP tool.
+- `test-discovery-modes.mjs` - Test multi-source discovery (project/user/git)
+- `test-list-tools.mjs` - Test tool listing and registration
+- `test-manifest-generation.mjs` - Test manifest generation
+- `test-virtual-manifests.mjs` - Test virtual manifest CSV
+- `verify-workflow-deduplication.mjs` - Test workflow deduplication
 
-**Usage:**
+### Test Execution
 
-```bash
-node scripts/show-tool-description.mjs <tool-name>
-```
+- `test-agent-execution.mjs` - Test agent execution
+- `test-agent-based-workflows.mjs` - Test non-standalone workflows
+- `test-workflow-execution.mjs` - Test workflow execution
+- `test-workflow-prompt-format.mjs` - Test execution prompt formatting
+- `test-handler.mjs` - Test workflow handler extraction
 
-**Example:**
+### Test Prompts & Responses
 
-```bash
-node scripts/show-tool-description.mjs bmad-resources
-node scripts/show-tool-description.mjs bmad-workflow
-node scripts/show-tool-description.mjs bmm-debug
-```
+- `test-prompts.mjs` - Test prompt generation
+- `test-ambiguous-responses.mjs` - Test ambiguous response handling
+- `test-completions.mjs` - Test LLM completions
+- `test-copilot-models.mjs` - Test model detection
 
-### show-tool-output.mjs
+### Debug Tools
 
-Call any tool with arguments and display the raw output.
+- `debug-workflow-matching.mjs` - Debug workflow name matching
+- `test-workflow-extraction.mjs` - Test workflow extraction
+- `test-xml-parse.mjs` - Test XML parsing
 
-**Usage:**
+### Test Server
 
-```bash
-node scripts/show-tool-output.mjs <tool-name> [args-json]
-```
-
-**Examples:**
-
-```bash
-node scripts/show-tool-output.mjs bmad-resources '{"operation":"modules"}'
-node scripts/show-tool-output.mjs bmad-resources '{"operation":"agents"}'
-node scripts/show-tool-output.mjs bmad-resources '{"operation":"workflows"}'
-node scripts/show-tool-output.mjs bmad-workflow '{"workflow":"prd"}'
-```
-
-### show-list-agents.mjs
-
-Display raw output from listing all agents.
-
-**Usage:**
-
-```bash
-node scripts/show-list-agents.mjs
-```
-
-### show-list-workflows.mjs
-
-Display raw output from listing all workflows.
-
-**Usage:**
-
-```bash
-node scripts/show-list-workflows.mjs
-```
-
-### show-list-resources.mjs
-
-Display raw output from listing all resources, optionally filtered by pattern.
-
-**Usage:**
-
-```bash
-node scripts/show-list-resources.mjs [pattern]
-```
-
-**Examples:**
-
-```bash
-node scripts/show-list-resources.mjs
-node scripts/show-list-resources.mjs "core/**/*.yaml"
-node scripts/show-list-resources.mjs "bmm/agents/**"
-```
+- `test-bmad-test-server.mjs` - Test server utility
 
 ## Output Format
 
@@ -146,4 +107,4 @@ This helps verify:
 
 ## Archive
 
-The `archive/` directory contains previous versions of scripts that have been replaced by the new focused troubleshooting utilities.
+The `archive/` directory contains previous versions of scripts that have been replaced by newer utilities or are no longer needed after the unified `bmad` tool migration.

@@ -1,6 +1,5 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
-import { BMADReporter } from './tests/framework/reporters/bmad-vitest-reporter.js';
 
 export default defineConfig({
   test: {
@@ -20,10 +19,14 @@ export default defineConfig({
     // Global setup runs before runner initialization
     globalSetup: ['./tests/framework/setup/global-setup.ts'],
     // Setup files run in test context for each test file
-    setupFiles: ['./tests/framework/setup/test-setup.ts'],
+    setupFiles: [
+      'allure-vitest/setup',
+      './tests/framework/setup/test-setup.ts',
+    ],
     reporters: [
-      'default', // Keep console output
-      new BMADReporter() as any, // Custom inline reporter
+      'default', // Console output
+      ['junit', { outputFile: './test-results/junit.xml' }], // JUnit XML for CI/CD
+      'allure-vitest/reporter', // Allure for beautiful reports
     ],
     coverage: {
       provider: 'v8',

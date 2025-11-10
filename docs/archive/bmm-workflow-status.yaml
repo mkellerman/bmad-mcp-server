@@ -1,0 +1,161 @@
+# Workflow Status - MCP Optimizer Feature
+# Tracks progress through BMM Quick Flow methodology
+# Phase 2 (Implementation) tracked separately in sprint-status.yaml
+
+generated: '2025-11-08T00:00:00Z'
+project: 'bmad-mcp-server'
+project_type: 'infrastructure'
+selected_track: 'quick-flow'
+field_type: 'brownfield'
+workflow_path: 'quick-flow-brownfield'
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+#   - in-progress: Currently working on this workflow
+
+workflow_status:
+  # ============================================================================
+  # PREREQUISITE: Documentation (Brownfield)
+  # ============================================================================
+  prerequisite:
+    document-project:
+      status: 'skipped'
+      note: 'Project already well-documented (README, docs/, comprehensive test suite)'
+
+  # ============================================================================
+  # PHASE 0: Discovery (Optional)
+  # ============================================================================
+  phase-0:
+    brainstorm-project:
+      status: 'docs/brainstorming-session-results-2025-11-07.md'
+      completed: '2025-11-07'
+      note: 'MCP SDK optimization brainstorming completed'
+
+    research:
+      status: 'skipped'
+      note: 'Direct implementation based on MCP SDK knowledge'
+
+  # ============================================================================
+  # PHASE 1: Planning
+  # ============================================================================
+  phase-1:
+    tech-spec:
+      status: 'in-progress'
+      note: 'MCP optimizer feature implementation - session-based ranking and LLM sampling integration complete'
+      artifacts:
+        - 'bmad/agents/mcp-sdk-optimizer.md'
+        - 'bmad/agents/mcp-sdk-optimizer-sidecar/'
+        - 'docs/cli-testing-guide.md'
+        - 'docs/bmad-system-diagnostic-report.md'
+        - 'docs/session-based-ranking.md'
+        - 'docs/sampling-integration-design.md'
+        - 'src/config.ts (RANKING_CONFIG)'
+        - 'src/core/session-tracker.ts'
+        - 'src/core/llm-ranker.ts'
+      implemented:
+        - 'Response shaping utility'
+        - 'Metrics & instrumentation system'
+        - 'MCP SDK optimizer agent'
+        - 'BMAD CLI tool with discovery modes'
+        - 'Ambiguous response handling'
+        - 'Performance tracking (p99 latency, adherence scoring)'
+        - 'Session-based intelligent ranking (4 signals: recency, frequency, manifest, boosts)'
+        - 'Centralized ranking configuration with agent/module priority boosts'
+        - 'Optimized ambiguous responses (52.3% token reduction)'
+        - 'MCP sampling capability detection'
+        - 'LLM-based ranking with hybrid strategy (LLM when available, session fallback)'
+        - 'Token-efficient ranking prompts (~200 tokens)'
+        - 'Robust response parsing with validation'
+        - 'Comprehensive unit tests for LLM ranker (28 tests)'
+        - 'Standalone workflow execution mode fix (agent: unknown → execution-mode: standalone)'
+        - 'Testing framework refactor (Allure reporter, Copilot Proxy only)'
+        - 'Comprehensive testing coding rules and ESLint enforcement'
+      planned:
+        - 'Tool description lazy loading (75-80% token reduction)'
+        - 'List operations format optimization'
+        - 'Read operations optimization'
+        - 'Error response optimization with fuzzy matching'
+
+  # ============================================================================
+  # PHASE 2: Implementation
+  # ============================================================================
+  phase-2:
+    sprint-planning:
+      status: 'not-started'
+      note: 'Will create sprint-status.yaml when formalizing remaining work'
+
+# ============================================================================
+# CURRENT STATE SUMMARY
+# ============================================================================
+current_phase: 'phase-1'
+current_workflow: 'tech-spec'
+current_task: 'optimization-planning'
+next_action: |
+  MCP Sampling Integration COMPLETE! ✅
+
+  Next optimization opportunities (in order of impact):
+
+  1. Tool Description Lazy Loading (75-80% token reduction target)
+     - Analyze when tool descriptions are actually needed
+     - Design conditional description inclusion
+     - Implement lazy-loading mechanism
+     - Test with various MCP clients
+
+  2. List Operations Format Optimization
+     - Streamline response format for list operations
+     - Remove redundant metadata
+     - Implement pagination for large lists
+
+  3. Read Operations Optimization
+     - Optimize agent/workflow content delivery
+     - Implement content caching
+     - Reduce repeated metadata
+
+  4. Error Response Enhancement
+     - Add fuzzy matching for typos
+     - Provide helpful suggestions
+     - Reduce error payload size
+
+  Current Status:
+  - Session-based ranking: COMPLETE ✅
+  - LLM sampling integration: COMPLETE ✅
+  - Ambiguous response optimization: 52.3% token reduction ✅
+  - Test suite: 263/263 passing (100%) ✅
+  - Testing standards: Documented and enforced ✅
+
+# ============================================================================
+# BRANCH STATUS
+# ============================================================================
+branch: 'feature/mcp-optimizer'
+commits_ahead_of_main: 25
+key_changes:
+  - 'MCP SDK optimizer agent with sidecar knowledge base'
+  - 'Response shaping utility for LLM payload optimization'
+  - 'Comprehensive metrics and instrumentation'
+  - 'BMAD CLI tool enhancements'
+  - 'Discovery modes and ambiguous response handling'
+  - 'Performance tracking (p99, adherence scores)'
+  - 'Session-based intelligent ranking (recency, frequency, manifest, boosts)'
+  - 'Centralized ranking configuration (agent/module priority)'
+  - 'Optimized ambiguous responses (52.3% token savings)'
+  - 'MCP sampling integration (LLM-based ranking with hybrid fallback)'
+  - 'Testing framework refactor (Allure, Copilot Proxy only, no LiteLLM)'
+  - 'Comprehensive testing coding rules and ESLint enforcement'
+
+recent_commits:
+  - '62c1619: docs(tests): add comprehensive testing coding rules and ESLint enforcement'
+  - '0f7cfe6: refactor(tests): remove legacy test infrastructure and move to standard Vitest'
+  - 'f282c4f: feat: Implement Phase 2 LLM-based ranking with hybrid strategy'
+  - '1d19e0e: feat(core): add session-based intelligent ranking system'
+  - '17af5b6: docs: add comprehensive session-based ranking documentation'
+
+test_status: '263/263 passing (100%)'

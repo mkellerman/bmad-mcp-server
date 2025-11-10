@@ -67,10 +67,76 @@ export default tseslint.config(
       },
       globals: {
         ...globals.node,
+        // Vitest globals
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        vi: 'readonly',
       },
     },
     rules: {
       'no-console': 'off',
+
+      // ============================================================================
+      // TESTING CODING RULES
+      // ============================================================================
+      // These rules enforce our testing standards documented in tests/README.md
+      //
+      // Key Requirements:
+      // 1. DO NOT use LiteLLM (use Copilot Proxy instead)
+      // 2. Mark tests as E2E if copilot-proxy is used
+      // 3. Mark tests as LLM-eval if LLM Judge is used (*.eval.test.ts)
+      // 4. Document test intent and expected steps/results in comments
+      // ============================================================================
+
+      // Prevent focused tests from being committed
+      // Focused tests (it.only, describe.only) will cause CI to only run those tests
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='it'][callee.property.name='only']",
+          message:
+            'it.only() is not allowed - remove .only() before committing',
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='describe'][callee.property.name='only']",
+          message:
+            'describe.only() is not allowed - remove .only() before committing',
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='test'][callee.property.name='only']",
+          message:
+            'test.only() is not allowed - remove .only() before committing',
+        },
+      ],
+
+      // Warn on skipped tests (allows temporary skip but flags for review)
+      'no-restricted-properties': [
+        'warn',
+        {
+          object: 'it',
+          property: 'skip',
+          message:
+            'Skipped test detected - ensure this is intentional and documented',
+        },
+        {
+          object: 'describe',
+          property: 'skip',
+          message:
+            'Skipped test suite detected - ensure this is intentional and documented',
+        },
+      ],
+
+      // Enforce proper async/await usage in tests
+      'no-return-await': 'off', // Allow for clarity in tests
     },
   },
   {

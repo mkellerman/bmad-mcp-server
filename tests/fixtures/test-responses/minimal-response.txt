@@ -1,0 +1,10 @@
+🤖 **Agent: Test Agent**
+
+This is a minimal test response to demonstrate the flexibility of the test operation.
+
+## Quick Info
+- Scenario: minimal-response
+- Purpose: Simple test case
+- Format: Plain text
+
+You can add any content here and it will be loaded dynamically.

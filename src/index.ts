@@ -31,6 +31,12 @@
  *
  * # Git remote with subpath (monorepo support)
  * node build/index.js git+https://github.com/org/repo.git#main:/bmad/core
+ *
+ * # Discovery modes
+ * node build/index.js --mode=strict git+https://github.com/org/repo.git
+ * node build/index.js --mode=local  # Only project root
+ * node build/index.js --mode=user   # Only ~/.bmad
+ * node build/index.js --mode=auto   # All sources (default)
  * ```
  *
  * @example
@@ -41,29 +47,59 @@
  */
 
 import { BMADServerLiteMultiToolGit } from './server.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import type { DiscoveryMode } from './types/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, '../package.json'), 'utf-8'),
+) as { version: string };
+const VERSION = packageJson.version;
 
 /**
  * Main entry point function
  *
  * Parses command line arguments and starts the MCP server.
  * All arguments starting with 'git+' are treated as Git remote URLs.
+ * --mode=<mode> sets the discovery mode.
  *
  * @remarks
- * The function filters command line arguments to extract Git URLs and passes
- * them to the server constructor. Non-Git arguments are ignored for forward
+ * The function filters command line arguments to extract Git URLs and discovery mode,
+ * passing them to the server constructor. Other arguments are ignored for forward
  * compatibility.
  */
 async function main() {
+  const args = process.argv.slice(2);
+
   // Parse Git URLs from command line arguments
-  const gitRemotes = process.argv
-    .slice(2)
-    .filter((arg) => arg.startsWith('git+'));
+  const gitRemotes = args.filter((arg) => arg.startsWith('git+'));
+
+  // Parse discovery mode
+  let discoveryMode: DiscoveryMode = 'auto';
+  for (const arg of args) {
+    if (arg.startsWith('--mode=')) {
+      const mode = arg.slice(7) as DiscoveryMode;
+      if (['strict', 'local', 'user', 'first', 'auto'].includes(mode)) {
+        discoveryMode = mode;
+      }
+    }
+  }
 
   // Allow overriding project root via BMAD_ROOT environment variable
-  // This is useful for testing and custom deployments
-  const projectRoot = process.env.BMAD_ROOT;
+  // If BMAD_ROOT is a git URL, treat it as a git remote instead of project root
+  let projectRoot: string | undefined = process.env.BMAD_ROOT;
 
-  console.error('BMAD MCP Server (Tool-per-Agent + Git Support)');
+  if (projectRoot?.startsWith('git+')) {
+    // BMAD_ROOT is a git URL - add it to gitRemotes and clear projectRoot
+    gitRemotes.push(projectRoot);
+    projectRoot = undefined;
+  }
+
+  console.error(`BMAD MCP Server - v${VERSION}`);
+  console.error(`Discovery mode: ${discoveryMode}`);
   if (gitRemotes.length > 0) {
     console.error(`Git remotes: ${gitRemotes.join(', ')}`);
   }
@@ -71,7 +107,11 @@ async function main() {
     console.error(`Project root: ${projectRoot}`);
   }
 
-  const server = new BMADServerLiteMultiToolGit(projectRoot, gitRemotes);
+  const server = new BMADServerLiteMultiToolGit(
+    projectRoot,
+    gitRemotes,
+    discoveryMode,
+  );
   await server.start();
 }
 
