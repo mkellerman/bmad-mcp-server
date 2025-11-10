@@ -127,15 +127,11 @@ export interface InstructionsConfig {
  *
  * @returns Complete instructions including resource access and agent activation
  */
-export function getAgentExecutionPrompt(context: {
-  agent: string;
-  userContext?: string;
-}): string {
+export function getAgentExecutionPrompt(context: { agent: string }): string {
   // Build the YAML frontmatter
   const frontmatter = `---
 
 agent: ${context.agent}
-user-prompt: ${context.userContext || '(no prompt provided)'}
 
 ---`;
 
@@ -166,7 +162,6 @@ Embody that agent completely and respond to the user's prompt.`;
 export function getWorkflowExecutionPrompt(context: {
   workflow: string;
   workflowPath: string;
-  userContext?: string;
   agent?: string;
   agentWorkflowHandler?: string;
 }): string {
@@ -176,16 +171,14 @@ export function getWorkflowExecutionPrompt(context: {
 
 agent: ${context.agent}
 workflow: ${context.workflow}
-workflow-path: ${context.workflowPath}
-user-prompt: ${context.userContext || '(no prompt provided)'}
+workflow-uri: ${context.workflowPath}
 
 ---`
     : `---
 
 execution-mode: standalone
 workflow: ${context.workflow}
-workflow-path: ${context.workflowPath}
-user-prompt: ${context.userContext || '(no prompt provided)'}
+workflow-uri: ${context.workflowPath}
 
 # INSTRUCTIONS FOR LLM:
 # This is a standalone workflow that executes without an agent.
@@ -206,7 +199,19 @@ If the <${context.agent}> persona is not already loaded, follow these steps:
 **WORKFLOW HANDLER INSTRUCTIONS:**
 
 ${context.agentWorkflowHandler || 'Follow the workflow instructions from the agent definition.'}`
-    : '\nThis workflow has been requested to be executed.';
+    : `
+This workflow has been requested to be executed.
+
+**CRITICAL INSTRUCTIONS:**
+1. **LOAD the workflow definition** using the bmad resource URI:
+   bmad({ operation: "read", workflow: "${context.workflow}" })
+
+2. The workflow definition will tell you what agents (if any) need to be loaded and how to orchestrate them.
+
+3. **Access workflow files via bmad:// URIs** - never read files directly from disk.
+   Example: To read workflow instructions, use the bmad tool with the workflow's bmad:// URI.
+
+4. Follow the workflow's instructions precisely.`;
 
   return `${frontmatter}${handlerSection}
 `;

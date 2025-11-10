@@ -41,11 +41,11 @@ node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"l
 # Call bmad tool to list workflows
 node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"list","query":"workflows"}}'
 
-# Call bmad tool to execute an agent
-node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"execute","agent":"debug","message":"Help me fix this bug"}}'
+# Call bmad tool to execute an agent (uses conversation history for context)
+node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"execute","agent":"debug"}}'
 
 # Call bmad tool to execute a workflow
-node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"execute","workflow":"prd","message":"Create PRD for mobile app"}}'
+node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"execute","workflow":"prd"}}'
 
 # List all available resources
 node scripts/bmad-cli.mjs resources/list

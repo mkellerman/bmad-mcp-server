@@ -574,9 +574,6 @@ export interface WorkflowExecutionContext {
   /** Workflow name */
   workflow: string;
 
-  /** User's message/request (optional) */
-  userContext?: string;
-
   /** Raw workflow.yaml content (the configuration) */
   workflowConfig: string;
 

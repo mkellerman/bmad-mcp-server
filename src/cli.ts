@@ -1,26 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * BMAD CLI Tool
- *
- * Command-line interface for BMAD with contextual TUI menus.
- * Similar to gh (GitHub CLI) - works with parameters OR interactive prompts.
+ * BMAD CLI - Command-line tool for BMAD operations
  *
  * Usage:
- *   bmad list agents [--json]
- *   bmad list workflows [--json]
- *   bmad list modules [--json]
- *   bmad search <query> [--type=agents|workflows|all] [--json]
+ *   bmad list agents|workflows [--json]
  *   bmad read agent <name> [--json]
  *   bmad read workflow <name> [--json]
- *   bmad execute agent <name> --message "..." [--json]
- *   bmad execute workflow <name> [--message "..."] [--json]
- *
- * Interactive mode (no args):
- *   bmad
- *
- * Environment Variables:
- *   BMAD_ROOT - Path to BMAD directory (overrides default .bmad location)
+ *   bmad execute agent <name> [--json]
+ *   bmad execute workflow <name> [--json]
+ *   bmad search <query> [--type agents|workflows|all] [--json]
  */
 
 import { existsSync, readFileSync } from 'fs';
@@ -38,7 +27,6 @@ interface CliArgs {
   command?: string;
   subcommand?: string;
   target?: string;
-  message?: string;
   query?: string;
   type?: 'agents' | 'workflows' | 'all';
   json?: boolean;
@@ -258,12 +246,10 @@ async function handleExecuteCommand(engine: BMADEngine, args: CliArgs) {
     case 'agent':
       return engine.executeAgent({
         agent: args.target,
-        message: args.message,
       });
     case 'workflow':
       return engine.executeWorkflow({
         workflow: args.target,
-        message: args.message,
       });
     default:
       throw new Error(
@@ -359,10 +345,6 @@ function parseArgs(): CliArgs {
       ) {
         args.mode = mode;
       }
-    } else if (arg.startsWith('--message=')) {
-      args.message = arg.slice(10);
-    } else if (arg === '--message' || arg === '-m') {
-      args.message = cleanArgs[++i];
     } else if (arg.startsWith('--type=')) {
       const type = arg.slice(7);
       if (type === 'agents' || type === 'workflows' || type === 'all') {
@@ -416,13 +398,12 @@ ${pc.bold('COMMANDS:')}
     bmad read workflow prd
 
   ${pc.cyan('execute')} <type> <name> [options]  # Execute agent or workflow
-    bmad execute agent dev --message "Create a login form"
+    bmad execute agent dev
     bmad execute workflow debug-inspect
-    bmad execute agent analyst -m "Help with project planning"
+    bmad execute agent analyst
 
 ${pc.bold('OPTIONS:')}
   --json                      # Output in JSON format (for scripting)
-  --message, -m <text>        # Message for execution (optional)
   --type <agents|workflows|all>  # Filter search results
   --help, -h                  # Show this help message
 
@@ -433,8 +414,8 @@ ${pc.bold('EXAMPLES:')}
   ${pc.dim('# Search for debug-related workflows')}
   bmad search debug --type=workflows
 
-  ${pc.dim('# Execute PM agent to create a PRD')}
-  bmad execute agent pm --message "Create PRD for user authentication"
+  ${pc.dim('# Execute PM agent')}
+  bmad execute agent pm
 
   ${pc.dim('# Interactive mode with contextual menus')}
   bmad
@@ -651,16 +632,6 @@ async function tuiExecute(engine: BMADEngine) {
     return;
   }
 
-  // Get message (optional)
-  const message = await clack.text({
-    message: `Enter message for ${what} (optional):`,
-    placeholder: 'Press Enter to skip',
-  });
-
-  if (clack.isCancel(message)) {
-    return;
-  }
-
   // Execute
   const execS = clack.spinner();
   execS.start(`Executing ${what}...`);
@@ -669,11 +640,9 @@ async function tuiExecute(engine: BMADEngine) {
     what === 'agent'
       ? await engine.executeAgent({
           agent: selected,
-          message: message || undefined,
         })
       : await engine.executeWorkflow({
           workflow: selected,
-          message: message || undefined,
         });
 
   execS.stop(result.success ? pc.green('✓ Executed') : pc.red('✗ Failed'));

@@ -86,10 +86,6 @@ export interface BMADToolParams {
   /** Resource URI for read operation */
   uri?: string;
 
-  // Execute operation params
-  /** User message/context (for execute operation) */
-  message?: string;
-
   // Test operation params
   /** Test scenario to return */
   testScenario?: string;
@@ -137,12 +133,12 @@ export function createBMADTool(
       '- list: Get available agents/workflows/modules\n' +
       '- search: Find agents/workflows by fuzzy search\n' +
       '- read: Inspect agent or workflow details (read-only)\n' +
-      '- execute: Run agent or workflow with user context (action)\n' +
+      '- execute: Activate agent or workflow (uses conversation history for context)\n' +
       '- test: Return hardcoded test response for development'
     : 'Operation type:\n' +
       '- list: Get available agents/workflows/modules\n' +
       '- read: Inspect agent or workflow details (read-only)\n' +
-      '- execute: Run agent or workflow with user context (action)\n' +
+      '- execute: Activate agent or workflow (uses conversation history for context)\n' +
       '- test: Return hardcoded test response for development';
 
   return {
@@ -177,11 +173,6 @@ export function createBMADTool(
           description:
             'For list operation: "agents", "workflows", "modules". Optionally filtered by module parameter.',
         },
-        message: {
-          type: 'string',
-          description:
-            "For execute operation: User's message, question, or context. Optional - some agents/workflows may work without an initial message.",
-        },
         testScenario: {
           type: 'string',
           description:
@@ -189,6 +180,7 @@ export function createBMADTool(
         },
       },
       required: ['operation'],
+      additionalProperties: false,
     },
   };
 }
@@ -249,7 +241,7 @@ function buildToolDescription(
       parts.push(agentLine);
 
       // Execute command with module pre-filled
-      const executeCmd = `    bmad({ operation: "execute", agent: "${agent.name}", module: "${moduleName}", message: "your task" })`;
+      const executeCmd = `    bmad({ operation: "execute", agent: "${agent.name}", module: "${moduleName}" })`;
       parts.push(executeCmd);
     }
     parts.push('');
@@ -268,17 +260,25 @@ function buildToolDescription(
     'Read workflow: bmad({ operation: "read", workflow: "prd", module: "bmm" })',
   );
   parts.push(
-    'Execute agent: bmad({ operation: "execute", agent: "analyst", module: "bmm", message: "your task" })',
+    'Execute agent: bmad({ operation: "execute", agent: "analyst", module: "bmm" })',
   );
   parts.push(
-    'Execute workflow: bmad({ operation: "execute", workflow: "prd", module: "bmm", agent: "pm", message: "your task" })',
+    'Execute workflow (auto-discover): bmad({ operation: "execute", workflow: "party-mode" })',
+  );
+  parts.push(
+    'Execute workflow (explicit module): bmad({ operation: "execute", workflow: "prd", module: "bmm" })',
   );
   parts.push('');
   parts.push('**Important:**');
   parts.push(
-    '- Execute operations require module parameter (and agent parameter for workflows)',
+    '- Execute operations DO NOT accept a "message" parameter - use conversation history instead',
   );
-  parts.push('- This ensures proper discovery before execution');
+  parts.push(
+    '- Specify ONLY ONE: either "agent" OR "workflow" parameter (not both)',
+  );
+  parts.push(
+    '- Module parameter is optional - server auto-discovers if not specified',
+  );
   parts.push(
     '- Use list operation to discover available agents/workflows first',
   );
@@ -323,6 +323,26 @@ export async function handleBMADTool(
   engine: BMADEngine,
 ): Promise<{ content: TextContent[] }> {
   const { operation } = params;
+
+  // DIAGNOSTIC: Log incoming parameters to detect schema violations
+  const hasMessageParam = 'message' in params;
+  const hasBothAgentAndWorkflow = params.agent && params.workflow;
+
+  if (hasMessageParam || hasBothAgentAndWorkflow) {
+    console.error('⚠️  SCHEMA VIOLATION DETECTED:');
+    console.error('   Received params:', JSON.stringify(params, null, 2));
+    if (hasMessageParam) {
+      console.error(
+        '   ❌ Contains "message" parameter (should be rejected by schema)',
+      );
+    }
+    if (hasBothAgentAndWorkflow) {
+      console.error('   ❌ Contains both "agent" and "workflow" parameters');
+    }
+    console.error(
+      '   This suggests MCP client is not respecting additionalProperties: false',
+    );
+  }
 
   switch (operation) {
     case 'list':
@@ -516,7 +536,6 @@ async function handleExecute(
     type,
     agent: params.agent,
     workflow: params.workflow,
-    message: params.message || '',
     module: params.module,
   };
 

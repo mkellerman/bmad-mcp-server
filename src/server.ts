@@ -660,7 +660,10 @@ export class BMADServerLiteMultiToolGit {
         await this.initialize();
 
         const agents = this.engine.getAgentMetadata();
-        const prompts = agents.map((agent) => {
+        const workflows = this.engine.getWorkflowMetadata();
+
+        // Include all agents as prompts
+        const agentPrompts = agents.map((agent) => {
           const promptName = agent.module
             ? `${agent.module}.${agent.name}`
             : `bmad.${agent.name}`;
@@ -668,22 +671,33 @@ export class BMADServerLiteMultiToolGit {
           return {
             name: promptName,
             description: `Activate ${agent.displayName} (${agent.title}) - ${agent.description}`,
-            arguments: [
-              {
-                name: 'message',
-                description:
-                  'Initial message or question for the agent (optional)',
-                required: false,
-              },
-            ],
           };
         });
 
-        const originalCount = prompts.length;
-        let finalPrompts = prompts;
+        // Include standalone workflows as prompts
+        // Use naming: module.agent.workflow (e.g., core.bmad-master.party-mode)
+        const standaloneWorkflowPrompts = workflows
+          .filter((w) => w.standalone)
+          .map((workflow) => {
+            // Standalone workflows in core have bmad-master as orchestrator
+            // For other modules, we'll use 'workflow-executor' as placeholder
+            const agentName =
+              workflow.module === 'core' ? 'bmad-master' : 'workflow-executor';
+            const promptName = `${workflow.module}.${agentName}.${workflow.name}`;
+
+            return {
+              name: promptName,
+              description: `Execute ${workflow.name} workflow - ${workflow.description}`,
+            };
+          });
+
+        const allPrompts = [...agentPrompts, ...standaloneWorkflowPrompts];
+
+        const originalCount = allPrompts.length;
+        let finalPrompts = allPrompts;
         if (shapeEnabled()) {
           const limit = Number(process.env.BMAD_SHAPE_MAX_LIST || 20);
-          finalPrompts = prompts.slice(0, Math.max(1, Math.min(200, limit)));
+          finalPrompts = allPrompts.slice(0, Math.max(1, Math.min(200, limit)));
         }
         const returnedCount = finalPrompts.length;
         try {
@@ -697,7 +711,7 @@ export class BMADServerLiteMultiToolGit {
       }),
     );
 
-    // Get a specific prompt (agent activation)
+    // Get a specific prompt (agent activation or standalone workflow)
     this.server.setRequestHandler(
       GetPromptRequestSchema,
       wrap('GetPrompt', async (request) => {
@@ -708,37 +722,124 @@ export class BMADServerLiteMultiToolGit {
             params: { name: string; arguments?: { message?: unknown } };
           }
         ).params.name;
-        const args =
-          (
-            request as {
-              params: { name: string; arguments?: { message?: unknown } };
-            }
-          ).params.arguments ?? {};
 
-        // Extract agent name from prompt name (e.g., "bmm.analyst" -> "analyst")
+        // Parse the prompt name to determine if it's an agent or workflow
+        // Formats:
+        //   - Agent: "module.agent" (e.g., "bmm.analyst")
+        //   - Workflow: "module.agent.workflow" (e.g., "core.bmad-master.party-mode")
         const parts = promptName.split('.');
-        const agentName =
-          parts.length > 1 ? parts.slice(1).join('.') : parts[0];
-        const module = parts.length > 1 ? parts[0] : undefined;
 
-        // Use the execute operation to get agent activation instructions
-        const result = await handleBMADTool(
-          {
-            operation: 'execute',
-            agent: agentName,
-            message: args.message as string | undefined,
-            module,
-          },
-          this.engine,
-        );
+        if (parts.length >= 3) {
+          // This is a workflow: module.agent.workflow
+          const workflowName = parts.slice(2).join('.'); // Handle workflows with dots in name
+          const module = parts[0];
 
-        return {
-          description: `Activate ${promptName} agent`,
-          messages: result.content.map((c) => ({
-            role: 'user' as const,
-            content: c,
-          })),
-        };
+          // Find the workflow
+          const workflow = this.engine.findWorkflow(workflowName, module);
+
+          if (!workflow) {
+            return {
+              description: `Workflow not found: ${workflowName}`,
+              messages: [
+                {
+                  role: 'user' as const,
+                  content: {
+                    type: 'text' as const,
+                    text: `Workflow "${workflowName}" not found in module "${module}".`,
+                  },
+                },
+              ],
+            };
+          }
+
+          // Check if it's standalone or requires an agent
+          if (workflow.standalone) {
+            // Execute standalone workflow directly
+            const result = await handleBMADTool(
+              {
+                operation: 'execute',
+                workflow: workflowName,
+                module,
+              },
+              this.engine,
+            );
+
+            return {
+              description: `Execute ${promptName} workflow`,
+              messages: result.content.map((c) => ({
+                role: 'user' as const,
+                content: c,
+              })),
+            };
+          } else {
+            // Non-standalone workflow: Load the associated agent instead
+            // The agent will show their menu, allowing the user to select the workflow
+
+            // Find which agents support this workflow
+            const agents = this.engine.getAgentMetadata();
+            const supportingAgent = agents.find(
+              (a) =>
+                a.workflowPaths &&
+                Object.keys(a.workflowPaths).includes(workflowName),
+            );
+
+            if (!supportingAgent) {
+              return {
+                description: `No agent found for workflow: ${workflowName}`,
+                messages: [
+                  {
+                    role: 'user' as const,
+                    content: {
+                      type: 'text' as const,
+                      text: `Workflow "${workflowName}" requires an agent, but no supporting agent was found.`,
+                    },
+                  },
+                ],
+              };
+            }
+
+            // Load the agent instead
+            const result = await handleBMADTool(
+              {
+                operation: 'execute',
+                agent: supportingAgent.name,
+                module: supportingAgent.module,
+              },
+              this.engine,
+            );
+
+            return {
+              description: `Activate ${supportingAgent.displayName} for ${workflowName} workflow`,
+              messages: result.content.map((c) => ({
+                role: 'user' as const,
+                content: c,
+              })),
+            };
+          }
+        } else {
+          // This is an agent: module.agent
+          const agentName =
+            parts.length > 1 ? parts.slice(1).join('.') : parts[0];
+          const module = parts.length > 1 ? parts[0] : undefined;
+
+          // Use the execute operation to get agent activation instructions
+          const result = await handleBMADTool(
+            {
+              operation: 'execute',
+              agent: agentName,
+              module,
+            },
+            this.engine,
+          );
+
+          return {
+            description: `Activate ${promptName} agent`,
+            messages: result.content.map((c) => ({
+              role: 'user' as const,
+              content: c,
+            })),
+          };
+        }
       }),
     );
 

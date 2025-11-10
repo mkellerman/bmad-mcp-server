@@ -1,8 +1,11 @@
 # API Contracts - BMAD MCP Server
 
+> **⚠️ NOTE:** This documentation is being updated. The `message` parameter has been removed from execute operations.  
+> Execute operations now rely solely on conversation history for context. See bmad-unified.ts for current schema.
+
 **Version:** 4.0.0  
 **Protocol:** MCP 1.0.4  
-**Last Updated:** November 6, 2025
+**Last Updated:** November 10, 2025
 
 ---
 

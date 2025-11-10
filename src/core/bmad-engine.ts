@@ -23,6 +23,7 @@ import {
   getAgentExecutionPrompt,
   getWorkflowExecutionPrompt,
 } from '../config.js';
+import { toBmadUri } from '../utils/bmad-path-utils.js';
 import { SessionTracker } from './session-tracker.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
@@ -70,44 +71,12 @@ export interface BMADResult {
  * Workflow match for ambiguous results
  */
 export interface WorkflowMatch {
-  /** Composite key: module:agent:workflow */
-  key: string;
-  /** Module name */
-  module: string;
-  /** Agent name */
-  agentName: string;
-  /** Agent display name */
-  agentDisplayName: string;
-  /** Agent title */
-  agentTitle: string;
-  /** Workflow name */
   workflow: string;
-  /** Workflow description */
-  description: string;
-  /** Example action for retry */
-  action: string;
-}
-
-/**
- * Agent match for ambiguous results
- */
-export interface AgentMatch {
-  /** Composite key: module:agent */
-  key: string;
-  /** Module name */
   module: string;
-  /** Agent name */
   agentName: string;
-  /** Agent display name */
   agentDisplayName: string;
-  /** Agent title */
   agentTitle: string;
-  /** Agent role */
-  role: string;
-  /** Agent description/identity */
   description: string;
-  /** Example action for retry */
-  action: string;
 }
 
 /**
@@ -121,6 +90,17 @@ export interface AmbiguousWorkflowResult extends BMADResult {
   type: 'workflow';
   /** Array of matching workflows */
   matches: WorkflowMatch[];
+}
+
+export interface AgentMatch {
+  key: string;
+  agentName: string;
+  agentDisplayName: string;
+  agentTitle: string;
+  role: string;
+  module: string;
+  description?: string;
+  action?: string;
 }
 
 /**
@@ -154,8 +134,6 @@ export interface ExecuteParams {
   agent?: string;
   /** Workflow name (for workflow execution) */
   workflow?: string;
-  /** User message/context (optional - some agents/workflows may work without initial message) */
-  message?: string;
   /** Module hint (for disambiguation) */
   module?: string;
 }
@@ -382,10 +360,6 @@ export class BMADEngine {
 
     // Try LLM ranking
     try {
-      console.log(
-        '🎯 Using LLM-based ranking for better context understanding',
-      );
-
       // Build ranking context
       const candidates: RankingCandidate[] = items.map((item) => {
         const key = keyExtractor(item);
@@ -419,7 +393,6 @@ export class BMADEngine {
       });
 
       // Call LLM via MCP sampling
-      const startTime = Date.now();
       const response = await this.mcpServer!.createMessage({
         messages: [
           {
@@ -432,9 +405,6 @@ export class BMADEngine {
         ],
         maxTokens: 100,
       });
-
-      const latency = Date.now() - startTime;
-      console.log(`✅ LLM ranking completed in ${latency}ms`);
 
       // Parse response
       const validKeys = new Set(candidates.map((c) => c.key));
@@ -779,7 +749,7 @@ export class BMADEngine {
   // ============================================================================
 
   /**
-   * Execute an agent with user message
+   * Execute an agent (activate agent persona)
    */
   async executeAgent(
     params: ExecuteParams,
@@ -852,7 +822,6 @@ export class BMADEngine {
       // Build minimal execution context (NO agent content loading!)
       const executionContext = {
         agent: params.agent,
-        userContext: params.message,
       };
 
       // Track agent usage for ranking
@@ -885,6 +854,10 @@ export class BMADEngine {
    *
    * The agent's workflow handler will instruct the LLM to load workflow.xml
    * and any other files needed.
+   *
+   * Auto-discovery features:
+   * - Module: If not provided, searches all modules
+   * - Agent: For non-standalone workflows, auto-selects offering agent
    */
   async executeWorkflow(
     params: ExecuteParams,
@@ -900,31 +873,68 @@ export class BMADEngine {
     await this.initialize();
 
     try {
-      // PRIORITY 1: Check if this is a standalone workflow FIRST
-      // Standalone workflows execute directly without agent selection
-      const standaloneWorkflow = this.workflows.find(
-        (w) =>
-          w.name === params.workflow &&
-          w.standalone &&
-          (!params.module || w.module === params.module),
-      );
+      // PHASE 1: Find the workflow (with auto-discovery)
+      // Search for workflow in specified module OR across all modules
+      const matchingWorkflows = this.workflows.filter((w) => {
+        if (w.name !== params.workflow) return false;
+        if (params.module && w.module !== params.module) return false;
+        return true;
+      });
 
-      if (standaloneWorkflow) {
-        // Execute standalone workflow without agent
-        const workflowPath = `{project-root}/bmad/${standaloneWorkflow.module}/workflows/${params.workflow}/workflow.yaml`;
+      if (matchingWorkflows.length === 0) {
+        return {
+          success: false,
+          error: `Workflow not found: ${params.workflow}${params.module ? ` in module: ${params.module}` : ''}`,
+          text: this.formatWorkflowNotFound(params.workflow),
+        };
+      }
+
+      // Handle ambiguity: same workflow name in multiple modules
+      if (matchingWorkflows.length > 1 && !params.module) {
+        const matches: WorkflowMatch[] = matchingWorkflows.map((wf) => {
+          const module = wf.module || 'core';
+          return {
+            key: `${module}:${wf.name}`,
+            module,
+            agentName: '',
+            agentDisplayName: '',
+            agentTitle: '',
+            workflow: wf.name,
+            description: wf.description || wf.name,
+            action: `bmad({ operation: "execute", workflow: "${wf.name}", module: "${module}" })`,
+          };
+        });
+
+        return {
+          success: true,
+          ambiguous: true,
+          type: 'workflow',
+          matches,
+          text: this.formatAmbiguousWorkflowResponse(matches),
+        };
+      }
+
+      // Single workflow found (or module was specified)
+      const selectedWorkflow = matchingWorkflows[0];
+      const workflowModule = selectedWorkflow.module || 'core';
+
+      // PHASE 2: Execute based on workflow type
+      if (selectedWorkflow.standalone) {
+        // STANDALONE WORKFLOW: Execute directly without agent
+        const workflowPath = `{project-root}/bmad/${workflowModule}/workflows/${params.workflow}/workflow.yaml`;
+
+        // Convert to bmad:// URI so LLMs use MCP resource API
+        const workflowUri = toBmadUri(workflowPath);
 
         const executionContext = {
           workflow: params.workflow,
-          workflowPath,
-          userContext: params.message,
+          workflowPath: workflowUri,
           agent: undefined,
           agentWorkflowHandler: undefined,
         };
 
         // Track workflow usage for ranking
-        this.sessionTracker.recordUsage(
-          `${standaloneWorkflow.module}:${params.workflow}`,
-        );
+        this.sessionTracker.recordUsage(`${workflowModule}:${params.workflow}`);
 
         const text = getWorkflowExecutionPrompt(executionContext);
 
@@ -933,22 +943,9 @@ export class BMADEngine {
           data: executionContext,
           text,
         };
-      }
-
-      // PRIORITY 2: Check if this workflow exists but is NOT standalone
-      // These must be executed through an agent
-      const nonStandaloneWorkflow = this.workflows.find(
-        (w) =>
-          w.name === params.workflow &&
-          !w.standalone &&
-          (!params.module || w.module === params.module),
-      );
-
-      if (nonStandaloneWorkflow) {
-        // This workflow requires an agent - find agents offering it
-        // Need to match by workflow path since agent metadata uses folder names
-        // which may differ from manifest names
-        const workflowPathPattern = nonStandaloneWorkflow.path;
+      } else {
+        // NON-STANDALONE WORKFLOW: Requires agent - auto-select one
+        const workflowPathPattern = selectedWorkflow.path;
 
         const matchingAgents = this.agentMetadata.filter((a) => {
           if (!a.workflowPaths) return false;
@@ -972,63 +969,46 @@ export class BMADEngine {
           return {
             success: false,
             error: `Workflow "${params.workflow}" is not standalone and no agent offers it`,
-            text: `❌ Workflow "${params.workflow}" requires an agent but no agent offers it.\n\nThis is a non-standalone workflow that must be executed through an agent menu.`,
+            text: `❌ Workflow "${params.workflow}" requires an agent but no agent offers it.\n\nThis is a non-standalone workflow that must be executed through an agent.`,
           };
         }
 
-        // Filter by module if specified
-        const filteredAgents = params.module
-          ? matchingAgents.filter((a) => a.module === params.module)
-          : matchingAgents;
+        // Filter by module if workflow's module was determined
+        const filteredAgents = matchingAgents.filter(
+          (a) => a.module === workflowModule,
+        );
 
-        // Check for ambiguity
-        if (!params.module && filteredAgents.length > 1) {
-          const matches: WorkflowMatch[] = filteredAgents.map((agent) => {
-            const module = agent.module || 'core';
-            const key = `${module}:${agent.name}:${params.workflow}`;
+        // Use filtered agents or fall back to all matching
+        const agentsToUse =
+          filteredAgents.length > 0 ? filteredAgents : matchingAgents;
 
-            return {
-              key,
-              module,
-              agentName: agent.name,
-              agentDisplayName: agent.displayName,
-              agentTitle: agent.title,
-              workflow: params.workflow!,
-              description: `Execute ${params.workflow} via ${agent.displayName}`,
-              action: `bmad({ operation: "execute", workflow: "${params.workflow}", module: "${module}" })`,
-            };
-          });
+        // Auto-select first agent (they should all work the same for this workflow)
+        const agentForWorkflow = agentsToUse[0];
 
-          const rankedMatches = this.rankByUsage(matches, (m) => m.key);
-
-          return {
-            success: true,
-            ambiguous: true,
-            type: 'workflow',
-            matches: rankedMatches,
-            text: this.formatAmbiguousWorkflowResponse(rankedMatches),
-          };
-        }
-
-        // Use the agent (first match or module-filtered)
-        const agentForWorkflow = filteredAgents[0];
+        // Get workflow path from agent metadata
         const workflowPath =
-          nonStandaloneWorkflow.path ||
-          `{project-root}/bmad/${nonStandaloneWorkflow.module}/workflows/${params.workflow}/workflow.yaml`;
+          agentForWorkflow?.workflowPaths?.[params.workflow] ||
+          selectedWorkflow.path ||
+          `{project-root}/bmad/${workflowModule}/workflows/${params.workflow}/workflow.yaml`;
 
+        // Convert to bmad:// URI so LLMs use MCP resource API
+        const workflowUri = toBmadUri(workflowPath);
+
+        // Build execution context with auto-selected agent
         const executionContext = {
           workflow: params.workflow,
-          workflowPath,
-          userContext: params.message,
+          workflowPath: workflowUri,
           agent: agentForWorkflow.name,
           agentWorkflowHandler: agentForWorkflow.workflowHandlerInstructions,
         };
 
-        // Track usage
-        const module = agentForWorkflow.module || 'core';
-        this.sessionTracker.recordUsage(`${module}:${params.workflow}`);
-        this.sessionTracker.recordUsage(`${module}:${agentForWorkflow.name}`);
+        // Track workflow and agent usage for ranking
+        this.sessionTracker.recordUsage(`${workflowModule}:${params.workflow}`);
+        this.sessionTracker.recordUsage(
+          `${agentForWorkflow.module || 'core'}:${agentForWorkflow.name}`,
+        );
 
+        // Build the prompt with agent metadata and handler
         const text = getWorkflowExecutionPrompt(executionContext);
 
         return {
@@ -1037,103 +1017,6 @@ export class BMADEngine {
           text,
         };
       }
-
-      // PRIORITY 3: Find all agents that offer this workflow (legacy/fallback)
-      // This handles cases where workflow isn't in manifest but agents reference it
-      const matchingAgents = this.agentMetadata.filter((a) =>
-        a.workflows?.includes(params.workflow!),
-      );
-
-      // Filter by module if specified
-      const filteredAgents = params.module
-        ? matchingAgents.filter((a) => a.module === params.module)
-        : matchingAgents;
-
-      // Check for ambiguity: multiple matches without module filter
-      if (!params.module && filteredAgents.length > 1) {
-        // Build matches array
-        const matches: WorkflowMatch[] = filteredAgents.map((agent) => {
-          const module = agent.module || 'core';
-          const key = `${module}:${agent.name}:${params.workflow}`;
-          const workflowIndex = agent.workflows!.indexOf(params.workflow!);
-          const description =
-            agent.workflowMenuItems?.[workflowIndex] || params.workflow!;
-
-          return {
-            key,
-            module,
-            agentName: agent.name,
-            agentDisplayName: agent.displayName,
-            agentTitle: agent.title,
-            workflow: params.workflow!,
-            description,
-            action: `bmad({ operation: "execute", workflow: "${params.workflow}", module: "${module}" })`,
-          };
-        });
-
-        // Rank matches by usage patterns
-        const rankedMatches = this.rankByUsage(matches, (m) => m.key);
-
-        // Return ambiguous result
-        return {
-          success: true,
-          ambiguous: true,
-          type: 'workflow',
-          matches: rankedMatches,
-          text: this.formatAmbiguousWorkflowResponse(rankedMatches),
-        };
-      }
-
-      // Single match or module-filtered result
-      let agentForWorkflow: AgentMetadata | undefined;
-
-      if (params.agent) {
-        // User specified which agent to use
-        agentForWorkflow = this.agentMetadata.find(
-          (a) => a.name === params.agent,
-        );
-      } else {
-        // Use first filtered match
-        agentForWorkflow = filteredAgents[0];
-      }
-
-      if (!agentForWorkflow) {
-        return {
-          success: false,
-          error: `No agent found offering workflow: ${params.workflow}${params.module ? ` in module: ${params.module}` : ''}`,
-          text: this.formatWorkflowNotFound(params.workflow),
-        };
-      }
-
-      // Get workflow path from agent metadata
-      const workflowPath =
-        agentForWorkflow?.workflowPaths?.[params.workflow] ||
-        `{project-root}/bmad/workflows/${params.workflow}/workflow.yaml`;
-
-      // Build minimal execution context (NO workflow.yaml loading!)
-      const executionContext = {
-        workflow: params.workflow,
-        workflowPath,
-        userContext: params.message,
-        agent: agentForWorkflow?.name,
-        agentWorkflowHandler: agentForWorkflow?.workflowHandlerInstructions,
-      };
-
-      // Track workflow and agent usage for ranking
-      const module = agentForWorkflow?.module || 'core';
-      this.sessionTracker.recordUsage(`${module}:${params.workflow}`);
-      if (agentForWorkflow) {
-        this.sessionTracker.recordUsage(`${module}:${agentForWorkflow.name}`);
-      }
-
-      // Build the prompt with just agent metadata and handler
-      const text = getWorkflowExecutionPrompt(executionContext);
-
-      return {
-        success: true,
-        data: executionContext,
-        text,
-      };
     } catch (error) {
       return {
         success: false,
@@ -1187,35 +1070,16 @@ export class BMADEngine {
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
-
-        const queryWords = searchQuery.split(/\s+/);
-        return queryWords.every((word) => searchableText.includes(word));
+        return searchableText.includes(searchQuery);
       });
-
-      results.agents = matchedAgents.map((a) => ({
-        name: a.name,
-        displayName: a.displayName,
-        module: a.module,
-      }));
+      if (matchedAgents.length > 0) {
+        results.agents = matchedAgents.map((a) => ({
+          name: a.name,
+          displayName: a.displayName,
+          module: a.module,
+        }));
+      }
     }
-
-    // Search workflows
-    if (type === 'workflows' || type === 'all') {
-      const matchedWorkflows = this.workflows.filter(
-        (w) =>
-          w.name.toLowerCase().includes(searchQuery) ||
-          (w.description &&
-            w.description.toLowerCase().includes(searchQuery)) ||
-          (w.module && w.module.toLowerCase().includes(searchQuery)),
-      );
-
-      results.workflows = matchedWorkflows.map((w) => ({
-        name: w.name,
-        description: w.description,
-        module: w.module,
-      }));
-    }
-
     const text = this.formatSearchResults(results, query);
 
     return {
@@ -1492,11 +1356,54 @@ export class BMADEngine {
   }
 
   /**
+   * Find a workflow by name (case-insensitive) and return its metadata
+   * @param workflowName - The name of the workflow to find
+   * @param module - Optional module to narrow the search
+   * @returns Workflow metadata if found, undefined otherwise
+   */
+  findWorkflow(workflowName: string, module?: string): Workflow | undefined {
+    const searchName = workflowName.toLowerCase();
+
+    return this.workflows.find((w) => {
+      const nameMatch = w.name.toLowerCase() === searchName;
+      const moduleMatch = !module || w.module === module;
+      return nameMatch && moduleMatch;
+    });
+  }
+
+  /**
+   * Find an agent by name (case-insensitive) and return its metadata
+   * @param agentName - The name of the agent to find
+   * @param module - Optional module to narrow the search
+   * @returns Agent metadata if found, undefined otherwise
+   */
+  findAgent(agentName: string, module?: string): AgentMetadata | undefined {
+    const searchName = agentName.toLowerCase();
+
+    return this.agentMetadata.find((a) => {
+      const nameMatch = a.name.toLowerCase() === searchName;
+      const moduleMatch = !module || a.module === module;
+      return nameMatch && moduleMatch;
+    });
+  }
+
+  /**
    * Get cached resources (requires initialization)
    */
   getCachedResources(): Array<{ uri: string; relativePath: string }> {
     return this.cachedResources;
   }
+
+  /**
+   * Convert a file path to a bmad:// URI
+   * 
+   * Searches the resource cache for a matching path and returns the bmad:// URI.
+   * This ensures LLMs use the MCP resource API instead of direct file access.
+   * 
+   * @param path - Path to convert (can be {project-root}/bmad/... or relative path)
+   * @returns bmad:// URI if found, original path if not found
+   * 
+   * @example
 
   /**
    * Get the underlying ResourceLoaderGit instance
@@ -1548,7 +1455,7 @@ export class BMADEngine {
       const principles = this.escapeCsvField(agent.principles || '');
       const module = this.escapeCsvField(moduleRaw);
       const path = this.escapeCsvField(
-        `bmad/${moduleRaw}/agents/${nameRaw}.md`,
+        toBmadUri(`bmad/${moduleRaw}/agents/${nameRaw}.md`),
       );
 
       rows.push(
@@ -1579,7 +1486,7 @@ export class BMADEngine {
       const name = this.escapeCsvField(workflow.name || '');
       const description = this.escapeCsvField(workflow.description || '');
       const module = this.escapeCsvField(workflow.module || 'core');
-      const path = this.escapeCsvField(workflow.path || '');
+      const path = this.escapeCsvField(toBmadUri(workflow.path || ''));
       const standalone = this.escapeCsvField(
         workflow.standalone ? 'true' : 'false',
       );
@@ -1611,7 +1518,7 @@ export class BMADEngine {
       const displayName = this.escapeCsvField(tool.displayName || '');
       const description = this.escapeCsvField(tool.description || '');
       const module = this.escapeCsvField(tool.module || 'core');
-      const path = this.escapeCsvField(tool.path || '');
+      const path = this.escapeCsvField(toBmadUri(tool.path || ''));
       const standalone = this.escapeCsvField(
         tool.standalone ? 'true' : 'false',
       );
@@ -1645,7 +1552,7 @@ export class BMADEngine {
       const displayName = this.escapeCsvField(task.displayName || '');
       const description = this.escapeCsvField(task.description || '');
       const module = this.escapeCsvField(task.module || 'core');
-      const path = this.escapeCsvField(task.path || '');
+      const path = this.escapeCsvField(toBmadUri(task.path || ''));
       const standalone = this.escapeCsvField(
         task.standalone ? 'true' : 'false',
       );

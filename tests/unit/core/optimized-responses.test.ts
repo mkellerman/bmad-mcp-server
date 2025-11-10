@@ -168,7 +168,7 @@ describe('Optimized Ambiguous Response Formats', () => {
         lines.push(`   • Role: ${match.role}`);
         lines.push(`   • Module: ${match.module}`);
         lines.push(
-          `   • Execute: bmad({ operation: "execute", agent: "${match.agentName}", module: "${match.module}", message: "your request" })`,
+          `   • Execute: bmad({ operation: "execute", agent: "${match.agentName}", module: "${match.module}" })`,
         );
         lines.push('');
       });

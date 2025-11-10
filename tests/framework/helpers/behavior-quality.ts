@@ -11,7 +11,7 @@
  * Usage:
  * ```ts
  * const qualityChecker = new BehaviorQualityChecker();
- * 
+ *
  * // Score tool call quality
  * const toolQuality = qualityChecker.scoreToolCallQuality({
  *   expectedOperation: 'execute',
@@ -20,7 +20,7 @@
  *   providedParams: { agent: 'debug', message: 'help' },
  *   contextAppropriate: true
  * });
- * 
+ *
  * // Get overall quality score
  * const overallScore = qualityChecker.calculateOverallQuality(sessionAnalysis);
  * ```
@@ -118,17 +118,21 @@ export class BehaviorQualityChecker {
    * @param criteria - Expected behavior criteria
    * @returns Quality assessment
    */
-  scoreToolCallQuality(toolCall: ToolCall, criteria?: BehaviorCriteria): ToolCallQuality {
+  scoreToolCallQuality(
+    toolCall: ToolCall,
+    criteria?: BehaviorCriteria,
+  ): ToolCallQuality {
     const issues: string[] = [];
     let score = 100;
 
     // Check operation type
-    const operationCorrect = !criteria?.expectedOperation || 
+    const operationCorrect =
+      !criteria?.expectedOperation ||
       toolCall.arguments.operation === criteria.expectedOperation;
-    
+
     if (!operationCorrect) {
       issues.push(
-        `Expected operation '${criteria?.expectedOperation}', got '${toolCall.arguments.operation}'`
+        `Expected operation '${criteria?.expectedOperation}', got '${toolCall.arguments.operation}'`,
       );
       score -= 25;
     }
@@ -137,9 +141,9 @@ export class BehaviorQualityChecker {
     const providedParams = Object.keys(toolCall.arguments);
     const requiredParams = criteria?.requiredParams || [];
     const missingParams = requiredParams.filter(
-      (param) => !providedParams.includes(param)
+      (param) => !providedParams.includes(param),
     );
-    
+
     const parametersComplete = missingParams.length === 0;
     if (!parametersComplete) {
       issues.push(`Missing required parameters: ${missingParams.join(', ')}`);
@@ -148,11 +152,17 @@ export class BehaviorQualityChecker {
 
     // Check parameter validity
     let parametersValid = true;
-    
+
     // Agent/workflow name should not have module prefix
-    if (toolCall.arguments.agent && typeof toolCall.arguments.agent === 'string') {
+    if (
+      toolCall.arguments.agent &&
+      typeof toolCall.arguments.agent === 'string'
+    ) {
       const agent = toolCall.arguments.agent as string;
-      if (agent.includes('-') && !['design-thinking', 'creative-problem-solver'].includes(agent)) {
+      if (
+        agent.includes('-') &&
+        !['design-thinking', 'creative-problem-solver'].includes(agent)
+      ) {
         // Likely has module prefix (e.g., 'bmm-debug' instead of 'debug')
         issues.push(`Agent name should not include module prefix: '${agent}'`);
         parametersValid = false;
@@ -160,7 +170,10 @@ export class BehaviorQualityChecker {
       }
     }
 
-    if (toolCall.arguments.workflow && typeof toolCall.arguments.workflow === 'string') {
+    if (
+      toolCall.arguments.workflow &&
+      typeof toolCall.arguments.workflow === 'string'
+    ) {
       const workflow = toolCall.arguments.workflow as string;
       if (workflow.includes('-') && workflow.split('-').length > 3) {
         // Suspiciously long workflow name with multiple hyphens
@@ -173,9 +186,13 @@ export class BehaviorQualityChecker {
     // Check forbidden parameter combinations
     if (criteria?.forbiddenParams) {
       for (const forbidden of criteria.forbiddenParams) {
-        const hasForbidden = forbidden.every((param) => providedParams.includes(param));
+        const hasForbidden = forbidden.every((param) =>
+          providedParams.includes(param),
+        );
         if (hasForbidden) {
-          issues.push(`Invalid parameter combination: ${forbidden.join(' + ')}`);
+          issues.push(
+            `Invalid parameter combination: ${forbidden.join(' + ')}`,
+          );
           parametersValid = false;
           score -= 20;
         }
@@ -184,11 +201,11 @@ export class BehaviorQualityChecker {
 
     // Check contextual appropriateness
     let contextAppropriate = true;
-    
-    // Execute should have message or explicit context
+
+    // Execute should have agent or workflow specified
     if (toolCall.arguments.operation === 'execute') {
-      if (!toolCall.arguments.message && !toolCall.arguments.agent && !toolCall.arguments.workflow) {
-        issues.push('Execute operation missing context (message, agent, or workflow)');
+      if (!toolCall.arguments.agent && !toolCall.arguments.workflow) {
+        issues.push('Execute operation missing target (agent or workflow)');
         contextAppropriate = false;
         score -= 15;
       }
@@ -222,7 +239,7 @@ export class BehaviorQualityChecker {
    */
   private calculateToolCallAccuracy(toolQualities: ToolCallQuality[]): number {
     if (toolQualities.length === 0) return 0;
-    
+
     const correctOps = toolQualities.filter((q) => q.operationCorrect).length;
     return (correctOps / toolQualities.length) * 100;
   }
@@ -233,9 +250,11 @@ export class BehaviorQualityChecker {
    * @param toolQualities - Assessed tool call qualities
    * @returns Score 0-100
    */
-  private calculateParameterCompleteness(toolQualities: ToolCallQuality[]): number {
+  private calculateParameterCompleteness(
+    toolQualities: ToolCallQuality[],
+  ): number {
     if (toolQualities.length === 0) return 0;
-    
+
     const complete = toolQualities.filter((q) => q.parametersComplete).length;
     return (complete / toolQualities.length) * 100;
   }
@@ -246,10 +265,14 @@ export class BehaviorQualityChecker {
    * @param toolQualities - Assessed tool call qualities
    * @returns Score 0-100
    */
-  private calculateContextualRelevance(toolQualities: ToolCallQuality[]): number {
+  private calculateContextualRelevance(
+    toolQualities: ToolCallQuality[],
+  ): number {
     if (toolQualities.length === 0) return 0;
-    
-    const appropriate = toolQualities.filter((q) => q.contextAppropriate).length;
+
+    const appropriate = toolQualities.filter(
+      (q) => q.contextAppropriate,
+    ).length;
     return (appropriate / toolQualities.length) * 100;
   }
 
@@ -265,9 +288,12 @@ export class BehaviorQualityChecker {
     let score = 100;
 
     // Check for message balance (not too one-sided)
-    const messageRatio = analysis.assistantMessages / Math.max(1, analysis.userMessages);
+    const messageRatio =
+      analysis.assistantMessages / Math.max(1, analysis.userMessages);
     if (messageRatio > 5) {
-      this.findings.push('Assistant dominated conversation (message ratio too high)');
+      this.findings.push(
+        'Assistant dominated conversation (message ratio too high)',
+      );
       score -= 20;
     } else if (messageRatio < 0.5) {
       this.findings.push('User dominated conversation (message ratio too low)');
@@ -276,18 +302,22 @@ export class BehaviorQualityChecker {
 
     // Check for tool call clustering (good) vs scattered calls (poor)
     if (analysis.toolCalls.length > 3) {
-      const timestamps = analysis.toolCalls.map((tc) => new Date(tc.timestamp).getTime());
+      const timestamps = analysis.toolCalls.map((tc) =>
+        new Date(tc.timestamp).getTime(),
+      );
       const gaps = [];
       for (let i = 1; i < timestamps.length; i++) {
         gaps.push(timestamps[i] - timestamps[i - 1]);
       }
-      
+
       const avgGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
       const maxGap = Math.max(...gaps);
-      
+
       // Large gaps suggest loss of context or confusion
       if (maxGap > avgGap * 5) {
-        this.findings.push('Large time gaps between tool calls suggest context loss');
+        this.findings.push(
+          'Large time gaps between tool calls suggest context loss',
+        );
         score -= 15;
       }
     }
@@ -298,10 +328,12 @@ export class BehaviorQualityChecker {
       const key = `${call.arguments.operation}-${call.arguments.agent || call.arguments.workflow || ''}`;
       operationCounts.set(key, (operationCounts.get(key) || 0) + 1);
     }
-    
+
     for (const [operation, count] of operationCounts) {
       if (count > 3) {
-        this.findings.push(`Repeated operation '${operation}' ${count} times (possible confusion)`);
+        this.findings.push(
+          `Repeated operation '${operation}' ${count} times (possible confusion)`,
+        );
         score -= 10;
       }
     }
@@ -316,39 +348,51 @@ export class BehaviorQualityChecker {
    * @param criteria - Expected behavior criteria
    * @returns Score 0-100
    */
-  private calculateEfficiency(analysis: SessionAnalysis, criteria?: BehaviorCriteria): number {
+  private calculateEfficiency(
+    analysis: SessionAnalysis,
+    criteria?: BehaviorCriteria,
+  ): number {
     let score = 100;
 
     // Penalize excessive tool calls
     const maxAllowed = criteria?.maxToolCalls || 5;
     if (analysis.bmadCalls.length > maxAllowed) {
       const excess = analysis.bmadCalls.length - maxAllowed;
-      this.findings.push(`Made ${analysis.bmadCalls.length} tool calls (expected ≤${maxAllowed})`);
+      this.findings.push(
+        `Made ${analysis.bmadCalls.length} tool calls (expected ≤${maxAllowed})`,
+      );
       score -= excess * 15;
     }
 
     // Check for optimal discovery pattern
     if (criteria?.shouldDiscover) {
       const hasListCall = analysis.bmadCalls.some(
-        (call) => call.arguments.operation === 'list'
+        (call) => call.arguments.operation === 'list',
       );
       const hasReadCall = analysis.bmadCalls.some(
-        (call) => call.arguments.operation === 'read'
+        (call) => call.arguments.operation === 'read',
       );
-      
+
       if (!hasListCall && !hasReadCall) {
-        this.findings.push('Missing discovery step (list or read) before execution');
-        this.recommendations.push('Add discovery step to understand available options');
+        this.findings.push(
+          'Missing discovery step (list or read) before execution',
+        );
+        this.recommendations.push(
+          'Add discovery step to understand available options',
+        );
         score -= 20;
       }
     }
 
     // Check for wasted calls (errors that didn't lead to correction)
-    const errorCount = analysis.toolCalls.length - 
+    const errorCount =
+      analysis.toolCalls.length -
       analysis.toolExecutions.filter((e) => e.success).length;
-    
+
     if (errorCount > 1) {
-      this.findings.push(`${errorCount} tool calls failed (inefficient error recovery)`);
+      this.findings.push(
+        `${errorCount} tool calls failed (inefficient error recovery)`,
+      );
       score -= errorCount * 10;
     }
 
@@ -364,7 +408,7 @@ export class BehaviorQualityChecker {
    */
   private calculateInstructionAdherence(
     analysis: SessionAnalysis,
-    criteria?: BehaviorCriteria
+    criteria?: BehaviorCriteria,
   ): number {
     let score = 100;
 
@@ -373,19 +417,25 @@ export class BehaviorQualityChecker {
       const usedTarget = analysis.bmadCalls.some(
         (call) =>
           call.arguments.agent === criteria.expectedTarget ||
-          call.arguments.workflow === criteria.expectedTarget
+          call.arguments.workflow === criteria.expectedTarget,
       );
-      
+
       if (!usedTarget) {
-        this.findings.push(`Did not use expected target '${criteria.expectedTarget}'`);
-        this.recommendations.push(`Ensure agent/workflow '${criteria.expectedTarget}' is invoked`);
+        this.findings.push(
+          `Did not use expected target '${criteria.expectedTarget}'`,
+        );
+        this.recommendations.push(
+          `Ensure agent/workflow '${criteria.expectedTarget}' is invoked`,
+        );
         score -= 30;
       }
     }
 
     // Check for all tools succeeding (basic instruction adherence)
     if (!analysis.allToolsSucceeded) {
-      this.findings.push('Not all tool calls succeeded (partial instruction adherence)');
+      this.findings.push(
+        'Not all tool calls succeeded (partial instruction adherence)',
+      );
       score -= 20;
     }
 
@@ -401,7 +451,7 @@ export class BehaviorQualityChecker {
    */
   calculateOverallQuality(
     analysis: SessionAnalysis,
-    criteria?: BehaviorCriteria
+    criteria?: BehaviorCriteria,
   ): BehaviorQualityReport {
     // Reset findings and recommendations
     this.findings = [];
@@ -409,23 +459,27 @@ export class BehaviorQualityChecker {
 
     // Score individual tool calls
     const toolCallQualities = analysis.bmadCalls.map((call) =>
-      this.scoreToolCallQuality(call, criteria)
+      this.scoreToolCallQuality(call, criteria),
     );
 
     // Calculate dimension scores
     const dimensions: QualityDimensions = {
       toolCallAccuracy: this.calculateToolCallAccuracy(toolCallQualities),
-      parameterCompleteness: this.calculateParameterCompleteness(toolCallQualities),
+      parameterCompleteness:
+        this.calculateParameterCompleteness(toolCallQualities),
       contextualRelevance: this.calculateContextualRelevance(toolCallQualities),
       conversationCoherence: this.calculateConversationCoherence(analysis),
       efficiency: this.calculateEfficiency(analysis, criteria),
-      instructionAdherence: this.calculateInstructionAdherence(analysis, criteria),
+      instructionAdherence: this.calculateInstructionAdherence(
+        analysis,
+        criteria,
+      ),
     };
 
     // Calculate weighted overall score
     const weights = {
-      toolCallAccuracy: 0.20,
-      parameterCompleteness: 0.20,
+      toolCallAccuracy: 0.2,
+      parameterCompleteness: 0.2,
       contextualRelevance: 0.15,
       conversationCoherence: 0.15,
       efficiency: 0.15,
@@ -450,22 +504,34 @@ export class BehaviorQualityChecker {
 
     // Generate recommendations based on low scores
     if (dimensions.toolCallAccuracy < 70) {
-      this.recommendations.push('Improve tool call operation selection (use correct operation types)');
+      this.recommendations.push(
+        'Improve tool call operation selection (use correct operation types)',
+      );
     }
     if (dimensions.parameterCompleteness < 70) {
-      this.recommendations.push('Ensure all required parameters are provided in tool calls');
+      this.recommendations.push(
+        'Ensure all required parameters are provided in tool calls',
+      );
     }
     if (dimensions.contextualRelevance < 70) {
-      this.recommendations.push('Make tool calls more contextually appropriate to user intent');
+      this.recommendations.push(
+        'Make tool calls more contextually appropriate to user intent',
+      );
     }
     if (dimensions.conversationCoherence < 70) {
-      this.recommendations.push('Improve conversation flow and context awareness');
+      this.recommendations.push(
+        'Improve conversation flow and context awareness',
+      );
     }
     if (dimensions.efficiency < 70) {
-      this.recommendations.push('Reduce unnecessary tool calls and improve error recovery');
+      this.recommendations.push(
+        'Reduce unnecessary tool calls and improve error recovery',
+      );
     }
     if (dimensions.instructionAdherence < 70) {
-      this.recommendations.push('Better follow system instructions and user constraints');
+      this.recommendations.push(
+        'Better follow system instructions and user constraints',
+      );
     }
 
     return {
@@ -535,23 +601,26 @@ export class BehaviorQualityChecker {
  */
 export function assertQualityMeetsStandard(
   report: BehaviorQualityReport,
-  minScore = 70
+  minScore = 70,
 ): { passed: boolean; message: string } {
   const passed = report.overallScore >= minScore;
-  
+
   let message = `Quality score: ${report.overallScore.toFixed(1)}/100 (${report.rating})`;
-  
+
   if (!passed) {
     message += `\nExpected: ≥${minScore}, Got: ${report.overallScore.toFixed(1)}`;
-    
+
     if (report.findings.length > 0) {
-      message += '\n\nFindings:\n' + report.findings.map((f) => `  - ${f}`).join('\n');
+      message +=
+        '\n\nFindings:\n' + report.findings.map((f) => `  - ${f}`).join('\n');
     }
-    
+
     if (report.recommendations.length > 0) {
-      message += '\n\nRecommendations:\n' + report.recommendations.map((r) => `  - ${r}`).join('\n');
+      message +=
+        '\n\nRecommendations:\n' +
+        report.recommendations.map((r) => `  - ${r}`).join('\n');
     }
   }
-  
+
   return { passed, message };
 }

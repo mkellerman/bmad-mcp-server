@@ -43,10 +43,10 @@ Single `bmad` tool with intelligent operations:
 { operation: "list", query: "agents" }
 
 // Read agent details (no execution)
-{ operation: "read", type: "agent", agent: "analyst" }
+{ operation: "read", agent: "analyst" }
 
-// Execute agent with context
-{ operation: "execute", agent: "analyst", message: "Help me..." }
+// Execute agent (uses conversation history for context)
+{ operation: "execute", agent: "analyst" }
 ```
 
 ### 11 Specialized Agents
@@ -220,7 +220,7 @@ Just ask your AI assistant naturally - it handles the MCP tool calls automatical
 
 ```
 You: "Ask Mary to analyze the market opportunity for a SaaS product"
-→ AI executes: { operation: "execute", agent: "analyst", message: "..." }
+→ AI executes: { operation: "execute", agent: "analyst" }
 → Mary (Business Analyst) provides market analysis
 ```
 
@@ -228,7 +228,7 @@ You: "Ask Mary to analyze the market opportunity for a SaaS product"
 
 ```
 You: "Start a PRD workflow for a task management app"
-→ AI executes: { operation: "execute", workflow: "prd", message: "..." }
+→ AI executes: { operation: "execute", workflow: "prd" }
 → John (Product Manager) guides you through PRD creation
 ```
 
@@ -236,7 +236,7 @@ You: "Start a PRD workflow for a task management app"
 
 ```
 You: "Ask Diana to debug this script" (with code attached)
-→ AI executes: { operation: "execute", agent: "debug", message: "..." }
+→ AI executes: { operation: "execute", agent: "debug" }
 → Diana starts comprehensive debugging workflow
 ```
 
@@ -244,7 +244,7 @@ You: "Ask Diana to debug this script" (with code attached)
 
 ```
 You: "Start party-mode with the planning team to brainstorm features"
-→ AI executes: { operation: "execute", workflow: "party-mode", message: "..." }
+→ AI executes: { operation: "execute", workflow: "party-mode" }
 → Multiple agents collaborate on brainstorming session
 ```
 
@@ -252,7 +252,7 @@ You: "Start party-mode with the planning team to brainstorm features"
 
 ```
 You: "Have Winston review this system design"
-→ AI executes: { operation: "execute", agent: "architect", message: "..." }
+→ AI executes: { operation: "execute", agent: "architect" }
 → Winston provides architectural guidance
 ```
 

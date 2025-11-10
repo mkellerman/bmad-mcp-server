@@ -13,7 +13,7 @@
       "command": "node",
       "args": [
         "${workspaceFolder}/build/index.js",
-        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:/bmad",
+        "git+https://github.com/mkellerman/BMAD-METHOD#debug-agent-workflow:.bmad",
         "--mode=strict"
       ]
     }

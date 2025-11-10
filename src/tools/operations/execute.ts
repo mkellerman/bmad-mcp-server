@@ -1,14 +1,14 @@
 /**
  * BMAD Execute Operation
  *
- * Executes agents or workflows with user messages.
+ * Activates agents or workflows. Uses conversation history for context.
  * This operation PERFORMS ACTIONS and may have side effects (file creation, etc.).
  *
  * Execute targets:
- * - agent: Execute an agent with a user message
- * - workflow: Execute a workflow with context
+ * - agent: Activate an agent
+ * - workflow: Activate a workflow
  *
- * Returns execution result including any outputs or artifacts.
+ * Returns activation prompt with instructions for the LLM.
  *
  * ⚠️ WARNING: This operation may modify the workspace or create files.
  */
@@ -60,8 +60,6 @@ export interface ExecuteOperationParams {
   agent?: string;
   /** Workflow name (for type=workflow) */
   workflow?: string;
-  /** User message/context (optional - some agents/workflows may work without initial message) */
-  message?: string;
   /** Optional module hint for disambiguation */
   module?: string;
 }
@@ -97,7 +95,6 @@ export async function executeExecuteOperation(
   const execParams: ExecuteParams = {
     agent: params.agent,
     workflow: params.workflow,
-    message: params.message || '', // Default to empty string if not provided
     module: params.module,
   };
 
@@ -243,12 +240,9 @@ export function validateExecuteParams(params: unknown): string | undefined {
     return 'Must provide either agent or workflow parameter';
   }
 
-  // Message is optional, but if provided must be valid
-  if (p.message !== undefined) {
-    if (typeof p.message !== 'string') {
-      return 'Parameter "message" must be a string';
-    }
-    // Allow empty string - some agents/workflows might accept it
+  // CRITICAL: Cannot specify both agent and workflow together
+  if (p.agent && p.workflow) {
+    return 'Cannot specify both "agent" and "workflow" parameters. Use workflow for workflow execution, or agent for direct agent execution.';
   }
 
   // Validate parameter types
@@ -264,9 +258,13 @@ export function validateExecuteParams(params: unknown): string | undefined {
     return 'Parameter "module" must be a string';
   }
 
-  // Module is required for execute operations
-  if (!p.module) {
-    return 'Missing required parameter: module (required for execute operations to ensure proper discovery)';
+  // Module is now OPTIONAL - server will auto-discover
+  // Only validate if provided
+  if (p.module) {
+    const validModules = ['core', 'bmm', 'cis'];
+    if (!validModules.includes(p.module)) {
+      return `Invalid module: ${p.module}. Must be one of: ${validModules.join(', ')}`;
+    }
   }
 
   return undefined;
@@ -277,8 +275,8 @@ export function validateExecuteParams(params: unknown): string | undefined {
  */
 export function getExecuteExamples(): string[] {
   return [
-    'Execute agent: { operation: "execute", agent: "analyst", module: "bmm", message: "Help me brainstorm a mobile app" }',
-    'Execute workflow: { operation: "execute", workflow: "prd", module: "bmm", message: "Create PRD for e-commerce platform" }',
-    'Execute agent without message: { operation: "execute", agent: "bmad-master", module: "core" }',
+    'Execute agent: { operation: "execute", agent: "analyst", module: "bmm" }',
+    'Execute workflow (auto-discover module): { operation: "execute", workflow: "party-mode" }',
+    'Execute workflow (explicit module): { operation: "execute", workflow: "prd", module: "bmm" }',
   ];
 }
