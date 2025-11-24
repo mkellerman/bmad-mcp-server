@@ -16,7 +16,7 @@ jobs:
     if: github.event.release.prerelease == false
     steps:
       - name: Checkout at release tag
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
