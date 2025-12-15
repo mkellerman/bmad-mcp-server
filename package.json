@@ -55,7 +55,7 @@
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.9.1",
+    "@types/node": "^25.0.2",
     "@vitest/coverage-v8": "^4.0.3",
     "@vitest/ui": "^4.0.3",
     "dotenv": "^17.2.3",
