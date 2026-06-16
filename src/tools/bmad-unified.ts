@@ -568,11 +568,21 @@ async function handleExecute(
   // Execute operation
   const result = await executeExecuteOperation(engine, execParams);
 
+  // Some execute targets build an empty prompt, leaving result.text undefined at
+  // runtime (BMADResult types it as a string, but the prompt builder can yield
+  // nothing). Emitting a content block with text: undefined violates the MCP
+  // result schema and surfaces as "-32602 invalid_union" on the client. Fall back
+  // to a non-empty string so the result always validates. See issue #35.
+  const text =
+    typeof result.text === 'string'
+      ? result.text
+      : result.error ?? JSON.stringify(result.data ?? result);
+
   return {
     content: [
       {
         type: 'text',
-        text: result.text,
+        text,
       },
     ],
   };
