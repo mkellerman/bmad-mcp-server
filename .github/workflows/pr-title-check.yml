@@ -16,7 +16,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check PR title format
-        uses: amannn/action-semantic-pull-request@v5
+        uses: amannn/action-semantic-pull-request@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -101,7 +101,7 @@ jobs:
           fi
 
       - name: Comment version info
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const bump = '${{ steps.version.outputs.bump }}';

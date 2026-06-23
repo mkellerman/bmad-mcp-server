@@ -36,7 +36,7 @@ jobs:
           persist-credentials: true
 
       - name: Download build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: build-${{ github.sha }}
           path: .
@@ -119,7 +119,7 @@ jobs:
             --prerelease
 
       - name: Comment on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const tag = '${{ steps.create_tag.outputs.tag_name }}';
