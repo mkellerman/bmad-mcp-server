@@ -1,0 +1,3 @@
+name,description,module,path,standalone
+"debug-session","Interactive debugging workflow unique to custom","core","bmad/core/workflows/debug-session/workflow.yaml","true"
+"code-review","Custom code review workflow","core","bmad/core/workflows/code-review/workflow.yaml","true"

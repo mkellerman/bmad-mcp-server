@@ -63,14 +63,36 @@ try {
   console.error('❌ Error:', error.message);
 }
 
-console.log('\n=== Testing Tool Manifest (should error) ===');
+console.log('\n=== Testing Tool Manifest ===');
 try {
-  await client.readResource({
+  const toolManifest = await client.readResource({
     uri: 'bmad://_cfg/tool-manifest.csv',
   });
-  console.log('❌ Should have thrown error');
+
+  const content = toolManifest.contents[0].text;
+  const lines = content.split('\n');
+
+  console.log(`✅ Generated ${lines.length - 1} tool entries`);
+  console.log('\nFirst 5 lines:');
+  lines.slice(0, 5).forEach((line) => console.log(line));
 } catch (error) {
-  console.log('✅ Expected error:', error.message);
+  console.error('❌ Error:', error.message);
+}
+
+console.log('\n=== Testing Task Manifest ===');
+try {
+  const taskManifest = await client.readResource({
+    uri: 'bmad://_cfg/task-manifest.csv',
+  });
+
+  const content = taskManifest.contents[0].text;
+  const lines = content.split('\n');
+
+  console.log(`✅ Generated ${lines.length - 1} task entries`);
+  console.log('\nFirst 5 lines:');
+  lines.slice(0, 5).forEach((line) => console.log(line));
+} catch (error) {
+  console.error('❌ Error:', error.message);
 }
 
 await client.close();

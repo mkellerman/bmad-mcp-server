@@ -30,7 +30,8 @@ describe('ResourceLoader (Lite)', () => {
       'name: test-workflow\ndescription: Test workflow',
     );
 
-    loader = new ResourceLoaderGit(testDir);
+    // Use 'local' mode to isolate from environment (no ~/.bmad, no git remotes)
+    loader = new ResourceLoaderGit(testDir, undefined, 'local');
   });
 
   afterEach(() => {

@@ -43,10 +43,10 @@ Single `bmad` tool with intelligent operations:
 { operation: "list", query: "agents" }
 
 // Read agent details (no execution)
-{ operation: "read", type: "agent", agent: "analyst" }
+{ operation: "read", agent: "analyst" }
 
-// Execute agent with context
-{ operation: "execute", agent: "analyst", message: "Help me..." }
+// Execute agent (uses conversation history for context)
+{ operation: "execute", agent: "analyst" }
 ```
 
 ### 11 Specialized Agents
@@ -220,7 +220,7 @@ Just ask your AI assistant naturally - it handles the MCP tool calls automatical
 
 ```
 You: "Ask Mary to analyze the market opportunity for a SaaS product"
-→ AI executes: { operation: "execute", agent: "analyst", message: "..." }
+→ AI executes: { operation: "execute", agent: "analyst" }
 → Mary (Business Analyst) provides market analysis
 ```
 
@@ -228,7 +228,7 @@ You: "Ask Mary to analyze the market opportunity for a SaaS product"
 
 ```
 You: "Start a PRD workflow for a task management app"
-→ AI executes: { operation: "execute", workflow: "prd", message: "..." }
+→ AI executes: { operation: "execute", workflow: "prd" }
 → John (Product Manager) guides you through PRD creation
 ```
 
@@ -236,7 +236,7 @@ You: "Start a PRD workflow for a task management app"
 
 ```
 You: "Ask Diana to debug this script" (with code attached)
-→ AI executes: { operation: "execute", agent: "debug", message: "..." }
+→ AI executes: { operation: "execute", agent: "debug" }
 → Diana starts comprehensive debugging workflow
 ```
 
@@ -244,7 +244,7 @@ You: "Ask Diana to debug this script" (with code attached)
 
 ```
 You: "Start party-mode with the planning team to brainstorm features"
-→ AI executes: { operation: "execute", workflow: "party-mode", message: "..." }
+→ AI executes: { operation: "execute", workflow: "party-mode" }
 → Multiple agents collaborate on brainstorming session
 ```
 
@@ -252,7 +252,7 @@ You: "Start party-mode with the planning team to brainstorm features"
 
 ```
 You: "Have Winston review this system design"
-→ AI executes: { operation: "execute", agent: "architect", message: "..." }
+→ AI executes: { operation: "execute", agent: "architect" }
 → Winston provides architectural guidance
 ```
 
@@ -347,9 +347,23 @@ The server searches for BMAD content in this order:
 
 ## Documentation
 
-- **[Architecture](./docs/architecture.md)** - System design and components
-- **[API Contracts](./docs/api-contracts.md)** - MCP tools and TypeScript APIs
-- **[Development Guide](./docs/development-guide.md)** - Contributing and testing
+**Core Documentation:**
+
+- **[Product Overview](./docs/README.md)** - Vision, principles, and value proposition
+- **[Architecture](./docs/architecture.md)** - Pure Delivery Proxy design
+- **[API Reference](./docs/api.md)** - MCP tool interface and contracts
+- **[Development Guide](./docs/development.md)** - Setup, testing, contributing
+
+**Architecture Decisions:**
+
+- **[ADR-001: Pure Delivery Proxy](./docs/adr/001-pure-delivery-proxy.md)** - Core architecture pattern
+- **[ADR-002: Session-Based Ranking](./docs/adr/002-session-based-ranking.md)** - Intelligent recommendations
+- **[ADR-003: LLM Sampling](./docs/adr/003-llm-sampling.md)** - Hybrid ranking strategy
+- **[All ADRs](./docs/adr/)** - Complete architecture decision records
+
+**Reference Materials:**
+
+- **[BMAD Dynamic Prompts](./docs/research/bmad-dynamic-prompts.md)** - Understanding BMAD's prompt engineering
 - **[Release Process](./.github/RELEASE_PROCESS.md)** - Release workflow for maintainers
 
 ---
@@ -418,7 +432,26 @@ npm run test:e2e
 
 # Watch mode
 npm run test:watch
+
+# Interactive UI
+npm run test:ui
+
+# Generate Allure reports (requires Java)
+npm run test:allure        # Run tests + generate + open report
+npm run test:allure:serve  # Serve existing results
+npm run test:report        # Generate report from existing results
 ```
+
+**📊 View Test Reports:**
+
+- **JUnit XML:** `test-results/junit.xml` (for CI/CD)
+- **Coverage:** `coverage/index.html` (line coverage)
+- **Allure:** `allure-report/index.html` (interactive reports)
+
+**Requirements:**
+
+- Java 17+ required for Allure reports (one-time install)
+- Install: `brew install openjdk@17` (macOS)
 
 ---
 

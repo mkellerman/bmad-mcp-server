@@ -6,10 +6,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export interface MCPToolResult {
   content: string;
@@ -31,12 +27,12 @@ export class MCPClientFixture {
 
   async setup() {
     // Path to the built server
-    const serverPath = path.join(__dirname, '../../build/index.js');
+    const serverPath = path.join(process.cwd(), 'build/index.js');
 
     // Create transport
     // The server looks for {projectRoot}/bmad/, so we point to the fixtures directory
     // which contains bmad/
-    const bmadSamplePath = path.join(__dirname, '../fixtures');
+    const bmadSamplePath = path.join(process.cwd(), 'tests/fixtures');
 
     this.transport = new StdioClientTransport({
       command: 'node',

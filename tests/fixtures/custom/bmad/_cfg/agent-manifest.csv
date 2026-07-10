@@ -1,0 +1,3 @@
+name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
+"debug","Debug Assistant","Debug Helper","🐛","Debugging Specialist","Expert at finding and fixing bugs","Technical and precise","Always verify assumptions","core","bmad/core/agents/debug.md"
+"shard-doc","Shard Doc (Custom)","Custom shard doc - should be overridden","📄","Document Processor","Shard processor","Direct","Custom version","core","bmad/core/agents/shard-doc.md"

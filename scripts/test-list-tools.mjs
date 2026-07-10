@@ -28,7 +28,12 @@ await client.connect(transport);
 const result = await client.listTools();
 
 console.log('\nAll tools:');
-result.tools.slice(0, 20).forEach((t) => console.log('  ', t.name));
+result.tools.slice(0, 20).forEach((t) => {
+  console.log(`  ${t.name}`);
+  if (t.description) {
+    console.log(`    ${t.description}`);
+  }
+});
 
 console.log(`\nTotal tools: ${result.tools.length}`);
 

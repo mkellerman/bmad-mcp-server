@@ -12,8 +12,11 @@
  *   # List all tools
  *   node scripts/bmad-cli.mjs tools/list
  *
- *   # Call a tool
- *   node scripts/bmad-cli.mjs tools/call '{"name":"bmad-resources","arguments":{"operation":"agents"}}'
+ *   # Call bmad tool to list agents
+ *   node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"list","query":"agents"}}'
+ *
+ *   # Call bmad tool to execute workflow
+ *   node scripts/bmad-cli.mjs tools/call '{"name":"bmad","arguments":{"operation":"execute","workflow":"prd","message":"Create PRD"}}'
  *
  *   # List resources
  *   node scripts/bmad-cli.mjs resources/list
@@ -54,12 +57,14 @@ function parseArgs(argv) {
     console.error('  # List all tools');
     console.error('  node scripts/bmad-cli.mjs tools/list');
     console.error('');
-    console.error('  # Get tool description');
-    console.error('  node scripts/bmad-cli.mjs tools/list --raw');
-    console.error('');
-    console.error('  # Call bmad-resources to list agents');
+    console.error('  # Call bmad tool to list agents');
     console.error(
-      '  node scripts/bmad-cli.mjs tools/call \'{"name":"bmad-resources","arguments":{"operation":"agents"}}\'',
+      '  node scripts/bmad-cli.mjs tools/call \'{"name":"bmad","arguments":{"operation":"list","query":"agents"}}\'',
+    );
+    console.error('');
+    console.error('  # Call bmad tool to execute workflow');
+    console.error(
+      '  node scripts/bmad-cli.mjs tools/call \'{"name":"bmad","arguments":{"operation":"execute","workflow":"prd"}}\'',
     );
     console.error('');
     console.error('  # List all resources');
