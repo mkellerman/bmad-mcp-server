@@ -1,0 +1,14 @@
+name: debug-session
+description: Interactive debugging workflow unique to custom fixture
+version: '1.0'
+standalone: true
+
+steps:
+  - name: reproduce
+    description: Reproduce the bug
+  - name: analyze
+    description: Analyze the issue
+  - name: fix
+    description: Apply the fix
+  - name: verify
+    description: Verify the solution

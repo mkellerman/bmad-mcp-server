@@ -21,9 +21,17 @@ System architecture, components, design principles, and data flow.
 
 MCP tools API, resources, prompts, completions, and TypeScript APIs.
 
-### � [Development Guide](./development-guide.md)
+### 🔧 [Development Guide](./development-guide.md)
 
 Development workflow, testing, building, contributing, and troubleshooting.
+
+### 🧪 [CLI Testing Guide](./cli-testing-guide.md)
+
+**NEW** - Command-line testing methodology using JSON-RPC and jq for fast, scriptable testing.
+
+### 📋 [MCP Protocol Test Strategy](./test-strategy-mcp-protocol.md)
+
+**NEW** - Comprehensive test strategy integrating CLI methodology with automated quality gates.
 
 ---
 

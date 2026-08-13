@@ -28,6 +28,7 @@ import { join } from 'path';
 import * as clack from '@clack/prompts';
 import pc from 'picocolors';
 import { BMADEngine } from './core/bmad-engine.js';
+import type { DiscoveryMode } from './types/index.js';
 
 // ============================================================================
 // Types
@@ -41,6 +42,7 @@ interface CliArgs {
   query?: string;
   type?: 'agents' | 'workflows' | 'all';
   json?: boolean;
+  mode?: DiscoveryMode;
 }
 
 // ============================================================================
@@ -108,7 +110,7 @@ async function main() {
   const args = parseArgs();
 
   // Initialize engine (silent in CLI mode, with spinner in interactive)
-  const engine = await initializeEngine(args.json === true);
+  const engine = await initializeEngine(args.json === true, args.mode);
 
   // Route to CLI or TUI
   if (args.command) {
@@ -122,13 +124,16 @@ async function main() {
 // Engine Initialization
 // ============================================================================
 
-async function initializeEngine(silent: boolean): Promise<BMADEngine> {
+async function initializeEngine(
+  silent: boolean,
+  mode?: DiscoveryMode,
+): Promise<BMADEngine> {
   const bmadRoot = loadBmadRoot();
   const gitRemotes = process.argv
     .slice(2)
     .filter((arg) => arg.startsWith('git+'));
 
-  const engine = new BMADEngine(bmadRoot, gitRemotes);
+  const engine = new BMADEngine(bmadRoot, gitRemotes, mode);
 
   if (silent) {
     await engine.initialize();
@@ -334,6 +339,26 @@ function parseArgs(): CliArgs {
 
     if (arg === '--json') {
       args.json = true;
+    } else if (arg.startsWith('--mode=')) {
+      const mode = arg.slice(7);
+      if (
+        mode === 'strict' ||
+        mode === 'local' ||
+        mode === 'user' ||
+        mode === 'auto'
+      ) {
+        args.mode = mode;
+      }
+    } else if (arg === '--mode') {
+      const mode = cleanArgs[++i];
+      if (
+        mode === 'strict' ||
+        mode === 'local' ||
+        mode === 'user' ||
+        mode === 'auto'
+      ) {
+        args.mode = mode;
+      }
     } else if (arg.startsWith('--message=')) {
       args.message = arg.slice(10);
     } else if (arg === '--message' || arg === '-m') {

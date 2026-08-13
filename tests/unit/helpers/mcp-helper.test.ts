@@ -13,13 +13,9 @@ import {
   validateMCPResult,
 } from '../../framework/helpers/mcp-helper.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const serverPath = path.join(__dirname, '../../build/index.js');
-const bmadSamplePath = path.join(__dirname, '../../.bmad/6.0.0-alpha.0/bmad');
+const serverPath = path.join(process.cwd(), 'build/index.js');
+const bmadSamplePath = path.join(process.cwd(), '.bmad/6.0.0-alpha.0/bmad');
 
 let serverAvailable = false;
 

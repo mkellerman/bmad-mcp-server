@@ -1,0 +1,4 @@
+<tool>
+  <name>test-analyzer</name>
+  <description>Analyzes test coverage and quality metrics</description>
+</tool>

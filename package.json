@@ -1,28 +1,28 @@
 {
   "name": "bmad-mcp-server",
-  "version": "2.1.0",
+  "version": "3.0.1",
   "description": "Model Context Protocol server for BMAD methodology",
   "type": "module",
   "bin": {
     "bmad-mcp-server": "./build/index.js",
-    "bmad": "./build/cli.js"
+    "bmad-cli": "./build/cli-tester.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x build/index.js && chmod +x build/cli.js",
+    "build": "tsc && chmod +x build/index.js && chmod +x build/cli.js && chmod +x build/cli-tester.js",
     "clean": "rm -rf build/ coverage/ test-results/ .bmad/cache/",
     "clean:all": "npm run clean && rm -rf node_modules/ package-lock.json",
     "prepare": "npm run build || true",
     "start": "node build/index.js",
     "dev": "tsx src/index.ts",
-    "test": "vitest run tests/unit tests/integration",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage tests/unit tests/integration",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "test:e2e": "vitest run tests/e2e",
+    "test": "npm run test:clean && vitest run tests/unit tests/integration",
+    "test:watch": "npm run test:clean && vitest",
+    "test:ui": "npm run test:clean && vitest --ui",
+    "test:coverage": "npm run test:clean && vitest run --coverage tests/unit tests/integration",
+    "test:unit": "npm run test:clean && vitest run tests/unit",
+    "test:integration": "npm run test:clean && vitest run tests/integration",
+    "test:e2e": "npm run test:clean && vitest run tests/e2e",
     "test:llm": "npm run test:e2e",
-    "test:all": "npm run test:unit; npm run test:integration; npm run test:e2e",
+    "test:all": "npm run test:clean && npm run test:unit; npm run test:integration; npm run test:e2e",
     "test:clean": "rm -rf test-results/.results/default* test-results/.results/unit* test-results/.results/integration* test-results/.results/e2e* test-results/test-results.* coverage/",
     "test:litellm-start": "docker-compose -f tests/e2e/framework/docker-compose.yml up -d",
     "test:litellm-stop": "docker-compose -f tests/e2e/framework/docker-compose.yml down",
@@ -36,15 +36,23 @@
     "cli:list-tools": "node scripts/bmad-cli.mjs tools/list",
     "cli:list-resources": "node scripts/bmad-cli.mjs resources/list",
     "cli:list-agents": "node scripts/show-list-agents.mjs",
-    "cli:list-workflows": "node scripts/show-list-workflows.mjs"
+    "cli:list-workflows": "node scripts/show-list-workflows.mjs",
+    "mcp": "node build/cli-tester.js",
+    "mcp:tools": "node build/cli-tester.js tools",
+    "mcp:resources": "node build/cli-tester.js resources",
+    "mcp:agents": "node build/cli-tester.js agents",
+    "mcp:workflows": "node build/cli-tester.js workflows"
   },
   "files": [
     "build/"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "bmad-method": "alpha",
+    "commander": "^12.1.0",
     "csv-parse": "^6.1.0",
     "fast-xml-parser": "^5.3.1",
+    "fs-extra": "^11.2.0",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
@@ -54,6 +62,7 @@
     "@eslint/js": "^9.38.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
+    "@types/fs-extra": "^11.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.9.1",
     "@vitest/coverage-v8": "^4.0.3",
